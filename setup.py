@@ -1,0 +1,15 @@
+import sys
+
+from skbuild import setup
+from setuptools import find_packages
+
+
+setup(
+    name="helfrich",
+    version="0.0.1",
+    description='Evaluation of the helfrich bending energy using OpenMesh',
+    author='Sebastian Kehl',
+    license="MIT",
+    packages=find_packages(),
+    cmake_install_dir="helfrich",
+)
