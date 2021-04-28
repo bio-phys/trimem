@@ -23,8 +23,8 @@ def tube(radius, n):
     # mesh, energy/kappa, surf, vol, curv
     return tri, np.pi/r, 2*np.pi*r, 2/3*np.pi*r**2, np.pi
 
-r = 0.5
-n = 16
+r = 1.0
+n = 32
 
 tri, e_ref, s_ref, v_ref, c_ref = sphere(r, n)
 #tri, e_ref, s_ref, v_ref, c_ref = tube(r, n)
@@ -64,10 +64,24 @@ print("time elapsed: {}".format(dt))
 # edge based evaluation in c++
 start = time.time()
 for i in range(10):
-    m,s,v,c = cppenergy.calc_energy_v(tri, 1.0)
+    m,s,v,c = cppenergy.calc_energy(tri, 1.0)
 dt = time.time()-start
 
 print("\n-- edge-based (c++)")
+print("Energy:    {} (={})".format(m, e_ref))
+print("Surface:   {} (={})".format(s, s_ref))
+print("Volume:    {} (={}".format(v, v_ref))
+print("Curvature: {} (={})".format(c, c_ref))
+print("time elapsed: {}".format(dt))
+
+# ---------------------------------------------------------------------------- #
+# vertex based evaluation in c++
+start = time.time()
+for i in range(10):
+    m,s,v,c = cppenergy.calc_energy_v(tri, 1.0)
+dt = time.time()-start
+
+print("\n-- vertex-based (c++)")
 print("Energy:    {} (={})".format(m, e_ref))
 print("Surface:   {} (={})".format(s, s_ref))
 print("Volume:    {} (={}".format(v, v_ref))
