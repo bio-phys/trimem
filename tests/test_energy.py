@@ -6,37 +6,70 @@ import meshzoo
 
 import time
 
-# unit sphere
-points, cells = meshzoo.icosa_sphere(32)
-tri = om.TriMesh(points, cells)
+
+def sphere(radius, n):
+    """Get sphere mesh with analytical reference values."""
+    points, cells = meshzoo.icosa_sphere(n)
+    tri = om.TriMesh(points*r, cells)
+    print("\nGenerating sphere with {} vertices.".format(tri.n_vertices()))
+    # mesh, energy/kappa, surf, vol, curv
+    return tri, 8*np.pi, 4*np.pi*r**2, 4/3*np.pi*r**3, 4*np.pi*r
+
+def tube(radius, n):
+    """Get tube mesh with analytical reference values."""
+    points, cells = meshzoo.tube(length=1, radius=radius, n=n)
+    tri = om.TriMesh(points, cells)
+    print("\nGenerating tube with {} vertices.".format(tri.n_vertices()))
+    # mesh, energy/kappa, surf, vol, curv
+    return tri, np.pi/r, 2*np.pi*r, 2/3*np.pi*r**2, np.pi
+
+r = 0.5
+n = 16
+
+tri, e_ref, s_ref, v_ref, c_ref = sphere(r, n)
+#tri, e_ref, s_ref, v_ref, c_ref = tube(r, n)
+
+# write mesh for debugging
 om.write_mesh("test.stl", tri)
-print(tri.n_vertices())
 
-m, s, v, c = pyenergy.calc_energy(tri, 1.0)
-
+# ---------------------------------------------------------------------------- #
+# edge based evaluation in python
 start = time.time()
 for i in range(10):
     m,s,v,c = pyenergy.calc_energy(tri, 1.0)
 dt = time.time()-start
 
-print("--")
-print("Energy:", m)
-print("Surface: {} (4*pi={})".format(s, 4*np.pi))
-print("Volume: {} (4/3*pi={}".format(v, 4/3*np.pi))
-print("Curvature: {} (4*pi={})".format(c, 4*np.pi))
+print("\n-- edge-based (python)")
+print("Energy:    {} (={})".format(m, e_ref))
+print("Surface:   {} (={})".format(s, s_ref))
+print("Volume:    {} (={}".format(v, v_ref))
+print("Curvature: {} (={})".format(c, c_ref))
 print("time elapsed: {}".format(dt))
 
-
-m, s, v, c = pyenergy.calc_energy(tri, 1.0)
-
+# ---------------------------------------------------------------------------- #
+# vertex based evaluation in python
 start = time.time()
 for i in range(10):
-    m = cppenergy.print_mesh(tri, 1.0)
+    m,s,v,c = pyenergy.calc_energy_v(tri, 1.0)
 dt = time.time()-start
 
-print("--")
-print("Energy:", m)
-#print("Surface: {} (4*pi={})".format(s, 4*np.pi))
-#print("Volume: {} (4/3*pi={}".format(v, 4/3*np.pi))
-#print("Curvature: {} (4*pi={})".format(c, 4*np.pi))
+print("\n-- vertex-based (python)")
+print("Energy:    {} (={})".format(m, e_ref))
+print("Surface:   {} (={})".format(s, s_ref))
+print("Volume:    {} (={}".format(v, v_ref))
+print("Curvature: {} (={})".format(c, c_ref))
+print("time elapsed: {}".format(dt))
+
+# ---------------------------------------------------------------------------- #
+# edge based evaluation in c++
+start = time.time()
+for i in range(10):
+    m,s,v,c = cppenergy.calc_energy_v(tri, 1.0)
+dt = time.time()-start
+
+print("\n-- edge-based (c++)")
+print("Energy:    {} (={})".format(m, e_ref))
+print("Surface:   {} (={})".format(s, s_ref))
+print("Volume:    {} (={}".format(v, v_ref))
+print("Curvature: {} (={})".format(c, c_ref))
 print("time elapsed: {}".format(dt))
