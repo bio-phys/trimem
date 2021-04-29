@@ -106,10 +106,34 @@ int check_edge_lengths(TriMesh& mesh, real min_tether, real max_tether)
     return invalid_edges;
 }
 
+int flip_edges(TriMesh& mesh)
+{
+    int flips = 0;
+    for (int i=0; i<mesh.n_edges(); i++)
+    {
+        auto eh = mesh.edge_handle(i);
+        real el = mesh.calc_edge_length(eh);
+        if (mesh.is_flip_ok(eh))
+        {
+            mesh.flip(eh);
+            real el_new = mesh.calc_edge_length(eh);
+            if (el_new > el)
+            {
+                mesh.flip(eh);
+            }
+            else
+                flips += 1;
+        }
+    }
+
+    return flips;
+}
+
 PYBIND11_MODULE(test, m) {
     m.doc() = "pybind11 example plugin"; // optional module docstring
 
     m.def("calc_energy", &energy, "Edge-based evaluation of the helfrich energy");
     m.def("calc_energy_v", &energy_v, "Vertex-based evaluation of the helfrich energy");
     m.def("check_edges", &check_edge_lengths, "Check for invalid edges");
+    m.def("flip_edges", &flip_edges, "Flip edges if convenient");
 }
