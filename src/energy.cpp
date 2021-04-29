@@ -90,9 +90,26 @@ std::tuple<real, real, real, real> energy_v(TriMesh& mesh, real kappa)
     return std::make_tuple(energy, surface, volume, curvature);
 }
 
+int check_edge_lengths(TriMesh& mesh, real min_tether, real max_tether)
+{
+    int invalid_edges = 0;
+
+    #pragma omp parallel for reduction(+:invalid_edges)
+    for (int i=0; i<mesh.n_edges(); i++)
+    {
+        auto eh = mesh.edge_handle(i);
+        auto el = mesh.calc_edge_length(eh);
+        if ((el<min_tether) or (el>max_tether))
+            invalid_edges += 1;
+    }
+
+    return invalid_edges;
+}
+
 PYBIND11_MODULE(test, m) {
     m.doc() = "pybind11 example plugin"; // optional module docstring
 
     m.def("calc_energy", &energy, "Edge-based evaluation of the helfrich energy");
     m.def("calc_energy_v", &energy_v, "Vertex-based evaluation of the helfrich energy");
+    m.def("check_edges", &check_edge_lengths, "Check for invalid edges");
 }
