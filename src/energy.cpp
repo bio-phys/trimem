@@ -117,7 +117,7 @@ int flip_edges(TriMesh& mesh, real min_tether, real max_tether)
         {
             mesh.flip(eh);
             real el_new = mesh.calc_edge_length(eh);
-            if ((el_new > el) or ((el<min_tether) or (el>max_tether)) )
+            if ((el_new > el) or ((el_new<min_tether) or (el_new>max_tether)) )
             {
                 mesh.flip(eh);
             }
