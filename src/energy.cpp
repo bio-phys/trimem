@@ -10,6 +10,7 @@
 
 #include "pybind11/pybind11.h"
 #include <pybind11/numpy.h>
+#include <pybind11/iostream.h>
 
 
 typedef double real;
@@ -660,7 +661,9 @@ PYBIND11_MODULE(test, m) {
         .def(py::init<real, real, real, real, real, real, real>())
         .def("get_energy", &EnergyValueStore::get_energy)
         .def("init", &EnergyValueStore::init)
-        .def("print_info", &EnergyValueStore::print_info)
+        .def("print_info", &EnergyValueStore::print_info,
+              py::call_guard<py::scoped_ostream_redirect,
+              py::scoped_estream_redirect>())
         .def_readwrite("energy", &EnergyValueStore::energy)
         .def_readwrite("area", &EnergyValueStore::area)
         .def_readwrite("volume", &EnergyValueStore::volume)
@@ -668,7 +671,6 @@ PYBIND11_MODULE(test, m) {
         .def_readwrite("ref_area", &EnergyValueStore::ref_area)
         .def_readwrite("ref_volume", &EnergyValueStore::ref_volume)
         .def_readwrite("ref_curvature", &EnergyValueStore::ref_curvature);
-
 
     // test volumes
     m.def("volume_v", &volume_v, "Volume based on triangle volumes.");
