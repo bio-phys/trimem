@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.18)
 project(test)
 
+set(CMAKE_CXX_STANDARD 11)
+
 find_package(Python COMPONENTS Interpreter Development)
 find_package(OpenMP)
 
