@@ -650,7 +650,7 @@ int flip_serial(TriMesh& mesh,
     return flips;
 }
 
-PYBIND11_MODULE(test, m) {
+PYBIND11_MODULE(_core, m) {
     m.doc() = "pybind11 example plugin"; // optional module docstring
 
     // energy stuff

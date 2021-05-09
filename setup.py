@@ -10,6 +10,8 @@ setup(
     description='Evaluation of the helfrich bending energy using OpenMesh',
     author='Sebastian Kehl',
     license="MIT",
-    packages=find_packages(),
-    cmake_install_dir="helfrich",
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
+    cmake_install_dir="src/helfrich",
+    include_package_data=True,
 )
