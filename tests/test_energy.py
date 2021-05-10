@@ -1,6 +1,6 @@
 import helfrich.openmesh as om
 import helfrich.energy as pyenergy
-import helfrich.test as cppenergy
+import helfrich as cppenergy
 import numpy as np
 import meshzoo
 

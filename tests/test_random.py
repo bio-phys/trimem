@@ -1,3 +1,3 @@
-import helfrich.test as test
+import helfrich as test
 
 print(test.rand())

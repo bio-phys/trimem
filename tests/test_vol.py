@@ -1,5 +1,5 @@
 import helfrich.openmesh as om
-import helfrich.test as test
+import helfrich as test
 import meshzoo
 import numpy as np
 
