@@ -55,7 +55,9 @@ public:
     EnergyValueStore& operator=(const EnergyValueStore& e) = default;
 
     // init values from mesh
-    void init(TriMesh& mesh)
+    void init(TriMesh& mesh,
+              const real& ref_delta = 1.0,
+              const real& ref_lambda = 0.0)
     {
         // evaluate initial properties
         std::tie(energy, area, volume, curvature) = properties_vv(mesh);
@@ -64,15 +66,38 @@ public:
         target_volume_    = volume * volume_frac_;
         target_curvature_ = curvature * curvature_frac_;
 
-        area_diff_      = area - target_area_;
-        volume_diff_    = volume - target_volume_;
-        curvature_diff_ = curvature - target_curvature_;
+        init_area_      = area;
+        init_volume_    = volume;
+        init_curvature_ = curvature;
 
-        ref_volume = target_volume_;
-        ref_area   = target_area_;
-        ref_curvature = target_curvature_;
+        ref_delta_  = ref_delta;
+        ref_lambda_ = ref_lambda;
+        if (ref_delta_ > 1.0)
+            throw std::runtime_error("Use ref_delta in range [0,1]");
+        if (ref_lambda_ > 1.0)
+            throw std::runtime_error("Use ref_lambda in range [0,1]");
+        set_references(ref_lambda_);
 
         init_ = true;
+    }
+
+    void set_references(const real& lambda)
+    {
+        ref_volume      = (1.0 - lambda) * init_volume_ +
+                          lambda * target_volume_;
+        ref_area        = (1.0 - lambda) * init_area_ +
+                          lambda * target_area_;
+        ref_curvature   = (1.0 - lambda) * init_curvature_ +
+                          lambda * target_curvature_;
+    }
+
+    void update_references()
+    {
+        if (ref_lambda_ < 1.0)
+        {
+            ref_lambda_ += ref_delta_;
+            set_references(ref_lambda_);
+        }
     }
 
     real area_energy()
@@ -154,14 +179,17 @@ private:
     real target_volume_;
     real target_curvature_;
 
-    real area_diff_;
-    real volume_diff_;
-    real curvature_diff_;
+    real init_area_;
+    real init_volume_;
+    real init_curvature_;
 
     real kappa_b_;
     real kappa_a_;
     real kappa_v_;
     real kappa_c_;
+
+    real ref_lambda_ = 0.0;
+    real ref_delta_  = 1.0;
 
     bool init_ = false;
 };
@@ -660,7 +688,10 @@ PYBIND11_MODULE(_core, m) {
      py::class_<EnergyValueStore>(m, "EnergyValueStore")
         .def(py::init<real, real, real, real, real, real, real>())
         .def("get_energy", &EnergyValueStore::get_energy)
-        .def("init", &EnergyValueStore::init)
+        .def("init", &EnergyValueStore::init,
+              py::arg("mesh"), py::arg("ref_delta") = 1.0,
+              py::arg("ref_lambda") = 0.0)
+        .def("update_references", &EnergyValueStore::update_references)
         .def("print_info", &EnergyValueStore::print_info,
               py::call_guard<py::scoped_ostream_redirect,
               py::scoped_estream_redirect>())
