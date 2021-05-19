@@ -506,15 +506,16 @@ std::tuple<int, real, real> check_edge_lengths(TriMesh& mesh,
     return std::make_tuple(invalid_edges, min_edge, max_edge);
 }
 
-int move_serial(TriMesh& mesh,
-                EnergyValueStore& estore,
-                const py::array_t<int>& idx,
-                const py::array_t<real>& val,
-                const real& min_t,
-                const real& max_t,
-                const real& temp = 1.0)
+std::tuple<int, int> move_serial(TriMesh& mesh,
+                                 EnergyValueStore& estore,
+                                 const py::array_t<int>& idx,
+                                 const py::array_t<real>& val,
+                                 const real& min_t,
+                                 const real& max_t,
+                                 const real& temp = 1.0)
 {
-    int acc = 0;
+    int acc           = 0;
+    int invalid_edges = 0;
     std::uniform_real_distribution<real> accept_dist(0,1);
 
     // get proxy objects
@@ -540,10 +541,11 @@ int move_serial(TriMesh& mesh,
         mesh.set_point(vh, mesh.point(vh)+p);
 
         // check for invalid edges
-        int invalid_edges = check_edge_lengths_v(mesh, vh, min_t, max_t);
-        if (invalid_edges > 0)
+        int invalid_edges_v = check_edge_lengths_v(mesh, vh, min_t, max_t);
+        if (invalid_edges_v > 0)
         {
             mesh.set_point(vh, mesh.point(vh)-p);
+            invalid_edges += invalid_edges_v;
             continue;
         }
 
@@ -571,14 +573,14 @@ int move_serial(TriMesh& mesh,
         }
     }
 
-    return acc;
+    return std::make_tuple(acc, invalid_edges);
 }
 
-int move_global(TriMesh& mesh,
-                EnergyValueStore& estore,
-                const real& min_t,
-                const real& max_t,
-                const real& temp = 1.0)
+std::tuple<int, int> move_global(TriMesh& mesh,
+                                 EnergyValueStore& estore,
+                                 const real& min_t,
+                                 const real& max_t,
+                                 const real& temp = 1.0)
 {
     std::uniform_real_distribution<real> accept_dist(0,1);
 
@@ -586,7 +588,7 @@ int move_global(TriMesh& mesh,
     int num_invalid = std::get<0>(check_edge_lengths(mesh, min_t, max_t));
     if (num_invalid > 0)
     {
-        return 0;
+        return std::make_tuple(0, num_invalid);
     }
 
     EnergyValueStore estore_new = estore;
@@ -608,22 +610,23 @@ int move_global(TriMesh& mesh,
     if (u <= alpha)
     {
         estore = estore_new;
-        return 1;
+        return std::make_tuple(1,0);
     }
 
-    return 0;
+    return std::make_tuple(0, 0);
 }
 
-int flip_serial(TriMesh& mesh,
-                EnergyValueStore& estore,
-                const py::array_t<int>& idx,
-                const real& min_t,
-                const real& max_t,
-                const real& temp = 1.0)
+std::tuple<int, int> flip_serial(TriMesh& mesh,
+                                 EnergyValueStore& estore,
+                                 const py::array_t<int>& idx,
+                                 const real& min_t,
+                                 const real& max_t,
+                                 const real& temp = 1.0)
 {
     std::uniform_real_distribution<real> accept_dist(0.0,1.0);
 
     int flips = 0;
+    int invalid_edges = 0;
     auto r_idx = idx.unchecked<1>(); // check for ndim==1
     for (py::ssize_t i=0; i<r_idx.shape(0); i++)
     {
@@ -645,6 +648,7 @@ int flip_serial(TriMesh& mesh,
             if ((el<min_t) or (el>max_t))
             {
                 mesh.flip(eh);
+                invalid_edges += 1;
             }
             else
             {
@@ -675,7 +679,7 @@ int flip_serial(TriMesh& mesh,
         }
     }
 
-    return flips;
+    return std::make_tuple(flips, invalid_edges);
 }
 
 PYBIND11_MODULE(_core, m) {
