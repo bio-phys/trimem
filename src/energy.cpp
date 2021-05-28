@@ -9,8 +9,12 @@
 #include "OpenMesh/Core/Mesh/Handles.hh"
 
 #include "pybind11/pybind11.h"
-#include <pybind11/numpy.h>
-#include <pybind11/iostream.h>
+#include "pybind11/numpy.h"
+#include "pybind11/iostream.h"
+#include "pybind11/stl.h"
+
+#include "neighbour_list.h"
+#include "cell_list.h"
 
 
 typedef double real;
@@ -729,4 +733,64 @@ PYBIND11_MODULE(_core, m) {
     m.def("flip_serial", &flip_serial, "Test global flip markov step",
           py::arg("mesh"), py::arg("energy_store"), py::arg("idx"),
           py::arg("min_t"), py::arg("max_t"), py::arg("temp") = 1.0);
+
+
+    // reduced (self and one-ring excluded) neighbour list
+    py::class_<trimem::NeighbourLists<true,true>>(m, "rNeighbourList")
+        .def(py::init<const TriMesh&, double, double>(),
+             "Init verlet list.",
+             py::arg("mesh"), py::arg("rlist"), py::arg("eps") = 1.0e-6)
+        .def_readwrite("neighbours",
+                       &trimem::NeighbourLists<true,true>::neighbours)
+        .def("distance_matrix",
+             &trimem::NeighbourLists<true, true>::distance_matrix,
+             "Compute distance matrix.",
+             py::arg("mesh"), py::arg("dmax"))
+        .def("distance_counts",
+             &trimem::NeighbourLists<true, true>::distance_counts,
+             "Count distances <= dmax.",
+             py::arg("mesh"), py::arg("dmax"));
+
+    // standard neighbour list
+    py::class_<trimem::NeighbourLists<false,false>>(m, "NeighbourList")
+        .def(py::init<const TriMesh&, double, double>(),
+             "Init verlet list.",
+             py::arg("mesh"), py::arg("rlist"), py::arg("eps") = 1.0e-6)
+        .def_readwrite("neighbours",
+                       &trimem::NeighbourLists<false,false>::neighbours)
+        .def("distance_matrix",
+             &trimem::NeighbourLists<false, false>::distance_matrix,
+             "Compute distance matrix.",
+             py::arg("mesh"), py::arg("dmax"))
+        .def("distance_counts",
+             &trimem::NeighbourLists<false, false>::distance_counts,
+             "Count distances <= dmax.",
+             py::arg("mesh"), py::arg("dmax"));
+
+    // cell list
+    py::class_<trimem::CellList>(m, "CellList")
+        .def(py::init<const TriMesh&, double, double>(), "Init cell list",
+             py::arg("mesh"), py::arg("rlist"), py::arg("eps") = 1.0e-6)
+        .def_readwrite("cells", &trimem::CellList::cells)
+        .def_readwrite("points", &trimem::CellList::points)
+        .def_readwrite("shape", &trimem::CellList::shape)
+        .def_readwrite("strides", &trimem::CellList::strides)
+        .def_readwrite("r_list", &trimem::CellList::r_list)
+        .def_readwrite("cell_pairs", &trimem::CellList::cell_pairs)
+        .def("distance_matrix",
+             &trimem::CellList::distance_matrix<false, false>,
+             "Compute distance matrix.",
+             py::arg("mesh"), py::arg("dmax"))
+        .def("r_distance_matrix",
+             &trimem::CellList::distance_matrix<true, true>,
+             "Compute distance matrix with self and one-ring excluded.",
+             py::arg("mesh"), py::arg("dmax"))
+        .def("distance_counts",
+             &trimem::CellList::distance_counts<false, false>,
+             "Count distances <= dmax.",
+             py::arg("mesh"), py::arg("dmax"))
+        .def("r_distance_counts",
+             &trimem::CellList::distance_counts<true, true>,
+             "Count distances <= dmax (with self and one-ring excluded).",
+             py::arg("mesh"), py::arg("dmax"));
 }
