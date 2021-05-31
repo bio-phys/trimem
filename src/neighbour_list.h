@@ -1,5 +1,5 @@
-/** \file neighbours.h
- * \brief Neighbour list tools to be used with openmesh
+/** \file neighbour_list.h
+ * \brief Neighbour list tools to be used with openmesh.
  */
 #ifndef NEIGHBOURS_H
 #define NEIGHBOURS_H
@@ -94,6 +94,8 @@ struct NeighbourLists
 
     int distance_counts(const TriMesh& mesh, const double& dmax)
     {
+        double dmax2 = dmax * dmax;
+
         const TriMesh::Point& point = mesh.point(mesh.vertex_handle(0));
         const double *data = point.data();
 
@@ -112,7 +114,7 @@ struct NeighbourLists
                 const double* odata = data+*it*3;
 
                 // compute distance and count in case
-                double dist = distance<double>(idata, odata, 3);
+                double dist = squ_distance<double>(idata, odata, 3);
                 if (dist <= dmax)
                 {
                     ni += 1;

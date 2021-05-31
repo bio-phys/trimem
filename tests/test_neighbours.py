@@ -86,7 +86,7 @@ def valid_nlist():
 
     # check distance computation
     d,i,j = n.distance_matrix(mesh, 0.2)
-    A = coo_matrix((d,(i,j)))
+    A = coo_matrix((d,(i,j)), shape=(len(x),len(x)))
 
     plt.matshow(A.toarray())
     plt.show()
@@ -105,7 +105,7 @@ def check_scaling():
 
     dts_trimem = []
     dts_kdtree = []
-    dims = [2**3, 2**4, 2**5, 2**6, 2**7, 2**8]
+    dims = [2**3, 2**4, 2**5, 2**6, 2**7, 2**8, 2**9, 2**10]
     N    = [d**2 for d in dims] # mesh gen takes sqrt(n) as input
     for n in dims:
         mesh = get_mesh(n, constant_density=True)
@@ -113,6 +113,7 @@ def check_scaling():
 
         start = time()
         nl = m.CellList(mesh, 0.2)
+        secl = time()-start
 #        nl = m.NeighbourList(mesh, 0.2)
         d = nl.distance_counts(mesh, 0.2)
 #        d,i,j = m.distance_matrix(mesh, nl, 0.2)
@@ -120,14 +121,16 @@ def check_scaling():
 
         start = time()
         tree = KDTree(points)
+        setr = time()-start
         d = tree.count_neighbors(tree, 0.2)
-        print(d)
 #        d = tree.sparse_distance_matrix(tree, 0.2, output_type="coo_matrix")
         dts_kdtree.append(time()-start)
 
         print("Compute distances for {} vertices took:".format(n**2))
         print("  trimem {}s".format(dts_trimem[-1]))
         print("  kdtree {}s".format(dts_kdtree[-1]))
+        print("  setup cost clist(%) :", secl/dts_trimem[-1])
+        print("  setup cost kdtree(%):", setr/dts_kdtree[-1])
 
     # references
     cli = dts_trimem[0]/N[0]
@@ -149,15 +152,47 @@ def check_scaling():
 
 def test_3d():
     """Test in 3d."""
-    points, cells = meshzoo.icosa_sphere(8)
+    points, cells = meshzoo.icosa_sphere(20)
     mesh = om.TriMesh(points, cells)
+    x = mesh.points()
 
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    # cell list
+    c = m.CellList(mesh, 0.2)
+    print("Cells::shape:", c.shape)
+    print("Cells::stride:", c.strides)
+    print("Cells::r_list:", c.r_list)
+    print("len(Cells::pairs):", len(c.cell_pairs))
+
+    start = time()
+    d = c.distance_counts(mesh, 0.2)
+    dt = time()-start
+    print("Cells::count_distances (timeing):", dt)
+
+    #for vi in c.cells.values():
+    for vi in c.cells.values():
+        plt.plot(x[vi,0], x[vi,1], x[vi,2], '.')
+    plt.show()
+
+    # check distances
+    d,i,j = c.distance_matrix(mesh, 0.2)
+    A = coo_matrix((d,(i,j)), shape=(len(x),len(x)))
+    M = A + A.transpose()
+
+    tree = KDTree(x)
+    B = tree.sparse_distance_matrix(tree, 0.2)
+    plt.matshow(M.toarray()-B.toarray())
+    plt.show()
+
+    # check neighbour lists
     c = m.rNeighbourList(mesh, 0.2)
 
     start = time()
-    d = c.distance_counts(mesh, 0.01)
+    d = c.distance_counts(mesh, 0.2)
     dt = time()-start
-    print(d)
+    print("Nlist count distances:", dt)
 
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
@@ -165,7 +200,6 @@ def test_3d():
     x = points
     plt.plot(x[:,0], x[:,1], x[:,2], '.')
     plt.plot(x[25,0], x[25,1], x[25,2], 'o', color='b')
-    print(c.neighbours[25])
     for p in c.neighbours[25]:
         plt.plot(x[p,0], x[p,1], x[p,2], 'o', color='orange', alpha=0.3)
     plt.show()

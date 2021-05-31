@@ -772,7 +772,6 @@ PYBIND11_MODULE(_core, m) {
         .def(py::init<const TriMesh&, double, double>(), "Init cell list",
              py::arg("mesh"), py::arg("rlist"), py::arg("eps") = 1.0e-6)
         .def_readwrite("cells", &trimem::CellList::cells)
-        .def_readwrite("points", &trimem::CellList::points)
         .def_readwrite("shape", &trimem::CellList::shape)
         .def_readwrite("strides", &trimem::CellList::strides)
         .def_readwrite("r_list", &trimem::CellList::r_list)

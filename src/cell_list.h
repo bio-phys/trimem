@@ -1,5 +1,5 @@
-/** \file neighbours.h
- * \brief Neighbour list tools to be used with openmesh
+/** \file cell_list.h
+ * \brief Cell list algorithm that can be used with openmesh.
  */
 #ifndef CELL_LIST_H
 #define CELL_LIST_H
@@ -23,12 +23,22 @@ real distance(const real* avec, const real* bvec, int n)
     return std::sqrt(dist);
 }
 
+template<class real>
+real squ_distance(const real* avec, const real* bvec, int n)
+{
+    real dist=0.0;
+    for (int i=0; i<n; i++)
+    {
+        real di = avec[i] - bvec[i];
+        dist += di * di;
+    }
+    return dist;
+}
+
 struct CellList
 {
   //! cells -> points lookup
   std::map<int, std::vector<int> > cells;
-  //! points -> cells lookup
-  std::vector<int> points;
   //! shape of the cell array
   std::array<int, 3> shape;
   //! strides of cells-array
@@ -40,8 +50,8 @@ struct CellList
 
   CellList(const TriMesh& mesh, double rlist, double box_eps=1.0e-6)
   {
-      //compute box-dims
-      std::array<double, 3> box_min = { std::numeric_limits<double>::infinity() };
+      // compute box-dims
+      std::array<double, 3> box_min = { std::numeric_limits<double>::max() };
       std::array<double, 3> box_max = { -1 };
       for (int i=0; i<mesh.n_vertices(); i++)
       {
@@ -53,7 +63,7 @@ struct CellList
           }
       }
 
-      //adjust rlist per dimension and compute shape of cell_array
+      // adjust rlist per dimension and compute shape of cell_array
       std::array<int, 3> cell_min;
       for (int k=0; k<3; k++)
       {
@@ -63,33 +73,22 @@ struct CellList
           shape[k]    = (nk > 0) ? nk : 1;
           cell_min[k] = int(box_min[k] / r_list[k]);
       }
+      strides = { 1, shape[0], shape[0]*shape[1] };
 
-      // compute cell coordinates, i.e. (i,j,k)-triplets indexing into the array
-      std::vector<std::array<int,3>> cell_coords;
-      cell_coords.reserve(mesh.n_vertices());
+      // compute flat cell-array from cell-coordinates, i.e.
+      // (i,j,k) triplets to flat-index
       for (int i=0; i<mesh.n_vertices(); i++)
       {
           auto point = mesh.point(mesh.vertex_handle(i));
-          std::array<int, 3> icoords;
+          int id = 0;
           for (int k=0; k<3; k++)
           {
-              icoords[k] = int(point[k] / r_list[k]) - cell_min[k];
+              id += (int(point[k] / r_list[k]) - cell_min[k]) * strides[k];
           }
-          cell_coords.push_back(icoords);
+          cells[id].push_back(i);
       }
 
-      // compute linear cell indices and sort vertices into CellList
-      strides = { 1, shape[0], shape[0]*shape[1] };
-      points.reserve(mesh.n_vertices());
-      int point = 0;
-      for (auto it=cell_coords.begin(); it!=cell_coords.end(); ++it, ++point)
-      {
-          auto v = *it;
-          int id = v[0] * strides[0] + v[1] * strides[1] + v[2] * strides[1];
-          cells[id].push_back(point);
-          points.push_back(id);
-      }
-
+      // store unique pairs of neighbouring cells
       compute_cell_pairs();
   }
 
@@ -138,6 +137,9 @@ struct CellList
   template<bool exclude_self=true, bool exclude_one_ring=true>
   int distance_counts(const TriMesh& mesh, const double& rlist)
   {
+
+      double rlist2 = rlist * rlist;
+
       const TriMesh::Point& point = mesh.point(mesh.vertex_handle(0));
       const double *data = point.data();
 
@@ -148,6 +150,8 @@ struct CellList
           const std::vector<int>& icell = cells.at(it->first);
           const std::vector<int>& ocell = cells.at(it->second);
 
+          // symmetric (i.e. *i_it>*o_it) interactions can only be skipped
+          // for interactions within a cell.
           bool is_same_cell = ( it->first == it->second );
 
           // vertices in icell
@@ -185,8 +189,8 @@ struct CellList
                   const double* odata = data+*o_it*3;
 
                   // compute distance and count in case
-                  double  dist  = distance<double>(idata, odata, 3);
-                  if (dist <= rlist)
+                  double  dist  = squ_distance<double>(idata, odata, 3);
+                  if (dist <= rlist2)
                   {
                       ni+=2;
                   }
@@ -215,6 +219,8 @@ struct CellList
           const std::vector<int>& icell = cells.at(it->first);
           const std::vector<int>& ocell = cells.at(it->second);
 
+          // symmetric (i.e. *i_it>*o_it) interactions can only be skipped
+          // for interactions within a cell.
           bool is_same_cell = ( it->first == it->second );
 
           // vertices in icell
