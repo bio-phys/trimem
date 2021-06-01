@@ -46,8 +46,8 @@ struct CellList
   std::array<int, 3> strides;
   //! (adjusted) r_list per dimension
   std::array<double, 3> r_list;
-  //! minimum cell index in each dimension
-  std::array<int, 3> cell_min;
+  //! box
+  std::vector<std::array<double, 3>> box;
   //! cell pairs
   std::vector<std::pair<int, int>> cell_pairs;
 
@@ -73,7 +73,6 @@ struct CellList
           int nk     = int(dim/rlist);
           r_list[k]   = (nk > 0) ? dim/nk : box_eps;
           shape[k]    = (nk > 0) ? nk : 1;
-          cell_min[k] = int(box_min[k] / r_list[k]);
       }
       strides = { 1, shape[0], shape[0]*shape[1] };
 
@@ -85,13 +84,17 @@ struct CellList
           int id = 0;
           for (int k=0; k<3; k++)
           {
-              id += (int(point[k] / r_list[k]) - cell_min[k]) * strides[k];
+              id += int((point[k] - box_min[k]) / r_list[k]) * strides[k];
           }
           cells[id].push_back(i);
       }
 
       // store unique pairs of neighbouring cells
       compute_cell_pairs();
+
+      // keep box
+      box.push_back(box_min);
+      box.push_back(box_max);
   }
 
   void compute_cell_pairs()
@@ -210,7 +213,7 @@ struct CellList
       std::array<int,3> coords;
       for (int k=0; k<3; k++)
       {
-          coords[k] = (int(point[k] / r_list[k]) - cell_min[k]);
+          coords[k] = int((point[k] - box[0][k]) / r_list[k]);
       }
 
       double dmax2 = dmax * dmax;
