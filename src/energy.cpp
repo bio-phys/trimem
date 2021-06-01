@@ -828,8 +828,11 @@ PYBIND11_MODULE(_core, m) {
              "Count distances <= dmax.",
              py::arg("mesh"), py::arg("pid"), py::arg("dmax"));
 
+    // mesh constraint interface
+    py::class_<trimem::IMeshConstraint>(m, "IMeshConstraint");
+
     // mesh constraint using cell lists (with one-ring and self exclusion)
-    py::class_<trimem::MeshConstraintCL>(m, "MeshConstraintCL")
+    py::class_<trimem::MeshConstraintCL, trimem::IMeshConstraint>(m, "MeshConstraintCL")
         .def(py::init<const TriMesh&, const double&, const double&>(),
              "Init constraint",
              py::arg("mesh"), py::arg("rlist"), py::arg("dmax"))
@@ -844,7 +847,7 @@ PYBIND11_MODULE(_core, m) {
              py::arg("mesh"), py::arg("pid"));
 
     // mesh constraint using neighbour lists (with one-ring and self exclusion)
-    py::class_<trimem::MeshConstraintNL>(m, "MeshConstraintNL")
+    py::class_<trimem::MeshConstraintNL, trimem::IMeshConstraint>(m, "MeshConstraintNL")
         .def(py::init<const TriMesh&, const double&, const double&>(),
              "Init constraint",
              py::arg("mesh"), py::arg("rlist"), py::arg("dmax"))
