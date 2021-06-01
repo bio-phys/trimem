@@ -15,6 +15,7 @@
 
 #include "neighbour_list.h"
 #include "cell_list.h"
+#include "mesh_constraint.h"
 
 
 typedef double real;
@@ -516,6 +517,7 @@ std::tuple<int, int> move_serial(TriMesh& mesh,
                                  const py::array_t<real>& val,
                                  const real& min_t,
                                  const real& max_t,
+                                 const trimem::IMeshConstraint& constraint,
                                  const real& temp = 1.0)
 {
     int acc           = 0;
@@ -550,6 +552,13 @@ std::tuple<int, int> move_serial(TriMesh& mesh,
         {
             mesh.set_point(vh, mesh.point(vh)-p);
             invalid_edges += invalid_edges_v;
+            continue;
+        }
+
+        // check for mesh intersection
+        if (not constraint.check_local(mesh, vi))
+        {
+            mesh.set_point(vh, mesh.point(vh)-p);
             continue;
         }
 
@@ -726,7 +735,7 @@ PYBIND11_MODULE(_core, m) {
     m.def("move_serial", &move_serial, "Test single vertex markov step",
           py::arg("mesh"), py::arg("energy_store"), py::arg("idx"),
           py::arg("vals"), py::arg("min_t"), py::arg("max_t"),
-          py::arg("temp") = 1.0);
+          py::arg("mesh constraint"), py::arg("temp") = 1.0);
     m.def("move_global", &move_global, "Test global vertex markov step",
           py::arg("mesh"), py::arg("energy_store"), py::arg("min_t"),
           py::arg("max_t"), py::arg("temp") = 1.0);
@@ -736,60 +745,116 @@ PYBIND11_MODULE(_core, m) {
 
 
     // reduced (self and one-ring excluded) neighbour list
-    py::class_<trimem::NeighbourLists<true,true>>(m, "rNeighbourList")
+    py::class_<trimem::rNeighbourLists>(m, "rNeighbourList")
         .def(py::init<const TriMesh&, double, double>(),
              "Init verlet list.",
              py::arg("mesh"), py::arg("rlist"), py::arg("eps") = 1.0e-6)
         .def_readwrite("neighbours",
-                       &trimem::NeighbourLists<true,true>::neighbours)
+                       &trimem::rNeighbourLists::neighbours)
         .def("distance_matrix",
-             &trimem::NeighbourLists<true, true>::distance_matrix,
+             &trimem::rNeighbourLists::distance_matrix,
              "Compute distance matrix.",
              py::arg("mesh"), py::arg("dmax"))
         .def("distance_counts",
-             &trimem::NeighbourLists<true, true>::distance_counts,
+             &trimem::rNeighbourLists::distance_counts,
              "Count distances <= dmax.",
-             py::arg("mesh"), py::arg("dmax"));
+             py::arg("mesh"), py::arg("dmax"))
+        .def("point_distance_counts",
+             &trimem::rNeighbourLists::point_distance_counts,
+             "Count distances <= dmax.",
+             py::arg("mesh"), py::arg("pid"), py::arg("dmax"));
 
     // standard neighbour list
-    py::class_<trimem::NeighbourLists<false,false>>(m, "NeighbourList")
+    py::class_<trimem::fNeighbourLists>(m, "NeighbourList")
         .def(py::init<const TriMesh&, double, double>(),
              "Init verlet list.",
              py::arg("mesh"), py::arg("rlist"), py::arg("eps") = 1.0e-6)
         .def_readwrite("neighbours",
-                       &trimem::NeighbourLists<false,false>::neighbours)
+                       &trimem::fNeighbourLists::neighbours)
         .def("distance_matrix",
-             &trimem::NeighbourLists<false, false>::distance_matrix,
+             &trimem::fNeighbourLists::distance_matrix,
              "Compute distance matrix.",
              py::arg("mesh"), py::arg("dmax"))
         .def("distance_counts",
-             &trimem::NeighbourLists<false, false>::distance_counts,
+             &trimem::fNeighbourLists::distance_counts,
              "Count distances <= dmax.",
-             py::arg("mesh"), py::arg("dmax"));
+             py::arg("mesh"), py::arg("dmax"))
+        .def("point_distance_counts",
+             &trimem::fNeighbourLists::point_distance_counts,
+             "Count distances <= dmax.",
+             py::arg("mesh"), py::arg("pid"), py::arg("dmax"));
 
-    // cell list
-    py::class_<trimem::CellList>(m, "CellList")
+    // cell list with one-ring and self exclusion at distance evaluation
+    py::class_<trimem::rCellList>(m, "rCellList")
         .def(py::init<const TriMesh&, double, double>(), "Init cell list",
              py::arg("mesh"), py::arg("rlist"), py::arg("eps") = 1.0e-6)
-        .def_readwrite("cells", &trimem::CellList::cells)
-        .def_readwrite("shape", &trimem::CellList::shape)
-        .def_readwrite("strides", &trimem::CellList::strides)
-        .def_readwrite("r_list", &trimem::CellList::r_list)
-        .def_readwrite("cell_pairs", &trimem::CellList::cell_pairs)
+        .def_readwrite("cells", &trimem::rCellList::cells)
+        .def_readwrite("shape", &trimem::rCellList::shape)
+        .def_readwrite("strides", &trimem::rCellList::strides)
+        .def_readwrite("r_list", &trimem::rCellList::r_list)
+        .def_readwrite("cell_pairs", &trimem::rCellList::cell_pairs)
         .def("distance_matrix",
-             &trimem::CellList::distance_matrix<false, false>,
+             &trimem::rCellList::distance_matrix,
              "Compute distance matrix.",
              py::arg("mesh"), py::arg("dmax"))
-        .def("r_distance_matrix",
-             &trimem::CellList::distance_matrix<true, true>,
-             "Compute distance matrix with self and one-ring excluded.",
-             py::arg("mesh"), py::arg("dmax"))
         .def("distance_counts",
-             &trimem::CellList::distance_counts<false, false>,
+             &trimem::rCellList::distance_counts,
              "Count distances <= dmax.",
              py::arg("mesh"), py::arg("dmax"))
-        .def("r_distance_counts",
-             &trimem::CellList::distance_counts<true, true>,
-             "Count distances <= dmax (with self and one-ring excluded).",
-             py::arg("mesh"), py::arg("dmax"));
+        .def("point_distance_counts",
+             &trimem::rCellList::point_distance_counts,
+             "Count distances <= dmax.",
+             py::arg("mesh"), py::arg("pid"), py::arg("dmax"));
+
+    // cell list (standard)
+    py::class_<trimem::fCellList>(m, "CellList")
+        .def(py::init<const TriMesh&, double, double>(), "Init cell list",
+             py::arg("mesh"), py::arg("rlist"), py::arg("eps") = 1.0e-6)
+        .def_readwrite("cells", &trimem::fCellList::cells)
+        .def_readwrite("shape", &trimem::fCellList::shape)
+        .def_readwrite("strides", &trimem::fCellList::strides)
+        .def_readwrite("r_list", &trimem::fCellList::r_list)
+        .def_readwrite("cell_pairs", &trimem::fCellList::cell_pairs)
+        .def("distance_matrix",
+             &trimem::fCellList::distance_matrix,
+             "Compute distance matrix.",
+             py::arg("mesh"), py::arg("dmax"))
+        .def("distance_counts",
+             &trimem::fCellList::distance_counts,
+             "Count distances <= dmax.",
+             py::arg("mesh"), py::arg("dmax"))
+        .def("point_distance_counts",
+             &trimem::fCellList::point_distance_counts,
+             "Count distances <= dmax.",
+             py::arg("mesh"), py::arg("pid"), py::arg("dmax"));
+
+    // mesh constraint using cell lists (with one-ring and self exclusion)
+    py::class_<trimem::MeshConstraintCL>(m, "MeshConstraintCL")
+        .def(py::init<const TriMesh&, const double&, const double&>(),
+             "Init constraint",
+             py::arg("mesh"), py::arg("rlist"), py::arg("dmax"))
+        .def_readwrite("nlist", &trimem::MeshConstraintCL::nlist)
+        .def("check_global",
+             &trimem::MeshConstraintCL::check_global,
+             "Check global constraint violation.",
+             py::arg("mesh"))
+        .def("check_local",
+             &trimem::MeshConstraintCL::check_local,
+             "Check local constraint violation.",
+             py::arg("mesh"), py::arg("pid"));
+
+    // mesh constraint using neighbour lists (with one-ring and self exclusion)
+    py::class_<trimem::MeshConstraintNL>(m, "MeshConstraintNL")
+        .def(py::init<const TriMesh&, const double&, const double&>(),
+             "Init constraint",
+             py::arg("mesh"), py::arg("rlist"), py::arg("dmax"))
+        .def_readwrite("nlist", &trimem::MeshConstraintNL::nlist)
+        .def("check_global",
+             &trimem::MeshConstraintNL::check_global,
+             "Check global constraint violation.",
+             py::arg("mesh"))
+        .def("check_local",
+             &trimem::MeshConstraintNL::check_local,
+             "Check local constraint violation.",
+             py::arg("mesh"), py::arg("pid"));
 }

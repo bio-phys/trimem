@@ -49,7 +49,7 @@ def valid_cell_list():
     d = c.distance_counts(mesh, 0.2)
     print("num pairs in r:",d)
 
-    # compare agains kd-tree distance counts
+    # compare against kd-tree distance counts
     tree = KDTree(x)
     d = tree.count_neighbors(tree, 0.2)
     print("num pairs in r from tree:", d)
@@ -77,11 +77,13 @@ def valid_nlist():
     n = m.rNeighbourList(mesh, 0.2)
 
     # plot some neighbourhood
-    idx = 50
+    idx = 151
+    nn = n.point_distance_counts(mesh, idx, 0.2)
     plt.plot(x[:,0], x[:,1], '.')
     plt.plot(x[idx,0], x[idx,1], 'o', color='b')
     p = n.neighbours[idx]
     plt.plot(x[p,0], x[p,1], 'o', color='orange', alpha=0.3)
+    plt.title("Should be {} neighbours".format(nn))
     plt.show()
 
     # check distance computation
@@ -92,8 +94,9 @@ def valid_nlist():
     plt.show()
 
     # validate against direct cell based computation
-    c = m.CellList(mesh, 0.2)
-    d,i,j = c.r_distance_matrix(mesh, 0.2)
+    c = m.rCellList(mesh, 0.2)
+    d,i,j = c.distance_matrix(mesh, 0.2)
+    assert nn == c.point_distance_counts(mesh, idx, 0.2)
     B = coo_matrix((d,(i,j)), shape=(len(x),len(x)))
     B = B+B.transpose()
 
@@ -112,17 +115,18 @@ def check_scaling():
         points = mesh.points()
 
         start = time()
-        nl = m.CellList(mesh, 0.2)
+        nl = m.rNeighbourList(mesh, 0.2)
         secl = time()-start
-#        nl = m.NeighbourList(mesh, 0.2)
-        d = nl.distance_counts(mesh, 0.2)
+        for i in range(10):
+            d = nl.distance_counts(mesh, 0.2)
 #        d,i,j = m.distance_matrix(mesh, nl, 0.2)
         dts_trimem.append(time()-start)
 
         start = time()
         tree = KDTree(points)
         setr = time()-start
-        d = tree.count_neighbors(tree, 0.2)
+        for i in range(10):
+            d = tree.count_neighbors(tree, 0.2)
 #        d = tree.sparse_distance_matrix(tree, 0.2, output_type="coo_matrix")
         dts_kdtree.append(time()-start)
 
@@ -204,11 +208,28 @@ def test_3d():
         plt.plot(x[p,0], x[p,1], x[p,2], 'o', color='orange', alpha=0.3)
     plt.show()
 
+def check_constraint():
+    """Check mesh constraints."""
+
+    mesh = get_mesh(20)
+    x = mesh.points()
+
+    mc = m.MeshConstraintCL(mesh, 0.2, 0.2)
+    print(mc.nlist)
+
+    counts = mc.check_local(mesh, 50)
+    print("Any violation detected from cell list?:", not counts)
+
+    mc = m.MeshConstraintNL(mesh, 0.2, 0.2)
+    counts = mc.check_local(mesh, 50)
+    print("Any violation detected from neighbour lists?:", not counts)
 
 if __name__ == "__main__":
     #valid_cell_list()
     #valid_nlist()
 
     check_scaling()
+
+    #check_constraint()
 
     #test_3d()

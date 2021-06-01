@@ -35,6 +35,7 @@ real squ_distance(const real* avec, const real* bvec, int n)
     return dist;
 }
 
+template<bool exclude_self=true, bool exclude_one_ring=true>
 struct CellList
 {
   //! cells -> points lookup
@@ -45,6 +46,8 @@ struct CellList
   std::array<int, 3> strides;
   //! (adjusted) r_list per dimension
   std::array<double, 3> r_list;
+  //! minimum cell index in each dimension
+  std::array<int, 3> cell_min;
   //! cell pairs
   std::vector<std::pair<int, int>> cell_pairs;
 
@@ -64,7 +67,6 @@ struct CellList
       }
 
       // adjust rlist per dimension and compute shape of cell_array
-      std::array<int, 3> cell_min;
       for (int k=0; k<3; k++)
       {
           double dim = box_max[k] - box_min[k] + box_eps;
@@ -134,11 +136,9 @@ struct CellList
       }
   }
 
-  template<bool exclude_self=true, bool exclude_one_ring=true>
-  int distance_counts(const TriMesh& mesh, const double& rlist)
+  int distance_counts(const TriMesh& mesh, const double& dmax) const
   {
-
-      double rlist2 = rlist * rlist;
+      double dmax2 = dmax * dmax;
 
       const TriMesh::Point& point = mesh.point(mesh.vertex_handle(0));
       const double *data = point.data();
@@ -182,7 +182,7 @@ struct CellList
                       if (in_ring) continue;
                   }
 
-                  // save some time since the distance in symmetric
+                  // save some time since the distance is symmetric
                   if (is_same_cell and *i_it > *o_it) continue;
 
                   // other vertex's coordinates
@@ -190,7 +190,7 @@ struct CellList
 
                   // compute distance and count in case
                   double  dist  = squ_distance<double>(idata, odata, 3);
-                  if (dist <= rlist2)
+                  if (dist <= dmax2)
                   {
                       ni+=2;
                   }
@@ -198,12 +198,91 @@ struct CellList
           }
       }
 
-      return ni - mesh.n_vertices();
+      return (exclude_self) ? ni : ni - mesh.n_vertices();
   }
 
-  template<bool exclude_self=true, bool exclude_one_ring=true>
+  int point_distance_counts(const TriMesh& mesh,
+                            const int& pid,
+                            const double& dmax) const
+  {
+      // get pid's cell's grid coordinates
+      auto point = mesh.point(mesh.vertex_handle(pid));
+      std::array<int,3> coords;
+      for (int k=0; k<3; k++)
+      {
+          coords[k] = (int(point[k] / r_list[k]) - cell_min[k]);
+      }
+
+      double dmax2 = dmax * dmax;
+
+      const TriMesh::Point& tmp = mesh.point(mesh.vertex_handle(0));
+      const double *data = tmp.data();
+      const double* idata = data+pid*3;
+
+      int ni = 0;
+      // loop over all neighbouring cells
+      for (int i=-1; i<2; i++)
+      {
+          int ii = coords[0]+i;
+          if (ii < 0 or ii >= shape[0]) continue;
+
+          for (int j=-1; j<2; j++)
+          {
+              int jj = coords[1]+j;
+              if (jj < 0 or jj >= shape[1]) continue;
+
+              for (int k=-1; k<2; k++)
+              {
+                  int kk = coords[2]+k;
+                  if (kk < 0 or kk >= shape[2]) continue;
+
+                  int ocell = ii * strides[0] + jj * strides[1] + kk * strides[2];
+                  auto oit = cells.find(ocell);
+
+                  // pass on if no vertices are in this cell
+                  if (oit==cells.end()) continue;
+
+                  auto& vertices = oit->second;
+                  for (auto vit=vertices.begin(); vit!=vertices.end(); ++vit)
+                  {
+                      if (exclude_self)
+                      {
+                          if (pid == *vit) continue;
+                      }
+                      if (exclude_one_ring)
+                      {
+                          bool in_ring = false;
+                          auto vh = mesh.vertex_handle(pid);
+                          for (auto vjt=mesh.cvv_iter(vh); vjt.is_valid(); vjt++)
+                          {
+                              if (vjt->idx() == *vit)
+                              {
+                                  in_ring = true;
+                                  break;
+                              }
+                          }
+                          if (in_ring) continue;
+                      }
+
+                      // other vertex's coordinates
+                      const double* odata = data+*vit*3;
+
+                      // compute distance and count in case
+                      double  dist  = squ_distance<double>(idata, odata, 3);
+                      if (dist <= dmax2)
+                      {
+                          ni += 1;
+                      }
+                  }
+              }
+          }
+      }
+
+      return ni;
+  }
+
   std::tuple<std::vector<double>, std::vector<int>, std::vector<int> >
-  distance_matrix(const TriMesh& mesh, const double& rlist)
+  distance_matrix(const TriMesh& mesh, const double& rlist) const
   {
       const TriMesh::Point& point = mesh.point(mesh.vertex_handle(0));
       const double *data = point.data();
@@ -280,6 +359,9 @@ struct CellList
   }
 
 };
+
+typedef CellList<true, true>   rCellList;
+typedef CellList<false, false> fCellList;
 
 }
 #endif
