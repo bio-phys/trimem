@@ -469,6 +469,100 @@ std::tuple<real, real, real, real> properties_vv(TriMesh& mesh)
     return std::make_tuple(energy, surface, volume, curvature);
 }
 
+real energy(TriMesh& mesh, EnergyValueStore& estore)
+{
+    // update properties and evaluate new energy
+    auto props = properties_vv(mesh);
+    estore.energy    = std::get<0>(props);
+    estore.area      = std::get<1>(props);
+    estore.volume    = std::get<2>(props);
+    estore.curvature = std::get<3>(props);
+
+    // evaluate energies
+    return estore.get_energy();
+}
+
+void gradient(TriMesh& mesh,
+              EnergyValueStore& estore,
+              py::array_t<real>& grad,
+              real eps=1.0e-6)
+{
+    // unperturbed energy
+    real e0 = energy(mesh, estore);
+
+    // data acess
+    TriMesh::Point& point = mesh.point(mesh.vertex_handle(0));
+    double *data = point.data();
+
+    auto r_grad = grad.mutable_unchecked<2>();
+    for (int i=0; i<mesh.n_vertices(); i++)
+    {
+        for (int j=0; j<3; j++)
+        {
+            // do perturbation
+            double* di = data+(3*i)+j;
+            *di = *di + eps;
+
+            // evaluate differential energy
+            real de = ( energy(mesh, estore) - e0 ) / eps;
+            r_grad(i,j) = de;
+
+            // undo perturbation
+            *di = *di - eps;
+        }
+    }
+}
+
+void s_gradient(TriMesh& mesh,
+                EnergyValueStore& estore,
+                py::array_t<real>& grad,
+                real eps=1.0e-6)
+{
+    // unperturbed energy
+    real e0 = energy(mesh, estore);
+
+    // data acess
+    TriMesh::Point& point = mesh.point(mesh.vertex_handle(0));
+    double *data = point.data();
+
+    auto r_grad = grad.mutable_unchecked<2>();
+    for (int i=0; i<mesh.n_vertices(); i++)
+    {
+        auto vh = mesh.vertex_handle(i);
+
+        for (int j=0; j<3; j++)
+        {
+            // initialize new energy properties
+            EnergyValueStore estore_new = estore;
+
+            // remove vertex i's and its neighbors' properties
+            auto props =  vertex_vertex_properties(mesh, vh);
+            estore_new.energy    -= std::get<0>(props);
+            estore_new.area      -= std::get<1>(props);
+            estore_new.volume    -= std::get<2>(props);
+            estore_new.curvature -= std::get<3>(props);
+
+            // do perturbation
+            double* di = data+(3*i)+j;
+            *di = *di + eps;
+
+            // evaluate new properties for vertex i and its neighbors
+            props = vertex_vertex_properties(mesh, vh);
+            estore_new.energy    += std::get<0>(props);
+            estore_new.area      += std::get<1>(props);
+            estore_new.volume    += std::get<2>(props);
+            estore_new.curvature += std::get<3>(props);
+
+            // evaluate differential energy
+            real de = ( estore_new.get_energy() - e0 ) / eps;
+            r_grad(i,j) = de;
+
+            // undo perturbation
+            *di = *di - eps;
+        }
+    }
+}
+
 int check_edge_lengths_v(TriMesh& mesh,
                          VertexHandle& ve,
                          const real& min_t,
@@ -593,7 +687,8 @@ std::tuple<int, int> move_global(TriMesh& mesh,
                                  EnergyValueStore& estore,
                                  const real& min_t,
                                  const real& max_t,
-                                 const real& temp = 1.0)
+                                 const real& temp = 1.0,
+                                 const real& delta_e_kin = 0.0)
 {
     std::uniform_real_distribution<real> accept_dist(0,1);
 
@@ -618,7 +713,7 @@ std::tuple<int, int> move_global(TriMesh& mesh,
     real energy_old = estore.get_energy();
 
     // evaluate acceptance probability
-    real alpha = std::exp(-(energy_new - energy_old)/temp);
+    real alpha = std::exp(-(energy_new - energy_old + delta_e_kin)/temp);
     real u     = accept_dist(generator_);
     if (u <= alpha)
     {
@@ -634,6 +729,7 @@ std::tuple<int, int> flip_serial(TriMesh& mesh,
                                  const py::array_t<int>& idx,
                                  const real& min_t,
                                  const real& max_t,
+                                 const trimem::IMeshConstraint& constraint,
                                  const real& temp = 1.0)
 {
     std::uniform_real_distribution<real> accept_dist(0.0,1.0);
@@ -657,8 +753,20 @@ std::tuple<int, int> flip_serial(TriMesh& mesh,
             estore_new.curvature -= std::get<3>(props);
 
             mesh.flip(eh);
+
+            // check edge length criterion
             real el = mesh.calc_edge_length(eh);
-            if ((el<min_t) or (el>max_t))
+
+            // check mesh distance crriterion
+            bool dist_check = true;
+            auto heh = mesh.halfedge_handle(eh, 0);
+            auto ve = mesh.to_vertex_handle(heh);
+            if (constraint.check_local(mesh, ve.idx())) dist_check = false;
+            heh = mesh.halfedge_handle(eh, 1);
+            ve = mesh.to_vertex_handle(heh);
+            if (constraint.check_local(mesh, ve.idx())) dist_check = false;
+
+            if ((el<min_t) or (el>max_t) or (not dist_check))
             {
                 mesh.flip(eh);
                 invalid_edges += 1;
@@ -719,6 +827,9 @@ PYBIND11_MODULE(_core, m) {
         .def_readwrite("ref_area", &EnergyValueStore::ref_area)
         .def_readwrite("ref_volume", &EnergyValueStore::ref_volume)
         .def_readwrite("ref_curvature", &EnergyValueStore::ref_curvature);
+    m.def("energy", &energy, "Evaluate energy");
+    m.def("gradient", &gradient, "Finite difference gradient of energy");
+    m.def("s_gradient", &s_gradient, "Finite difference gradient of energy");
 
     // test volumes
     m.def("volume_v", &volume_v, "Volume based on triangle volumes.");
@@ -738,10 +849,11 @@ PYBIND11_MODULE(_core, m) {
           py::arg("mesh constraint"), py::arg("temp") = 1.0);
     m.def("move_global", &move_global, "Test global vertex markov step",
           py::arg("mesh"), py::arg("energy_store"), py::arg("min_t"),
-          py::arg("max_t"), py::arg("temp") = 1.0);
+          py::arg("max_t"), py::arg("temp") = 1.0, py::arg("eoff") = 0.0);
     m.def("flip_serial", &flip_serial, "Test global flip markov step",
           py::arg("mesh"), py::arg("energy_store"), py::arg("idx"),
-          py::arg("min_t"), py::arg("max_t"), py::arg("temp") = 1.0);
+          py::arg("min_t"), py::arg("max_t"),
+          py::arg("mesh constraint"), py::arg("temp") = 1.0);
 
 
     // reduced (self and one-ring excluded) neighbour list
