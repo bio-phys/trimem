@@ -120,7 +120,7 @@ def test_vv_integration():
 
     def force(x):
         g = np.empty_like(x)
-        m.s_gradient(mesh, estore, g, 1.0e-3)
+        m.gradient(mesh, estore, g, 1.0e-3)
         return -g*sigma**2
 
     def energy(q,p):
@@ -155,7 +155,7 @@ def test_minimization():
         points = mesh.points()
         points += x.reshape(points.shape)
         g = np.empty_like(points)
-        m.s_gradient(mesh, estore, g, 1.0e-8)
+        m.gradient(mesh, estore, g, 1.0e-8)
         points -= x.reshape(points.shape)
         return g.ravel()
 
@@ -171,5 +171,5 @@ def test_minimization():
 if __name__ == "__main__":
     #test_energy()
     #test_vv()
-    #test_vv_integration()
-    test_minimization()
+    test_vv_integration()
+    #test_minimization()

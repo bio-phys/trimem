@@ -61,38 +61,10 @@ print("Curvature: {} (={})".format(c, c_ref))
 print("time elapsed: {}".format(dt))
 
 # ---------------------------------------------------------------------------- #
-# edge based evaluation in c++
-start = time.time()
-for i in range(10):
-    m,s,v,c = cppenergy.calc_properties_e(tri)
-dt = time.time()-start
-
-print("\n-- edge-based (c++) (wrong energy)")
-print("Energy:    {} (={})".format(m, e_ref))
-print("Surface:   {} (={})".format(s, s_ref))
-print("Volume:    {} (={}".format(v, v_ref))
-print("Curvature: {} (={})".format(c, c_ref))
-print("time elapsed: {}".format(dt))
-
-# ---------------------------------------------------------------------------- #
 # vertex based evaluation in c++
 start = time.time()
 for i in range(10):
-    m,s,v,c = cppenergy.calc_properties_v(tri)
-dt = time.time()-start
-
-print("\n-- vertex-based (c++)")
-print("Energy:    {} (={})".format(m, e_ref))
-print("Surface:   {} (={})".format(s, s_ref))
-print("Volume:    {} (={}".format(v, v_ref))
-print("Curvature: {} (={})".format(c, c_ref))
-print("time elapsed: {}".format(dt))
-
-# ---------------------------------------------------------------------------- #
-# vertex based evaluation in c++ (version 2)
-start = time.time()
-for i in range(10):
-    m,s,v,c = cppenergy.calc_properties_vv(tri)
+    m,s,v,c = cppenergy.calc_properties(tri)
 dt = time.time()-start
 
 print("\n-- vertex-based (c++) (version 2)")

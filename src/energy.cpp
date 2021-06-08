@@ -199,85 +199,6 @@ private:
     bool init_ = false;
 };
 
-std::tuple<real, real, real, real> properties_e(TriMesh& mesh)
-{
-    real curvature = 0;
-    real surface   = 0;
-    real volume    = 0;
-    real energy    = 0;
-
-    #pragma omp parallel for reduction(+:curvature,surface,volume,energy)
-    for (int i=0; i<mesh.n_halfedges(); i++)
-    {
-        auto eh = mesh.halfedge_handle(i);
-        auto fh = mesh.face_handle(eh);
-        if ( fh.is_valid() )
-        {
-            real sector_area = mesh.calc_sector_area(eh);
-            real edge_length = mesh.calc_edge_length(eh);
-            real edge_angle  = mesh.calc_dihedral_angle(eh);
-            auto face_normal = mesh.calc_face_normal(fh);
-            auto face_center = mesh.calc_face_centroid(fh);
-            real edge_curv   = 0.5 * edge_angle * edge_length;
-
-            curvature += edge_curv;
-            surface   += sector_area;
-            volume    += dot(face_normal, face_center) * sector_area / 3;
-            energy    += edge_curv * edge_curv;
-        }
-     }
-
-    // correct multiplicity
-    energy    /= 2;
-    curvature /= 2;
-    surface   /= 3;
-    volume    /= 3;
-    return std::make_tuple(2 * energy, surface, volume, curvature);
-}
-
-std::tuple<real, real, real, real> properties_v(TriMesh& mesh)
-{
-    real curvature = 0;
-    real surface   = 0;
-    real volume    = 0;
-    real energy    = 0;
-
-    #pragma omp parallel for reduction(+:curvature,surface,volume,energy)
-    for (int i=0; i<mesh.n_vertices(); i++)
-    {
-        real c=0.0, s=0.0, v = 0.0;
-        auto ve = mesh.vertex_handle(i);
-        auto h_it = mesh.voh_iter(ve);
-        for(;h_it.is_valid(); ++h_it)
-        {
-            auto fh = mesh.face_handle(*h_it);
-
-            if ( fh.is_valid() )
-            {
-                real sector_area = mesh.calc_sector_area(*h_it);
-                real edge_length = mesh.calc_edge_length(*h_it);
-                real edge_angle  = mesh.calc_dihedral_angle(*h_it);
-                auto face_normal = mesh.calc_face_normal(fh);
-                auto face_center = mesh.calc_face_centroid(fh);
-                real edge_curv   = 0.25 * edge_angle * edge_length;
-
-                c += edge_curv;
-                s += sector_area / 3;
-                v += dot(face_normal, face_center) * sector_area / 3;
-            }
-        }
-
-        surface   += s;
-        volume    += v;
-        curvature += c;
-        energy    += 2 * c * c / s;
-     }
-
-    // correct multiplicity
-    volume    /= 3;
-    return std::make_tuple(energy, surface, volume, curvature);
-}
-
 real volume_v(TriMesh& mesh)
 {
     real volume = 0;
@@ -450,9 +371,6 @@ std::tuple<real, real, real, real> properties_vv(TriMesh& mesh)
     real volume    = 0;
     real energy    = 0;
 
-    //for (TriMesh::VertexIter ve = mesh.vertices_begin(); ve!=mesh.vertices_end(); ve++)
-    //for (int i=0; i<mesh.n_vertices(); i++)
-    //for (auto ve : mesh.vertices() )
     #pragma omp parallel for reduction(+:curvature,surface,volume,energy)
     for (int i=0; i<mesh.n_vertices(); i++)
     {
@@ -486,37 +404,6 @@ void gradient(TriMesh& mesh,
               EnergyValueStore& estore,
               py::array_t<real>& grad,
               real eps=1.0e-6)
-{
-    // unperturbed energy
-    real e0 = energy(mesh, estore);
-
-    // data acess
-    TriMesh::Point& point = mesh.point(mesh.vertex_handle(0));
-    double *data = point.data();
-
-    auto r_grad = grad.mutable_unchecked<2>();
-    for (int i=0; i<mesh.n_vertices(); i++)
-    {
-        for (int j=0; j<3; j++)
-        {
-            // do perturbation
-            double* di = data+(3*i)+j;
-            *di = *di + eps;
-
-            // evaluate differential energy
-            real de = ( energy(mesh, estore) - e0 ) / eps;
-            r_grad(i,j) = de;
-
-            // undo perturbation
-            *di = *di - eps;
-        }
-    }
-}
-
-void s_gradient(TriMesh& mesh,
-                EnergyValueStore& estore,
-                py::array_t<real>& grad,
-                real eps=1.0e-6)
 {
     // unperturbed energy
     real e0 = energy(mesh, estore);
@@ -807,29 +694,27 @@ PYBIND11_MODULE(_core, m) {
     m.doc() = "pybind11 example plugin"; // optional module docstring
 
     // energy stuff
-    m.def("calc_properties_e", &properties_e, "Edge-based evaluation of surface properties");
-    m.def("calc_properties_v", &properties_v, "Vertex-based evaluation of surface properties");
-    m.def("calc_properties_vv", &properties_vv, "Vertex-based evaluation of surface properties");
-     py::class_<EnergyValueStore>(m, "EnergyValueStore")
-        .def(py::init<real, real, real, real, real, real, real>())
-        .def("get_energy", &EnergyValueStore::get_energy)
-        .def("init", &EnergyValueStore::init,
-              py::arg("mesh"), py::arg("ref_delta") = 1.0,
-              py::arg("ref_lambda") = 0.0)
-        .def("update_references", &EnergyValueStore::update_references)
-        .def("print_info", &EnergyValueStore::print_info,
-              py::call_guard<py::scoped_ostream_redirect,
-              py::scoped_estream_redirect>())
-        .def_readwrite("energy", &EnergyValueStore::energy)
-        .def_readwrite("area", &EnergyValueStore::area)
-        .def_readwrite("volume", &EnergyValueStore::volume)
-        .def_readwrite("curvature", &EnergyValueStore::curvature)
-        .def_readwrite("ref_area", &EnergyValueStore::ref_area)
-        .def_readwrite("ref_volume", &EnergyValueStore::ref_volume)
-        .def_readwrite("ref_curvature", &EnergyValueStore::ref_curvature);
+    m.def("calc_properties", &properties_vv,
+          "Vertex-based evaluation of surface properties");
+    py::class_<EnergyValueStore>(m, "EnergyValueStore")
+       .def(py::init<real, real, real, real, real, real, real>())
+       .def("get_energy", &EnergyValueStore::get_energy)
+       .def("init", &EnergyValueStore::init,
+             py::arg("mesh"), py::arg("ref_delta") = 1.0,
+             py::arg("ref_lambda") = 0.0)
+       .def("update_references", &EnergyValueStore::update_references)
+       .def("print_info", &EnergyValueStore::print_info,
+             py::call_guard<py::scoped_ostream_redirect,
+             py::scoped_estream_redirect>())
+       .def_readwrite("energy", &EnergyValueStore::energy)
+       .def_readwrite("area", &EnergyValueStore::area)
+       .def_readwrite("volume", &EnergyValueStore::volume)
+       .def_readwrite("curvature", &EnergyValueStore::curvature)
+       .def_readwrite("ref_area", &EnergyValueStore::ref_area)
+       .def_readwrite("ref_volume", &EnergyValueStore::ref_volume)
+       .def_readwrite("ref_curvature", &EnergyValueStore::ref_curvature);
     m.def("energy", &energy, "Evaluate energy");
     m.def("gradient", &gradient, "Finite difference gradient of energy");
-    m.def("s_gradient", &s_gradient, "Finite difference gradient of energy");
 
     // test volumes
     m.def("volume_v", &volume_v, "Volume based on triangle volumes.");
