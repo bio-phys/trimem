@@ -252,7 +252,7 @@ std::tuple<real, real, real, real> vertex_properties(TriMesh& mesh,
                                                      const VertexHandle& ve)
 {
     real curvature = 0.0;
-    real surface   = 0.0;
+    real area      = 0.0;
     real volume    = 0.0;
 
     int invalid_lengths = 0;
@@ -272,24 +272,24 @@ std::tuple<real, real, real, real> vertex_properties(TriMesh& mesh,
             real edge_curv   = 0.5 * edge_angle * edge_length;
 
             curvature += edge_curv;
-            surface   += sector_area;
+            area      += sector_area;
             volume    += dot(face_normal, face_center) * sector_area / 3;
         }
     }
 
     // correct multiplicity
     // (every face contributes to 3 vertices)
-    surface /= 3;
+    area    /= 3;
     volume  /= 3;
     // (every edge contributes to 2 vertices)
     curvature /= 2;
 
-    if (surface < 0)
+    if (area < 0)
       throw std::runtime_error("Surface must be larger zero");
 
-    real energy = 2 * curvature * curvature / surface;
+    real energy = 2 * curvature * curvature / area;
 
-    return std::make_tuple(energy, surface, volume, curvature);
+    return std::make_tuple(energy, area, volume, curvature);
 }
 
 std::tuple<real, real, real, real> vertex_vertex_properties(TriMesh& mesh,
@@ -367,24 +367,24 @@ edge_vertex_properties(TriMesh& mesh, const EdgeHandle& eh)
 std::tuple<real, real, real, real> properties_vv(TriMesh& mesh)
 {
     real curvature = 0;
-    real surface   = 0;
+    real area      = 0;
     real volume    = 0;
     real energy    = 0;
 
-    #pragma omp parallel for reduction(+:curvature,surface,volume,energy)
+    #pragma omp parallel for reduction(+:curvature,area,volume,energy)
     for (int i=0; i<mesh.n_vertices(); i++)
     {
         auto ve = mesh.vertex_handle(i);
         auto props = vertex_properties(mesh, ve);
 
         energy    += std::get<0>(props);
-        surface   += std::get<1>(props);
+        area      += std::get<1>(props);
         volume    += std::get<2>(props);
         curvature += std::get<3>(props);
      }
 
     // correct multiplicity
-    return std::make_tuple(energy, surface, volume, curvature);
+    return std::make_tuple(energy, area, volume, curvature);
 }
 
 real energy(TriMesh& mesh, EnergyValueStore& estore)
