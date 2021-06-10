@@ -3,6 +3,7 @@
 #include <random>
 #include <chrono>
 #include <stdexcept>
+#include <ctgmath>
 
 #include "MeshTypes.hh"
 #include "OpenMesh/Core/Geometry/VectorT.hh"
@@ -22,8 +23,6 @@ typedef double real;
 typedef OpenMesh::VertexHandle VertexHandle;
 typedef OpenMesh::EdgeHandle EdgeHandle;
 
-std::tuple<real, real, real, real> properties_vv(TriMesh& mesh);
-
 typedef std::chrono::high_resolution_clock myclock;
 static std::mt19937 generator_(myclock::now().time_since_epoch().count());
 
@@ -38,6 +37,15 @@ real randomn()
     return dist(generator_);
 }
 
+struct BondParams
+{
+  real b, lc0, lc1, lmax, lmin, a;
+  std::string type;
+};
+
+std::tuple<real, real, real, real, real, real> properties_vv(TriMesh& mesh, const BondParams& params);
+
+
 class EnergyValueStore
 {
 public:
@@ -47,7 +55,9 @@ public:
                      real kappa_c,
                      real volume_frac,
                      real area_frac,
-                     real curvature_frac) :
+                     real curvature_frac,
+                     BondParams bparams) :
+        bond_params(bparams),
         kappa_b_(kappa_b),
         kappa_a_(kappa_a),
         kappa_v_(kappa_v),
@@ -65,7 +75,8 @@ public:
               const real& ref_lambda = 0.0)
     {
         // evaluate initial properties
-        std::tie(energy, area, volume, curvature) = properties_vv(mesh);
+        std::tie(energy, area, volume, curvature, attract, repel) =
+            properties_vv(mesh, bond_params);
 
         target_area_      = area * area_frac_;
         target_volume_    = volume * volume_frac_;
@@ -74,6 +85,8 @@ public:
         init_area_      = area;
         init_volume_    = volume;
         init_curvature_ = curvature;
+
+        a0_ = area/mesh.n_faces();
 
         ref_delta_  = ref_delta;
         ref_lambda_ = ref_lambda;
@@ -129,6 +142,22 @@ public:
         return area_difference;
     }
 
+    real tether_potential()
+    {
+        if (bond_params.type == "tether")
+        {
+            if ((attract+repel)<0) throw std::runtime_error("uups");
+            return attract + repel;
+        }
+        else if (bond_params.type == "area")
+        {
+            real val = attract/a0_ - 2*area;
+            return bond_params.b * val;
+        }
+        else
+            throw std::runtime_error("Wrong constraint type");
+    }
+
     real get_energy()
     {
         if (not init_)
@@ -140,8 +169,10 @@ public:
         real area_diff = area_diff_energy();
         // bending energy
         real bending_energy = kappa_b_ * energy;
+        // tether potential
+        real tether = tether_potential();
 
-        return area + volume + bending_energy + area_diff;
+        return area + volume + bending_energy + area_diff + tether;
     }
 
     void print_info(const std::string& baseindent)
@@ -161,6 +192,7 @@ public:
       std::cout << indent << "  volume:    " << volume_energy() << std::endl;
       std::cout << indent << "  area diff: " << area_diff_energy() << std::endl;
       std::cout << indent << "  bending:   " << kappa_b_ * energy << std::endl;
+      std::cout << indent << "  tether:    " << tether_potential() << std::endl;
       std::cout << indent << "  total:     " << get_energy() << std::endl;
       std::cout << std::endl;
     }
@@ -170,9 +202,14 @@ public:
     real curvature;
     real energy;
 
+    real attract;
+    real repel;
+
     real ref_area;
     real ref_volume;
     real ref_curvature;
+
+    BondParams bond_params;
 
 private:
 
@@ -188,10 +225,13 @@ private:
     real init_volume_;
     real init_curvature_;
 
+    real a0_;
+
     real kappa_b_;
     real kappa_a_;
     real kappa_v_;
     real kappa_c_;
+    real kappa_ar_;
 
     real ref_lambda_ = 0.0;
     real ref_delta_  = 1.0;
@@ -248,14 +288,16 @@ real volume_f(TriMesh& mesh)
     return volume;
 }
 
-std::tuple<real, real, real, real> vertex_properties(TriMesh& mesh,
-                                                     const VertexHandle& ve)
+std::tuple<real, real, real, real, real, real>
+vertex_properties(TriMesh& mesh,
+                  const VertexHandle& ve,
+                  const BondParams& params)
 {
     real curvature = 0.0;
     real area      = 0.0;
     real volume    = 0.0;
-
-    int invalid_lengths = 0;
+    real attract   = 0.0;
+    real repel     = 0.0;
 
     auto h_it = mesh.voh_iter(ve);
     for(; h_it.is_valid(); ++h_it)
@@ -264,6 +306,7 @@ std::tuple<real, real, real, real> vertex_properties(TriMesh& mesh,
 
         if ( fh.is_valid() )
         {
+            // geometric properties
             real sector_area = mesh.calc_sector_area(*h_it);
             real edge_length = mesh.calc_edge_length(*h_it);
             real edge_angle  = mesh.calc_dihedral_angle(*h_it);
@@ -274,13 +317,35 @@ std::tuple<real, real, real, real> vertex_properties(TriMesh& mesh,
             curvature += edge_curv;
             area      += sector_area;
             volume    += dot(face_normal, face_center) * sector_area / 3;
+
+            if (params.type == "tether")
+            {
+                // constraint penalties
+                if (edge_length > params.lc0)
+                {
+                    attract += params.b *
+                               std::exp(0.1/(params.lc0 - edge_length)) /
+                               (params.lmax - edge_length);
+                }
+                if (edge_length < params.lc1)
+                {
+                    repel += params.b *
+                             std::exp(0.1/(edge_length - params.lc1)) /
+                             (edge_length - params.lmin);
+                }
+            }
+            else if(params.type == "area")
+            {
+                real d = sector_area * sector_area;
+                attract += d;
+            }
         }
     }
 
     // correct multiplicity
     // (every face contributes to 3 vertices)
-    area    /= 3;
-    volume  /= 3;
+    area     /= 3;
+    volume   /= 3;
     // (every edge contributes to 2 vertices)
     curvature /= 2;
 
@@ -289,112 +354,138 @@ std::tuple<real, real, real, real> vertex_properties(TriMesh& mesh,
 
     real energy = 2 * curvature * curvature / area;
 
-    return std::make_tuple(energy, area, volume, curvature);
+    return std::make_tuple(energy, area, volume, curvature, attract, repel);
 }
 
-std::tuple<real, real, real, real> vertex_vertex_properties(TriMesh& mesh,
-                                                            const VertexHandle& ve)
+std::tuple<real, real, real, real, real, real>
+vertex_vertex_properties(TriMesh& mesh,
+                         const VertexHandle& ve,
+                         const BondParams& params)
 {
     real energy    = 0.0;
     real area      = 0.0;
     real volume    = 0.0;
     real curvature = 0.0;
+    real attract   = 0.0;
+    real repel     = 0.0;
 
     // ve's properties
-    std::tie(energy, area, volume, curvature) = vertex_properties(mesh, ve);
+    std::tie(energy, area, volume, curvature, attract, repel) = \
+        vertex_properties(mesh, ve, params);
 
     // ve's neighbors' properties
     auto ve_it = mesh.vv_iter(ve);
     for (; ve_it.is_valid(); ve_it++)
     {
-        auto props = vertex_properties(mesh, *ve_it);
+        auto props = vertex_properties(mesh, *ve_it, params);
         energy    += std::get<0>(props);
         area      += std::get<1>(props);
         volume    += std::get<2>(props);
         curvature += std::get<3>(props);
+        attract   += std::get<4>(props);
+        repel     += std::get<5>(props);
     }
 
-    return std::make_tuple(energy, area, volume, curvature);
+    return std::make_tuple(energy, area, volume, curvature, attract, repel);
 }
 
-std::tuple<real, real, real, real>
-edge_vertex_properties(TriMesh& mesh, const EdgeHandle& eh)
+std::tuple<real, real, real, real, real, real>
+edge_vertex_properties(TriMesh& mesh,
+                       const EdgeHandle& eh,
+                       const BondParams& params)
 {
     real energy    = 0.0;
     real area      = 0.0;
     real volume    = 0.0;
     real curvature = 0.0;
+    real attract   = 0.0;
+    real repel     = 0.0;
 
     // vertex properties of the first face
     auto heh   = mesh.halfedge_handle(eh, 0);
 
     auto ve = mesh.to_vertex_handle(heh);
-    auto props = vertex_properties(mesh, ve);
+    auto props = vertex_properties(mesh, ve, params);
     energy    += std::get<0>(props);
     area      += std::get<1>(props);
     volume    += std::get<2>(props);
     curvature += std::get<3>(props);
+    attract   += std::get<4>(props);
+    repel     += std::get<5>(props);
 
     auto next_heh = mesh.next_halfedge_handle(heh);
     ve = mesh.to_vertex_handle(next_heh);
-    props = vertex_properties(mesh, ve);
+    props = vertex_properties(mesh, ve, params);
     energy    += std::get<0>(props);
     area      += std::get<1>(props);
     volume    += std::get<2>(props);
     curvature += std::get<3>(props);
+    attract   += std::get<4>(props);
+    repel     += std::get<5>(props);
 
     // vertex properties of the other face
     heh = mesh.halfedge_handle(eh, 1);
 
     ve = mesh.to_vertex_handle(heh);
-    props = vertex_properties(mesh, ve);
+    props = vertex_properties(mesh, ve, params);
     energy    += std::get<0>(props);
     area      += std::get<1>(props);
     volume    += std::get<2>(props);
     curvature += std::get<3>(props);
+    attract   += std::get<4>(props);
+    repel     += std::get<5>(props);
 
     next_heh = mesh.next_halfedge_handle(heh);
     ve = mesh.to_vertex_handle(next_heh);
-    props = vertex_properties(mesh, ve);
+    props = vertex_properties(mesh, ve, params);
     energy    += std::get<0>(props);
     area      += std::get<1>(props);
     volume    += std::get<2>(props);
     curvature += std::get<3>(props);
+    attract   += std::get<4>(props);
+    repel     += std::get<5>(props);
 
-    return std::make_tuple(energy, area, volume, curvature);
+    return std::make_tuple(energy, area, volume, curvature, attract, repel);
 }
 
-std::tuple<real, real, real, real> properties_vv(TriMesh& mesh)
+std::tuple<real, real, real, real, real, real>
+properties_vv(TriMesh& mesh, const BondParams& params)
 {
     real curvature = 0;
     real area      = 0;
     real volume    = 0;
     real energy    = 0;
+    real attract   = 0.0;
+    real repel     = 0.0;
 
     #pragma omp parallel for reduction(+:curvature,area,volume,energy)
     for (int i=0; i<mesh.n_vertices(); i++)
     {
         auto ve = mesh.vertex_handle(i);
-        auto props = vertex_properties(mesh, ve);
+        auto props = vertex_properties(mesh, ve, params);
 
         energy    += std::get<0>(props);
         area      += std::get<1>(props);
         volume    += std::get<2>(props);
         curvature += std::get<3>(props);
+        attract   += std::get<4>(props);
+        repel     += std::get<5>(props);
      }
 
     // correct multiplicity
-    return std::make_tuple(energy, area, volume, curvature);
+    return std::make_tuple(energy, area, volume, curvature, attract, repel);
 }
 
 real energy(TriMesh& mesh, EnergyValueStore& estore)
 {
     // update properties and evaluate new energy
-    auto props = properties_vv(mesh);
+    auto props = properties_vv(mesh, estore.bond_params);
     estore.energy    = std::get<0>(props);
     estore.area      = std::get<1>(props);
     estore.volume    = std::get<2>(props);
     estore.curvature = std::get<3>(props);
+    estore.attract   = std::get<4>(props);
+    estore.repel     = std::get<5>(props);
 
     // evaluate energies
     return estore.get_energy();
@@ -412,6 +503,9 @@ void gradient(TriMesh& mesh,
     TriMesh::Point& point = mesh.point(mesh.vertex_handle(0));
     double *data = point.data();
 
+    // global bond parameters
+    BondParams& params = estore.bond_params;
+
     auto r_grad = grad.mutable_unchecked<2>();
     for (int i=0; i<mesh.n_vertices(); i++)
     {
@@ -423,22 +517,26 @@ void gradient(TriMesh& mesh,
             EnergyValueStore estore_new = estore;
 
             // remove vertex i's and its neighbors' properties
-            auto props =  vertex_vertex_properties(mesh, vh);
+            auto props =  vertex_vertex_properties(mesh, vh, params);
             estore_new.energy    -= std::get<0>(props);
             estore_new.area      -= std::get<1>(props);
             estore_new.volume    -= std::get<2>(props);
             estore_new.curvature -= std::get<3>(props);
+            estore_new.attract   -= std::get<4>(props);
+            estore_new.repel     -= std::get<5>(props);
 
             // do perturbation
             double* di = data+(3*i)+j;
             *di = *di + eps;
 
             // evaluate new properties for vertex i and its neighbors
-            props = vertex_vertex_properties(mesh, vh);
+            props = vertex_vertex_properties(mesh, vh, params);
             estore_new.energy    += std::get<0>(props);
             estore_new.area      += std::get<1>(props);
             estore_new.volume    += std::get<2>(props);
             estore_new.curvature += std::get<3>(props);
+            estore_new.attract   += std::get<4>(props);
+            estore_new.repel     += std::get<5>(props);
 
             // evaluate differential energy
             real de = ( estore_new.get_energy() - e0 ) / eps;
@@ -517,11 +615,13 @@ std::tuple<int, int> move_serial(TriMesh& mesh,
         EnergyValueStore estore_new = estore;
 
         // remove vertex i's and its neighbors' properties
-        auto props =  vertex_vertex_properties(mesh, vh);
+        auto props =  vertex_vertex_properties(mesh, vh, estore.bond_params);
         estore_new.energy    -= std::get<0>(props);
         estore_new.area      -= std::get<1>(props);
         estore_new.volume    -= std::get<2>(props);
         estore_new.curvature -= std::get<3>(props);
+        estore_new.attract   -= std::get<4>(props);
+        estore_new.repel     -= std::get<5>(props);
 
         // move vertex
         auto p = TriMesh::Point(r_val(i,0),r_val(i,1),r_val(i,2));
@@ -544,11 +644,13 @@ std::tuple<int, int> move_serial(TriMesh& mesh,
         }
 
         // evaluate new properties for vertex i and its neighbors
-        props = vertex_vertex_properties(mesh, vh);
+        props = vertex_vertex_properties(mesh, vh, estore.bond_params);
         estore_new.energy    += std::get<0>(props);
         estore_new.area      += std::get<1>(props);
         estore_new.volume    += std::get<2>(props);
         estore_new.curvature += std::get<3>(props);
+        estore_new.attract   += std::get<4>(props);
+        estore_new.repel     += std::get<5>(props);
 
         // compute energies
         real energy_new = estore_new.get_energy();
@@ -574,8 +676,7 @@ std::tuple<int, int> move_global(TriMesh& mesh,
                                  EnergyValueStore& estore,
                                  const real& min_t,
                                  const real& max_t,
-                                 const real& temp = 1.0,
-                                 const real& delta_e_kin = 0.0)
+                                 const real& temp = 1.0)
 {
     std::uniform_real_distribution<real> accept_dist(0,1);
 
@@ -589,18 +690,20 @@ std::tuple<int, int> move_global(TriMesh& mesh,
     EnergyValueStore estore_new = estore;
 
     // update properties and evaluate new energy
-    auto props = properties_vv(mesh);
+    auto props = properties_vv(mesh, estore.bond_params);
     estore_new.energy    = std::get<0>(props);
     estore_new.area      = std::get<1>(props);
     estore_new.volume    = std::get<2>(props);
     estore_new.curvature = std::get<3>(props);
+    estore_new.attract   = std::get<4>(props);
+    estore_new.repel     = std::get<5>(props);
 
     // evaluate energies
     real energy_new = estore_new.get_energy();
     real energy_old = estore.get_energy();
 
     // evaluate acceptance probability
-    real alpha = std::exp(-(energy_new - energy_old + delta_e_kin)/temp);
+    real alpha = std::exp(-(energy_new - energy_old)/temp);
     real u     = accept_dist(generator_);
     if (u <= alpha)
     {
@@ -633,11 +736,13 @@ std::tuple<int, int> flip_serial(TriMesh& mesh,
             EnergyValueStore estore_new = estore;
 
             // remove old properties
-            auto props = edge_vertex_properties(mesh, eh);
+            auto props = edge_vertex_properties(mesh, eh, estore.bond_params);
             estore_new.energy    -= std::get<0>(props);
             estore_new.area      -= std::get<1>(props);
             estore_new.volume    -= std::get<2>(props);
             estore_new.curvature -= std::get<3>(props);
+            estore_new.attract   -= std::get<4>(props);
+            estore_new.repel     -= std::get<5>(props);
 
             mesh.flip(eh);
 
@@ -661,11 +766,13 @@ std::tuple<int, int> flip_serial(TriMesh& mesh,
             else
             {
                 // update new properties
-                auto props = edge_vertex_properties(mesh, eh);
+                auto props = edge_vertex_properties(mesh, eh, estore.bond_params);
                 estore_new.energy    += std::get<0>(props);
                 estore_new.area      += std::get<1>(props);
                 estore_new.volume    += std::get<2>(props);
                 estore_new.curvature += std::get<3>(props);
+                estore_new.attract   += std::get<4>(props);
+                estore_new.repel     += std::get<5>(props);
 
                 // evaluate energies
                 real energy_new = estore_new.get_energy();
@@ -696,8 +803,17 @@ PYBIND11_MODULE(_core, m) {
     // energy stuff
     m.def("calc_properties", &properties_vv,
           "Vertex-based evaluation of surface properties");
+    py::class_<BondParams>(m, "BondParams")
+        .def(py::init())
+        .def_readwrite("b", &BondParams::b)
+        .def_readwrite("lc0", &BondParams::lc0)
+        .def_readwrite("lc1", &BondParams::lc1)
+        .def_readwrite("lmax", &BondParams::lmax)
+        .def_readwrite("lmin", &BondParams::lmin)
+        .def_readwrite("a", &BondParams::a)
+        .def_readwrite("type", &BondParams::type);
     py::class_<EnergyValueStore>(m, "EnergyValueStore")
-       .def(py::init<real, real, real, real, real, real, real>())
+       .def(py::init<real, real, real, real, real, real, real, BondParams>())
        .def("get_energy", &EnergyValueStore::get_energy)
        .def("init", &EnergyValueStore::init,
              py::arg("mesh"), py::arg("ref_delta") = 1.0,
@@ -734,7 +850,7 @@ PYBIND11_MODULE(_core, m) {
           py::arg("mesh constraint"), py::arg("temp") = 1.0);
     m.def("move_global", &move_global, "Test global vertex markov step",
           py::arg("mesh"), py::arg("energy_store"), py::arg("min_t"),
-          py::arg("max_t"), py::arg("temp") = 1.0, py::arg("eoff") = 0.0);
+          py::arg("max_t"), py::arg("temp") = 1.0);
     m.def("flip_serial", &flip_serial, "Test global flip markov step",
           py::arg("mesh"), py::arg("energy_store"), py::arg("idx"),
           py::arg("min_t"), py::arg("max_t"),
