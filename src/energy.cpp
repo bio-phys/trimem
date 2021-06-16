@@ -458,7 +458,7 @@ properties_vv(TriMesh& mesh, const BondParams& params)
     real attract   = 0.0;
     real repel     = 0.0;
 
-    #pragma omp parallel for reduction(+:curvature,area,volume,energy)
+    #pragma omp parallel for reduction(+:curvature,area,volume,energy,attract,repel)
     for (int i=0; i<mesh.n_vertices(); i++)
     {
         auto ve = mesh.vertex_handle(i);
@@ -510,24 +510,24 @@ void gradient(TriMesh& mesh,
     for (int i=0; i<mesh.n_vertices(); i++)
     {
         auto vh = mesh.vertex_handle(i);
+        TriMesh::Point& point = mesh.point(vh);
+
+        // initialize new energy properties
+        EnergyValueStore estore_new = estore;
+
+        // remove vertex i's and its neighbors' properties
+        auto props =  vertex_vertex_properties(mesh, vh, params);
+        estore_new.energy    -= std::get<0>(props);
+        estore_new.area      -= std::get<1>(props);
+        estore_new.volume    -= std::get<2>(props);
+        estore_new.curvature -= std::get<3>(props);
+        estore_new.attract   -= std::get<4>(props);
+        estore_new.repel     -= std::get<5>(props);
 
         for (int j=0; j<3; j++)
         {
-            // initialize new energy properties
-            EnergyValueStore estore_new = estore;
-
-            // remove vertex i's and its neighbors' properties
-            auto props =  vertex_vertex_properties(mesh, vh, params);
-            estore_new.energy    -= std::get<0>(props);
-            estore_new.area      -= std::get<1>(props);
-            estore_new.volume    -= std::get<2>(props);
-            estore_new.curvature -= std::get<3>(props);
-            estore_new.attract   -= std::get<4>(props);
-            estore_new.repel     -= std::get<5>(props);
-
             // do perturbation
-            double* di = data+(3*i)+j;
-            *di = *di + eps;
+            point[j] += eps;
 
             // evaluate new properties for vertex i and its neighbors
             props = vertex_vertex_properties(mesh, vh, params);
@@ -540,6 +540,155 @@ void gradient(TriMesh& mesh,
 
             // evaluate differential energy
             real de = ( estore_new.get_energy() - e0 ) / eps;
+            r_grad(i,j) = de;
+
+            // undo perturbation
+            point[j] -= eps;
+            estore_new.energy    -= std::get<0>(props);
+            estore_new.area      -= std::get<1>(props);
+            estore_new.volume    -= std::get<2>(props);
+            estore_new.curvature -= std::get<3>(props);
+            estore_new.attract   -= std::get<4>(props);
+            estore_new.repel     -= std::get<5>(props);
+
+        }
+    }
+}
+
+TriMesh get_neighbourhood_copy(TriMesh& mesh, VertexHandle& vh)
+{
+    TriMesh patch;
+
+    // add center
+    patch.add_vertex(mesh.point(vh));
+
+    // add all direct neighbouring vertices
+    int nn = 0;
+    for (auto h_it=mesh.voh_ccwiter(vh); h_it.is_valid(); ++h_it)
+    {
+        // next vertex
+        auto n_vh = mesh.to_vertex_handle(*h_it);
+        patch.add_vertex(mesh.point(n_vh));
+        nn += 1;
+    }
+
+    // add all direct neighbouring faces
+    for (int i=0; i<nn; i++)
+    {
+        std::vector<VertexHandle> face = { VertexHandle(0),
+                                           VertexHandle(i+1),
+                                           VertexHandle((i+1)%nn + 1) };
+        patch.add_face(face);
+    }
+
+    // add all faces with 'next he' -> 'opposite he' -> 'opposite vertex'
+    int i=0;
+    int nnn = nn;
+    for (auto h_it=mesh.voh_ccwiter(vh); h_it.is_valid(); ++h_it, ++i)
+    {
+        // next halfedge->opposite halfedge->opposite vertex
+        auto n_hh = mesh.next_halfedge_handle(*h_it);
+        auto o_vh = mesh.opposite_he_opposite_vh(n_hh);
+        if (o_vh.is_valid())
+        {
+            patch.add_vertex(mesh.point(o_vh));
+            nnn += 1;
+            std::vector<VertexHandle> face = { VertexHandle(i+1),
+                                               VertexHandle(nnn),
+                                               VertexHandle((i+1)%nn + 1) };
+            patch.add_face(face);
+        }
+    }
+
+    return patch;
+}
+
+void f_gradient(TriMesh& mesh,
+                EnergyValueStore& estore,
+                py::array_t<real>& grad,
+                real eps=1.0e-6)
+{
+    // unperturbed energy
+    real e0 = energy(mesh, estore);
+
+    // global bond parameters
+    BondParams& params = estore.bond_params;
+
+    auto r_grad = grad.mutable_unchecked<2>();
+    #pragma omp parallel for
+    for (int i=0; i<mesh.n_vertices(); i++)
+    {
+        auto vh     = mesh.vertex_handle(i);
+        auto patch  = get_neighbourhood_copy(mesh, vh);
+        auto center = patch.vertex_handle(0); //vh's copy in the patch
+
+        TriMesh::Point& point = patch.point(center);
+
+        // initialize new energy properties
+        EnergyValueStore estore_new = estore;
+
+        // remove vertex i's and its neighbours' properties
+        auto props =  vertex_vertex_properties(patch, center, params);
+        estore_new.energy    -= std::get<0>(props);
+        estore_new.area      -= std::get<1>(props);
+        estore_new.volume    -= std::get<2>(props);
+        estore_new.curvature -= std::get<3>(props);
+        estore_new.attract   -= std::get<4>(props);
+        estore_new.repel     -= std::get<5>(props);
+
+        for (int j=0; j<3; j++)
+        {
+            // do perturbation
+            point[j] += eps;
+
+            // evaluate new properties for vertex i and its neighbours
+            props = vertex_vertex_properties(patch, center, params);
+            estore_new.energy    += std::get<0>(props);
+            estore_new.area      += std::get<1>(props);
+            estore_new.volume    += std::get<2>(props);
+            estore_new.curvature += std::get<3>(props);
+            estore_new.attract   += std::get<4>(props);
+            estore_new.repel     += std::get<5>(props);
+
+            // evaluate differential energy
+            real de = ( estore_new.get_energy() - e0 ) / eps;
+            r_grad(i,j) = de;
+
+            // undo perturbation
+            point[j] -= eps;
+            estore_new.energy    -= std::get<0>(props);
+            estore_new.area      -= std::get<1>(props);
+            estore_new.volume    -= std::get<2>(props);
+            estore_new.curvature -= std::get<3>(props);
+            estore_new.attract   -= std::get<4>(props);
+            estore_new.repel     -= std::get<5>(props);
+        }
+    }
+}
+
+void s_gradient(TriMesh& mesh,
+                EnergyValueStore& estore,
+                py::array_t<real>& grad,
+                real eps=1.0e-6)
+{
+    // unperturbed energy
+    real e0 = energy(mesh, estore);
+
+    // data acess
+    TriMesh::Point& point = mesh.point(mesh.vertex_handle(0));
+    double *data = point.data();
+
+    auto r_grad = grad.mutable_unchecked<2>();
+    for (int i=0; i<mesh.n_vertices(); i++)
+    {
+        for (int j=0; j<3; j++)
+        {
+            // do perturbation
+            double* di = data+(3*i)+j;
+            *di = *di + eps;
+
+            // evaluate differential energy
+            real de = ( energy(mesh, estore) - e0 ) / eps;
             r_grad(i,j) = de;
 
             // undo perturbation
@@ -714,6 +863,32 @@ std::tuple<int, int> move_global(TriMesh& mesh,
     return std::make_tuple(0, 0);
 }
 
+real delaunay_angle(TriMesh& mesh, OpenMesh::EdgeHandle& edge)
+{
+    real angle = 0.0;
+
+    auto n_heh = mesh.next_halfedge_handle(mesh.halfedge_handle(edge,0));
+    angle += mesh.calc_sector_angle(n_heh);
+
+    auto o_heh = mesh.next_halfedge_handle(mesh.halfedge_handle(edge,1));
+    angle += mesh.calc_sector_angle(o_heh);
+
+    return angle;
+}
+
+void flip_edges(TriMesh& mesh)
+{
+    for (auto eh : mesh.edges())
+    {
+        if (mesh.is_flip_ok(eh))
+        {
+            real angle = delaunay_angle(mesh, eh);
+            if (angle < 3.14159) continue;
+            mesh.flip(eh);
+        }
+    }
+}
+
 std::tuple<int, int> flip_serial(TriMesh& mesh,
                                  EnergyValueStore& estore,
                                  const py::array_t<int>& idx,
@@ -831,6 +1006,10 @@ PYBIND11_MODULE(_core, m) {
        .def_readwrite("ref_curvature", &EnergyValueStore::ref_curvature);
     m.def("energy", &energy, "Evaluate energy");
     m.def("gradient", &gradient, "Finite difference gradient of energy");
+    m.def("s_gradient", &s_gradient, "Finite difference gradient of energy");
+    m.def("f_gradient", &f_gradient, "Finite difference gradient of energy");
+
+    m.def("get_neighbourhood_copy", &get_neighbourhood_copy, "nn");
 
     // test volumes
     m.def("volume_v", &volume_v, "Volume based on triangle volumes.");
@@ -838,6 +1017,7 @@ PYBIND11_MODULE(_core, m) {
 
     // flip stuff
     m.def("check_edges", &check_edge_lengths, "Check for invalid edges");
+    m.def("flip_edges", &flip_edges, "Flip edges for local delaunayhood");
 
     // random stuff
     m.def("seed", &seed, "Test random number generator");

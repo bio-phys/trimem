@@ -18,6 +18,7 @@ cells = np.array([[0,1,2],
                   [1,3,2]])
 
 mesh = om.TriMesh(points, cells)
+om.write_mesh("test0.stl", mesh)
 
 for he in mesh.halfedges():
     fh = mesh.face_handle(he)
@@ -36,6 +37,7 @@ for he in mesh.halfedges():
         edge_angle_trimem = math.acos(max(-1., min(np.dot(face_normal, o_face_normal), 1.0)))
 
         print("--")
-        print("Normals :",face_normal, o_face_normal)
-        print("Dihedral: (openmesh) {}, (trimem) {}".format(
+        print("EDGE:", mesh.calc_edge_vector(he))
+        print(" Normals :",face_normal, o_face_normal)
+        print(" Dihedral: (openmesh) {}, (trimem) {}".format(
               edge_angle, edge_angle_trimem))
