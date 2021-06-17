@@ -40,6 +40,7 @@ real randomn()
 struct BondParams
 {
   real b, lc0, lc1, lmax, lmin, a;
+  int r;
   std::string type;
 };
 
@@ -146,7 +147,6 @@ public:
     {
         if (bond_params.type == "tether")
         {
-            if ((attract+repel)<0) throw std::runtime_error("uups");
             return attract + repel;
         }
         else if (bond_params.type == "area")
@@ -323,15 +323,14 @@ vertex_properties(TriMesh& mesh,
                 // constraint penalties
                 if (edge_length > params.lc0)
                 {
-                    attract += params.b *
-                               std::exp(0.1/(params.lc0 - edge_length)) /
-                               (params.lmax - edge_length);
+                    attract += params.b * std::pow(params.r, params.r + 1) *
+                               std::pow(edge_length-params.lc0, params.r);
                 }
                 if (edge_length < params.lc1)
                 {
                     repel += params.b *
-                             std::exp(0.1/(edge_length - params.lc1)) /
-                             (edge_length - params.lmin);
+                             std::exp(edge_length/(edge_length - params.lc1)) /
+                             std::pow(edge_length,-params.r);
                 }
             }
             else if(params.type == "area")
@@ -986,6 +985,7 @@ PYBIND11_MODULE(_core, m) {
         .def_readwrite("lmax", &BondParams::lmax)
         .def_readwrite("lmin", &BondParams::lmin)
         .def_readwrite("a", &BondParams::a)
+        .def_readwrite("r", &BondParams::r)
         .def_readwrite("type", &BondParams::type);
     py::class_<EnergyValueStore>(m, "EnergyValueStore")
        .def(py::init<real, real, real, real, real, real, real, BondParams>())
