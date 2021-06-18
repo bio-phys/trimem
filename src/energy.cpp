@@ -17,6 +17,7 @@
 #include "neighbour_list.h"
 #include "cell_list.h"
 #include "mesh_constraint.h"
+#include "mesh_math.h"
 
 
 typedef double real;
@@ -299,25 +300,27 @@ vertex_properties(TriMesh& mesh,
     real attract   = 0.0;
     real repel     = 0.0;
 
-    auto h_it = mesh.voh_iter(ve);
-    for(; h_it.is_valid(); ++h_it)
+    for (auto he : mesh.voh_range(ve) )
     {
-        auto fh = mesh.face_handle(*h_it);
-
-        if ( fh.is_valid() )
+        if ( not he.is_boundary() )
         {
-            // geometric properties
-            real sector_area = mesh.calc_sector_area(*h_it);
-            real edge_length = mesh.calc_edge_length(*h_it);
-            real edge_angle  = mesh.calc_dihedral_angle(*h_it);
-            auto face_normal = mesh.calc_face_normal(fh);
-            auto face_center = mesh.calc_face_centroid(fh);
+            // geometric properties of the edge
+            real edge_length = trimem::edge_length(mesh, he);
+            real edge_angle  = trimem::dihedral_angle(mesh, he);
             real edge_curv   = 0.5 * edge_angle * edge_length;
 
+            // geometric properties of the face
+            TriMesh::Normal center = trimem::face_centroid(mesh, he);
+            TriMesh::Normal normal = trimem::face_normal(mesh, he);
+            real sector_area       = norm(normal)/2;
+            real sector_volume     = dot(normal, center) / 6;
+
+            // add up properties to the vertex
             curvature += edge_curv;
             area      += sector_area;
-            volume    += dot(face_normal, face_center) * sector_area / 3;
+            volume    += sector_volume;
 
+            // tethering
             if (params.type == "tether")
             {
                 // constraint penalties
