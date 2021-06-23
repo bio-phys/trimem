@@ -289,6 +289,23 @@ real volume_f(TriMesh& mesh)
     return volume;
 }
 
+real volume_n(TriMesh& mesh)
+{
+    real volume = 0.0;
+
+    #pragma omp parallel for reduction(+:volume)
+    for (int i=0; i<mesh.n_vertices(); i++)
+    {
+        auto ve = mesh.vertex_handle(i);
+        for (auto he : mesh.voh_range(ve))
+        {
+            volume += trimem::face_volume(mesh, he);
+        }
+    }
+
+    return volume/3;
+}
+
 std::tuple<real, real, real, real, real, real>
 vertex_properties(TriMesh& mesh,
                   const VertexHandle& ve,
@@ -300,7 +317,7 @@ vertex_properties(TriMesh& mesh,
     real attract   = 0.0;
     real repel     = 0.0;
 
-    for (auto he : mesh.voh_range(ve) )
+    for (auto he : mesh.voh_range(ve))
     {
         if ( not he.is_boundary() )
         {
@@ -310,15 +327,13 @@ vertex_properties(TriMesh& mesh,
             real edge_curv   = 0.5 * edge_angle * edge_length;
 
             // geometric properties of the face
-            TriMesh::Normal center = trimem::face_centroid(mesh, he);
-            TriMesh::Normal normal = trimem::face_normal(mesh, he);
-            real sector_area       = norm(normal)/2;
-            real sector_volume     = dot(normal, center) / 6;
+            real face_area   = trimem::face_area(mesh, he);
+            real face_volume = trimem::face_volume(mesh, he);
 
             // add up properties to the vertex
             curvature += edge_curv;
-            area      += sector_area;
-            volume    += sector_volume;
+            area      += face_area;
+            volume    += face_volume;
 
             // tethering
             if (params.type == "tether")
@@ -338,7 +353,7 @@ vertex_properties(TriMesh& mesh,
             }
             else if(params.type == "area")
             {
-                real d = sector_area * sector_area;
+                real d = face_area * face_area;
                 attract += d;
             }
         }
@@ -346,9 +361,9 @@ vertex_properties(TriMesh& mesh,
 
     // correct multiplicity
     // (every face contributes to 3 vertices)
-    area     /= 3;
-    volume   /= 3;
     // (every edge contributes to 2 vertices)
+    area      /= 3;
+    volume    /= 3;
     curvature /= 2;
 
     if (area < 0)
@@ -977,6 +992,9 @@ std::tuple<int, int> flip_serial(TriMesh& mesh,
 PYBIND11_MODULE(_core, m) {
     m.doc() = "pybind11 example plugin"; // optional module docstring
 
+    // expose properties
+    trimem::expose_properties(m);
+
     // energy stuff
     m.def("calc_properties", &properties_vv,
           "Vertex-based evaluation of surface properties");
@@ -1017,6 +1035,7 @@ PYBIND11_MODULE(_core, m) {
     // test volumes
     m.def("volume_v", &volume_v, "Volume based on triangle volumes.");
     m.def("volume_f", &volume_f, "Volume based on divergence theorem.");
+    m.def("volume_n", &volume_n, "Volume based on triangle volumes (mod).");
 
     // flip stuff
     m.def("check_edges", &check_edge_lengths, "Check for invalid edges");
