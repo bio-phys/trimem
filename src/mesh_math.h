@@ -18,72 +18,8 @@ namespace trimem {
 
 typedef OpenMesh::HalfedgeHandle HalfedgeHandle;
 
-//! a row-vector of the derivation of a scalar wrt components of another vector
-//! since the 'other' vector here is always a point coordinate, the gradient
-//! can be of type 'TriMesh::Point', i.e., it has lenght 3.
+//! Gradient
 typedef TriMesh::Point Vector;
-
-//! a MxN jacobian matrix of the gradients of an M-vector quantity wrt an
-//! N-vector (here 3-vector)
-typedef std::vector<Vector> Matrix;
-
-// Matrix vector product
-Vector dot(Matrix& A, Vector& x)
-{
-    Vector y;
-    for (size_t i=0; i<A.size(); i++)
-    {
-        y[i] = A[i].dot(x);
-    }
-
-    return y;
-}
-
-real edge_length(TriMesh& mesh, HalfedgeHandle& he)
-{
-    return mesh.calc_edge_length(he);
-}
-
-std::vector<Vector> edge_length_grad(TriMesh& mesh, HalfedgeHandle& he)
-{
-    std::vector<Vector> gradient;
-    gradient.reserve(2);
-
-    real length = edge_length(mesh, he);
-    auto to     = mesh.to_vertex_handle(he);
-    auto from   = mesh.from_vertex_handle(he);
-    TriMesh::Point diff = ( mesh.point(to) - mesh.point(from) );
-
-    diff /= length;
-    gradient.push_back( -diff );
-    gradient.push_back( diff );
-
-    return gradient;
-}
-
-TriMesh::Normal face_centroid(TriMesh& mesh, HalfedgeHandle& he)
-{
-    TriMesh::Point center = {0, 0, 0};
-    center += mesh.point( mesh.from_vertex_handle(he) );
-    center += mesh.point( mesh.to_vertex_handle(he) );
-    center += mesh.point( mesh.to_vertex_handle(mesh.next_halfedge_handle(he)) );
-    center /= 3;
-    return center;
-}
-
-std::vector<Matrix> face_centroid_grad(TriMesh& mesh, HalfedgeHandle he)
-{
-    std::vector<Matrix> jacs;
-    jacs.reserve(3);
-
-    Matrix m = { {1./3, 0., 0.}, {0., 1./3, 0.}, {0., 0., 1./3} };
-
-    jacs.push_back(m);
-    jacs.push_back(m);
-    jacs.push_back(m);
-
-    return jacs;
-}
 
 TriMesh::Normal edge_vector(TriMesh& mesh, HalfedgeHandle he)
 {
@@ -96,42 +32,32 @@ TriMesh::Normal face_normal(TriMesh& mesh, HalfedgeHandle he)
 {
     TriMesh::Normal normal;
     mesh.calc_sector_normal(he, normal);
-    return normal;
+    return normal/OpenMesh::norm(normal);
 }
 
-std::vector<Matrix> face_normal_grad(TriMesh& mesh, HalfedgeHandle he)
+real edge_length(TriMesh& mesh, HalfedgeHandle& he)
 {
-    std::vector<Matrix> jacs;
-    jacs.reserve(3);
+    return OpenMesh::norm(edge_vector(mesh, he));
+}
 
-    auto x0 = mesh.point( mesh.from_vertex_handle(he) );
-    auto x1 = mesh.point( mesh.to_vertex_handle(he));
-    auto x2 = mesh.point( mesh.to_vertex_handle(mesh.next_halfedge_handle(he)) );
+std::vector<Vector> edge_length_grad(TriMesh& mesh, HalfedgeHandle& he)
+{
+    std::vector<Vector> gradient;
+    gradient.reserve(2);
 
-    // dn/dx0
-    auto d21 = x2-x1;
-    jacs.push_back({ {       0,  -d21[2],  d21[1] },
-                     {  d21[2],       0,  -d21[0] },
-                     { -d21[1],   d21[0],       0  } });
+    auto edge = edge_vector(mesh, he);
+    edge /= OpenMesh::norm(edge);
 
-    // dn/dx1
-    auto d10 = x0-x1;
-    jacs.push_back({ {              0,   d21[2]-d10[2],  d10[1]-d21[1] },
-                     { -d21[2]+d10[2],               0,  d21[0]-d10[0] },
-                     { -d10[1]+d21[1],  -d21[0]+d10[0],              0 } });
+    gradient.push_back( -edge );
+    gradient.push_back(  edge );
 
-    // dn/dx2
-    jacs.push_back({ {       0,  d10[2], -d10[1] },
-                     { -d10[2],       0,  d10[0] },
-                     {  d10[1], -d10[0],       0 } });
-
-    return jacs;
-
+    return gradient;
 }
 
 real face_area(TriMesh& mesh, HalfedgeHandle he)
 {
-    auto normal = face_normal(mesh, he);
+    TriMesh::Normal normal;
+    mesh.calc_sector_normal(he, normal);
     return OpenMesh::norm(normal)/2;
 }
 
@@ -141,28 +67,6 @@ std::vector<Vector> face_area_grad(TriMesh& mesh, HalfedgeHandle he)
     gradient.reserve(3);
 
     auto normal = face_normal(mesh, he);
-    real nn     = OpenMesh::norm(normal)*2.0;
-
-    // (unnormalized) face normal gradients
-    auto dn = face_normal_grad(mesh, he);
-
-    // assemble gradient wrt to the 3 face vertices
-    Vector one(1.0);
-    //x0, x1 and x2
-    gradient.push_back( -dot(dn[0], normal) / nn);
-    gradient.push_back( -dot(dn[1], normal) / nn);
-    gradient.push_back( -dot(dn[2], normal) / nn);
-
-    return gradient;
-}
-
-std::vector<Vector> face_area_grad_alt(TriMesh& mesh, HalfedgeHandle he)
-{
-    std::vector<Vector> gradient;
-    gradient.reserve(3);
-
-    auto normal = face_normal(mesh, he);
-    normal /= OpenMesh::norm(normal);
 
     auto e0 = edge_vector(mesh, he);
     auto e1 = edge_vector(mesh, mesh.next_halfedge_handle(he));
@@ -200,24 +104,19 @@ std::vector<Vector> face_volume_grad(TriMesh& mesh, HalfedgeHandle he)
     return gradient;
 }
 
-
 real dihedral_angle(TriMesh& mesh, HalfedgeHandle& he)
 {
     return mesh.calc_dihedral_angle(he);
 }
 
-std::vector<Vector> dihedral_angle_grad_alt(TriMesh& mesh, HalfedgeHandle& he)
+std::vector<Vector> dihedral_angle_grad(TriMesh& mesh, HalfedgeHandle& he)
 {
     std::vector<Vector> gradient;
     gradient.reserve(4);
 
     auto n0 = face_normal(mesh, he);
     auto n1 = face_normal(mesh, mesh.opposite_halfedge_handle(he));
-    auto ve = edge_vector(mesh, he);
-    real l  = OpenMesh::norm(ve);
-
-    n0 = n0/OpenMesh::norm(n0);
-    n1 = n1/OpenMesh::norm(n1);
+    real l  = edge_length(mesh, he);
 
     real a01 = mesh.calc_sector_angle(mesh.prev_halfedge_handle(he));
     real a03 = mesh.calc_sector_angle(he);
@@ -233,71 +132,7 @@ std::vector<Vector> dihedral_angle_grad_alt(TriMesh& mesh, HalfedgeHandle& he)
     return gradient;
 }
 
-std::vector<Vector> dihedral_angle_grad(TriMesh& mesh, HalfedgeHandle& he)
-{
-    std::vector<Vector> gradient;
-    gradient.reserve(4);
-
-    auto n0 = face_normal(mesh, he);
-    auto n1 = face_normal(mesh, mesh.opposite_halfedge_handle(he));
-    auto ve = edge_vector(mesh, he);
-
-    auto nn0 = OpenMesh::norm(n0);
-    auto nn1 = OpenMesh::norm(n1);
-
-    auto denom = nn0*nn1;
-    if (denom == TriMesh::Scalar(0))
-    {
-        gradient.push_back(Vector(0));
-        gradient.push_back(Vector(0));
-        gradient.push_back(Vector(0));
-        gradient.push_back(Vector(0));
-        return gradient;
-    }
-
-    auto nom = n0.dot(n1);
-
-    // da_cos
-    int sgn = cross(n0,n1).dot(ve) >=0 ? 1 : -1;
-    real da_cos = nom/denom;
-
-    // (unnormalized) face normal derivatives
-    auto dn0 = face_normal_grad(mesh, he);
-    auto dn1 = face_normal_grad(mesh, mesh.opposite_halfedge_handle(he));
-
-    // face area derivative (factor 2 missing here. Account for it later)
-    auto da0 = face_area_grad(mesh, he);
-    auto da1 = face_area_grad(mesh, mesh.opposite_halfedge_handle(he));
-
-    // assemble gradients wrt the 4 vertices associated to the edge
-    real fac = 1. / ( std::sqrt(1. - da_cos * da_cos) * denom * denom ) * sgn;
-    // dx0
-    gradient.push_back(
-        ( ( dot(dn0[0], n1) + dot(dn1[1], n0) ) * denom +
-          ( da0[0] * nn1 + da1[1] * nn0 ) * nom * 2
-        ) * fac );
-
-    // dx1
-    gradient.push_back(
-        ( ( dot(dn0[1], n1) + dot(dn1[0], n0) ) * denom +
-          ( da0[1] * nn1 + da1[0] * nn0 ) * nom * 2
-        ) * fac );
-
-    // dx2
-    gradient.push_back(
-        ( dot(dn0[2], n1) * denom +
-          da0[2] * nn1 * nom * 2
-        ) * fac );
-
-    // dx3
-    gradient.push_back(
-        ( dot(dn1[2], n0)* denom +
-          da1[2] * nn0 * nom * 2
-        ) * fac );
-
-    return gradient;
-}
-
+// vector of some Row-type to numpy
 template<class Row>
 py::array_t<typename Row::value_type> tonumpy(Row& _vec, size_t _n = 1) {
 	typedef typename Row::value_type dtype;
@@ -321,32 +156,9 @@ void expose_properties(py::module& m)
             auto res = edge_length_grad(mesh, he);
             return tonumpy(res[0], res.size());});
 
-    m.def("face_centroid", [](TriMesh& mesh, HalfedgeHandle& he){
-            auto res = face_centroid(mesh, he);
-            return tonumpy(res);});
-    m.def("face_centroid_grad", [](TriMesh& mesh, HalfedgeHandle& he){
-            auto res = face_centroid_grad(mesh, he);
-            std::vector<py::array_t<typename Vector::value_type>> grad;
-            for (size_t i=0; i<res.size(); i++)
-                grad.push_back(tonumpy(res[i][0],res[i].size()));
-            return grad;});
-
-    m.def("face_normal", [](TriMesh& mesh, HalfedgeHandle& he){
-            auto res = face_normal(mesh, he);
-            return tonumpy(res);});
-    m.def("face_normal_grad", [](TriMesh& mesh, HalfedgeHandle& he){
-            auto res = face_normal_grad(mesh, he);
-            std::vector<py::array_t<typename Vector::value_type>> grad;
-            for (size_t i=0; i<res.size(); i++)
-                grad.push_back(tonumpy(res[i][0],res[i].size()));
-            return grad;});
-
     m.def("face_area", &face_area);
     m.def("face_area_grad", [](TriMesh& mesh, HalfedgeHandle& he) {
             auto res = face_area_grad(mesh, he);
-            return tonumpy(res[0], res.size());});
-    m.def("face_area_grad_alt", [](TriMesh& mesh, HalfedgeHandle& he) {
-            auto res = face_area_grad_alt(mesh, he);
             return tonumpy(res[0], res.size());});
 
     m.def("face_volume", &face_volume);
@@ -357,9 +169,6 @@ void expose_properties(py::module& m)
     m.def("dihedral_angle", &dihedral_angle);
     m.def("dihedral_angle_grad", [](TriMesh& mesh, HalfedgeHandle& he) {
             auto res = dihedral_angle_grad(mesh, he);
-            return tonumpy(res[0], res.size());});
-    m.def("dihedral_angle_grad_alt", [](TriMesh& mesh, HalfedgeHandle& he) {
-            auto res = dihedral_angle_grad_alt(mesh, he);
             return tonumpy(res[0], res.size());});
 }
 
