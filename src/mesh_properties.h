@@ -9,12 +9,11 @@
 #include "pybind11/pybind11.h"
 #include "pybind11/numpy.h"
 
-typedef double real;
-
 namespace trimem {
 
 typedef OpenMesh::HalfedgeHandle HalfedgeHandle;
 typedef TriMesh::Point Gradient;
+typedef TriMesh::Point::value_type real;
 
 TriMesh::Normal edge_vector(TriMesh& mesh, HalfedgeHandle he);
 
