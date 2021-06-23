@@ -1,8 +1,8 @@
-/** \file mesh_math.h
- * \brief Geomoetric utility function on edges.
+/** \file mesh_properties.h
+ * \brief Geometric properties and gradients on a OpenMesh::TriMesh.
  */
-#ifndef MESH_MATH_H
-#define MESH_MATH_H
+#ifndef MESH_PROPERTIES_H
+#define MESH_PROPERTIES_H
 
 #include <ctgmath>
 
@@ -19,7 +19,7 @@ namespace trimem {
 typedef OpenMesh::HalfedgeHandle HalfedgeHandle;
 
 //! Gradient
-typedef TriMesh::Point Vector;
+typedef TriMesh::Point Gradient;
 
 TriMesh::Normal edge_vector(TriMesh& mesh, HalfedgeHandle he)
 {
@@ -40,9 +40,9 @@ real edge_length(TriMesh& mesh, HalfedgeHandle& he)
     return OpenMesh::norm(edge_vector(mesh, he));
 }
 
-std::vector<Vector> edge_length_grad(TriMesh& mesh, HalfedgeHandle& he)
+std::vector<Gradient> edge_length_grad(TriMesh& mesh, HalfedgeHandle& he)
 {
-    std::vector<Vector> gradient;
+    std::vector<Gradient> gradient;
     gradient.reserve(2);
 
     auto edge = edge_vector(mesh, he);
@@ -61,9 +61,9 @@ real face_area(TriMesh& mesh, HalfedgeHandle he)
     return OpenMesh::norm(normal)/2;
 }
 
-std::vector<Vector> face_area_grad(TriMesh& mesh, HalfedgeHandle he)
+std::vector<Gradient> face_area_grad(TriMesh& mesh, HalfedgeHandle he)
 {
-    std::vector<Vector> gradient;
+    std::vector<Gradient> gradient;
     gradient.reserve(3);
 
     auto normal = face_normal(mesh, he);
@@ -88,9 +88,9 @@ real face_volume(TriMesh& mesh, HalfedgeHandle he)
     return OpenMesh::cross(p1,p2).dot(p0) / 6;
 }
 
-std::vector<Vector> face_volume_grad(TriMesh& mesh, HalfedgeHandle he)
+std::vector<Gradient> face_volume_grad(TriMesh& mesh, HalfedgeHandle he)
 {
-    std::vector<Vector> gradient;
+    std::vector<Gradient> gradient;
     gradient.reserve(3);
 
     auto p0 = mesh.point(mesh.from_vertex_handle(he));
@@ -109,9 +109,9 @@ real dihedral_angle(TriMesh& mesh, HalfedgeHandle& he)
     return mesh.calc_dihedral_angle(he);
 }
 
-std::vector<Vector> dihedral_angle_grad(TriMesh& mesh, HalfedgeHandle& he)
+std::vector<Gradient> dihedral_angle_grad(TriMesh& mesh, HalfedgeHandle& he)
 {
-    std::vector<Vector> gradient;
+    std::vector<Gradient> gradient;
     gradient.reserve(4);
 
     auto n0 = face_normal(mesh, he);

@@ -17,7 +17,7 @@
 #include "neighbour_list.h"
 #include "cell_list.h"
 #include "mesh_constraint.h"
-#include "mesh_math.h"
+#include "mesh_properties.h"
 
 
 typedef double real;
