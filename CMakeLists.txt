@@ -9,7 +9,7 @@ find_package(OpenMP)
 # instead add dependency of test on opemesh-python explicitly below
 add_subdirectory(openmesh-python EXCLUDE_FROM_ALL)
 
-pybind11_add_module(_core MODULE src/energy.cpp src/mesh_properties.cpp)
+pybind11_add_module(_core MODULE src/bindings.cpp src/mesh_properties.cpp)
 target_include_directories(_core PRIVATE openmesh-python/src)
 target_include_directories(_core PRIVATE openmesh-python/OpenMesh/src)
 
