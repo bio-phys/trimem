@@ -3,144 +3,161 @@
  */
 #include "mesh_properties.h"
 
-#include <ctgmath>
+#include "mesh_util.h"
+#include "mesh_tether.h"
 
-#include "OpenMesh/Core/Geometry/VectorT.hh"
+namespace trimem {
 
-using namespace trimem;
-
-TriMesh::Normal trimem::edge_vector(TriMesh& mesh, HalfedgeHandle he)
+VertexProperties vertex_properties(const TriMesh& mesh,
+                                   const BondPotential& bonds,
+                                   const VertexHandle& ve)
 {
-    TriMesh::Normal edge;
-    mesh.calc_edge_vector(he, edge);
-    return edge;
+    VertexProperties p{ 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+    for (auto he : mesh.voh_range(ve))
+    {
+        if ( not he.is_boundary() )
+        {
+            // edge curvature
+            real el      = edge_length(mesh, he);
+            real da      = dihedral_angle(mesh, he);
+            p.curvature += 0.5 * el * da;
+
+            // face area/volume
+            p.area   += face_area(mesh, he);
+            p.volume += face_volume(mesh, he);
+
+            // bonds
+            p.tethering += bonds.vertex_property(mesh, he);
+        }
+    }
+
+    // correct multiplicity
+    p.area      /= 3;
+    p.volume    /= 3;
+    p.curvature /= 2;
+    p.tethering /= bonds.valence();
+
+    p.bending    = 2 * p.curvature * p.curvature / p.area;
+
+    return p;
 }
 
-TriMesh::Normal trimem::face_normal(TriMesh& mesh, HalfedgeHandle he)
+void vertex_properties_grad(const TriMesh& mesh,
+                            const BondPotential& bonds,
+                            const VertexHandle& ve,
+                            std::vector<VertexPropertiesGradient>& d_props)
 {
-    TriMesh::Normal normal;
-    mesh.calc_sector_normal(he, normal);
-    return normal/OpenMesh::norm(normal);
+    // pre-compute vertex-curvature to vertex-area ratio (needed for bending)
+    real curvature = 0.0;
+    real area      = 0.0;
+    for (auto he : mesh.voh_range(ve))
+    {
+        real l  = edge_length(mesh, he);
+        real da = dihedral_angle(mesh, he);
+
+        curvature += 0.5 * l * da;
+        area      += face_area(mesh, he);
+    }
+    real c_to_a = curvature / area * 1.5;
+
+    for (auto he : mesh.voh_range(ve))
+    {
+        if ( not he.is_boundary() )
+        {
+            //relevant vertex indices of the facet-pair associated to 'he'
+            std::vector<int> idx
+              { ve.idx(),
+                mesh.to_vertex_handle(he).idx(),
+                mesh.to_vertex_handle(mesh.next_halfedge_handle(he)).idx(),
+                mesh.to_vertex_handle(mesh.next_halfedge_handle(
+                  mesh.opposite_halfedge_handle(he))).idx()
+              };
+
+            // edge curvature
+            real edge_length = trimem::edge_length(mesh, he);
+            real edge_angle  = trimem::dihedral_angle(mesh, he);
+            auto d_length = trimem::edge_length_grad(mesh, he);
+            auto d_angle  = trimem::dihedral_angle_grad(mesh, he);
+            for (size_t i=0; i<d_length.size(); i++)
+            {
+                auto val = 0.25 * edge_angle * d_length[i];
+                for (int j=0; j<3; j++)
+                {
+#pragma omp atomic
+                    d_props[idx[i]].curvature[j] += val[j];
+
+                    // contribution to bending
+#pragma omp atomic
+                    d_props[idx[i]].bending[j] += 4.0 * val[j] * c_to_a;
+                }
+            }
+
+            for (size_t i=0; i<d_angle.size(); i++)
+            {
+                auto val = 0.25 * edge_length * d_angle[i];
+                for (int j=0; j<3; j++)
+                {
+#pragma omp atomic
+                    d_props[idx[i]].curvature[j] += val[j];
+
+                    // contribution to bending
+#pragma omp atomic
+                    d_props[idx[i]].bending[j] += 4.0 * val[j] * c_to_a;
+                }
+            }
+
+            // face area
+            auto d_face_area = trimem::face_area_grad(mesh, he);
+            for (size_t i=0; i<d_face_area.size(); i++)
+            {
+                auto val = d_face_area[i] / 3;
+                for (int j=0; j<3; j++)
+                {
+#pragma omp atomic
+                    d_props[idx[i]].area[j] += val[j];
+
+                    // contribution to bending
+#pragma omp atomic
+                    d_props[idx[i]].bending[j] -= 2.0 * val[j] * c_to_a * c_to_a;
+                }
+            }
+
+            // face volume
+            auto d_face_volume = trimem::face_volume_grad(mesh, he);
+            for (size_t i=0; i<d_face_volume.size(); i++)
+            {
+                auto val = d_face_volume[i] / 3;
+                for (int j=0; j<3; j++)
+                {
+#pragma omp atomic
+                    d_props[idx[i]].volume[j] += val[j];
+                }
+            }
+
+            // tether bonds
+            auto d_bond = bonds.vertex_property_grad(mesh, he);
+            for (size_t i=0; i<d_bond.size(); i++)
+            {
+                auto val = d_bond[i] / bonds.valence();
+                for (int j=0; j<3; j++)
+                {
+#pragma omp atomic
+                    d_props[idx[i]].tethering[j] += val[j];
+                }
+            }
+        }
+    }
 }
 
-real trimem::edge_length(TriMesh& mesh, HalfedgeHandle& he)
+void expose_properties(py::module& m)
 {
-    return OpenMesh::norm(edge_vector(mesh, he));
+    py::class_<VertexProperties>(m, "VertexProperties")
+       .def(py::init())
+       .def_readwrite("area", &VertexProperties::area)
+       .def_readwrite("volume", &VertexProperties::volume)
+       .def_readwrite("curvature", &VertexProperties::curvature)
+       .def_readwrite("bending", &VertexProperties::bending)
+       .def_readwrite("tethering", &VertexProperties::tethering);
 }
-
-std::vector<Gradient> trimem::edge_length_grad(TriMesh& mesh,
-                                               HalfedgeHandle& he)
-{
-    std::vector<Gradient> gradient;
-    gradient.reserve(2);
-
-    auto edge = edge_vector(mesh, he);
-    edge /= OpenMesh::norm(edge);
-
-    gradient.push_back( -edge );
-    gradient.push_back(  edge );
-
-    return gradient;
-}
-
-real trimem::face_area(TriMesh& mesh, HalfedgeHandle he)
-{
-    TriMesh::Normal normal;
-    mesh.calc_sector_normal(he, normal);
-    return OpenMesh::norm(normal)/2;
-}
-
-std::vector<Gradient> trimem::face_area_grad(TriMesh& mesh, HalfedgeHandle he)
-{
-    std::vector<Gradient> gradient;
-    gradient.reserve(3);
-
-    auto normal = face_normal(mesh, he);
-
-    auto e0 = edge_vector(mesh, he);
-    auto e1 = edge_vector(mesh, mesh.next_halfedge_handle(he));
-    auto e2 = edge_vector(mesh, mesh.prev_halfedge_handle(he));
-
-    gradient.push_back( 0.5 * OpenMesh::cross(normal, e1) );
-    gradient.push_back( 0.5 * OpenMesh::cross(normal, e2) );
-    gradient.push_back( 0.5 * OpenMesh::cross(normal, e0) );
-
-    return gradient;
-}
-
-real trimem::face_volume(TriMesh& mesh, HalfedgeHandle he)
-{
-    auto p0 = mesh.point(mesh.from_vertex_handle(he));
-    auto p1 = mesh.point(mesh.to_vertex_handle(he));
-    auto p2 = mesh.point(mesh.to_vertex_handle(mesh.next_halfedge_handle(he)));
-
-    return OpenMesh::cross(p1,p2).dot(p0) / 6;
-}
-
-std::vector<Gradient> trimem::face_volume_grad(TriMesh& mesh, HalfedgeHandle he)
-{
-    std::vector<Gradient> gradient;
-    gradient.reserve(3);
-
-    auto p0 = mesh.point(mesh.from_vertex_handle(he));
-    auto p1 = mesh.point(mesh.to_vertex_handle(he));
-    auto p2 = mesh.point(mesh.to_vertex_handle(mesh.next_halfedge_handle(he)));
-
-    gradient.push_back( OpenMesh::cross(p1,p2) / 6 );
-    gradient.push_back( OpenMesh::cross(p2,p0) / 6 );
-    gradient.push_back( OpenMesh::cross(p0,p1) / 6 );
-
-    return gradient;
-}
-
-real trimem::dihedral_angle(TriMesh& mesh, HalfedgeHandle& he)
-{
-    return mesh.calc_dihedral_angle(he);
-}
-
-std::vector<Gradient> trimem::dihedral_angle_grad(TriMesh& mesh,
-                                                  HalfedgeHandle& he)
-{
-    std::vector<Gradient> gradient;
-    gradient.reserve(4);
-
-    auto n0 = face_normal(mesh, he);
-    auto n1 = face_normal(mesh, mesh.opposite_halfedge_handle(he));
-    real l  = edge_length(mesh, he);
-
-    real a01 = mesh.calc_sector_angle(mesh.prev_halfedge_handle(he));
-    real a03 = mesh.calc_sector_angle(he);
-    real a02 = mesh.calc_sector_angle(mesh.opposite_halfedge_handle(he));
-    real a04 = mesh.calc_sector_angle(mesh.prev_halfedge_handle(
-                                        mesh.opposite_halfedge_handle(he)));
-
-    gradient.push_back(  (1./std::tan(a03) * n0 + 1./std::tan(a04) * n1 ) / l );
-    gradient.push_back(  (1./std::tan(a01) * n0 + 1./std::tan(a02) * n1 ) / l );
-    gradient.push_back( -(1./std::tan(a01) + 1./std::tan(a03)) * n0 / l );
-    gradient.push_back( -(1./std::tan(a02) + 1./std::tan(a04)) * n1 / l );
-
-    return gradient;
-}
-
-void trimem::expose_properties(py::module& m)
-{
-    m.def("edge_length", &edge_length);
-    m.def("edge_length_grad", [](TriMesh& mesh, HalfedgeHandle& he) {
-            auto res = edge_length_grad(mesh, he);
-            return tonumpy(res[0], res.size());});
-
-    m.def("face_area", &face_area);
-    m.def("face_area_grad", [](TriMesh& mesh, HalfedgeHandle& he) {
-            auto res = face_area_grad(mesh, he);
-            return tonumpy(res[0], res.size());});
-
-    m.def("face_volume", &face_volume);
-    m.def("face_volume_grad", [](TriMesh& mesh, HalfedgeHandle& he) {
-            auto res = face_volume_grad(mesh, he);
-            return tonumpy(res[0], res.size());});
-
-    m.def("dihedral_angle", &dihedral_angle);
-    m.def("dihedral_angle_grad", [](TriMesh& mesh, HalfedgeHandle& he) {
-            auto res = dihedral_angle_grad(mesh, he);
-            return tonumpy(res[0], res.size());});
 }

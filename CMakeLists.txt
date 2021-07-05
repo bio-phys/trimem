@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 project(test)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 
 find_package(OpenMP)
 
@@ -9,7 +9,11 @@ find_package(OpenMP)
 # instead add dependency of test on opemesh-python explicitly below
 add_subdirectory(openmesh-python EXCLUDE_FROM_ALL)
 
-pybind11_add_module(_core MODULE src/bindings.cpp src/mesh_properties.cpp)
+pybind11_add_module(_core MODULE src/bindings.cpp
+                          src/params.cpp
+                          src/mesh_properties.cpp
+                          src/mesh_util.cpp
+                          src/energy.cpp)
 target_include_directories(_core PRIVATE openmesh-python/src)
 target_include_directories(_core PRIVATE openmesh-python/OpenMesh/src)
 

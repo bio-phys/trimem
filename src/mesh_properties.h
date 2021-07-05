@@ -1,56 +1,58 @@
 /** \file mesh_properties.h
- * \brief Geometric properties and gradients on a OpenMesh::TriMesh.
+ * \brief Evaluate vertex-based properties.
  */
 #ifndef MESH_PROPERTIES_H
 #define MESH_PROPERTIES_H
 
-#include "MeshTypes.hh"
+#include "defs.h"
 
 #include "pybind11/pybind11.h"
-#include "pybind11/numpy.h"
 
 namespace trimem {
 
-typedef OpenMesh::HalfedgeHandle HalfedgeHandle;
-typedef TriMesh::Point Gradient;
-typedef TriMesh::Point::value_type real;
+struct BondPotential;
 
-TriMesh::Normal edge_vector(TriMesh& mesh, HalfedgeHandle he);
+template<class T>
+struct TVertexProperties
+{
+    T area;
+    T volume;
+    T curvature;
+    T bending;
+    T tethering;
 
-TriMesh::Normal face_normal(TriMesh& mesh, HalfedgeHandle he);
+    TVertexProperties<T>& operator+=(const TVertexProperties<T>& lhs)
+    {
+        area      += lhs.area;
+        volume    += lhs.volume;
+        curvature += lhs.curvature;
+        bending   += lhs.bending;
+        tethering += lhs.tethering;
+        return *this;
+    }
 
-real edge_length(TriMesh& mesh, HalfedgeHandle& he);
+    TVertexProperties<T>& operator-=(const TVertexProperties<T>& lhs)
+    {
+        area      -= lhs.area;
+        volume    -= lhs.volume;
+        curvature -= lhs.curvature;
+        bending   -= lhs.bending;
+        tethering -= lhs.tethering;
+        return *this;
+    }
+};
 
-std::vector<Gradient> edge_length_grad(TriMesh& mesh, HalfedgeHandle& he);
+typedef TVertexProperties<real>  VertexProperties;
+typedef TVertexProperties<Point> VertexPropertiesGradient;
 
-real face_area(TriMesh& mesh, HalfedgeHandle he);
+VertexProperties vertex_properties(const TriMesh& mesh,
+                                   const BondPotential& bonds,
+                                   const VertexHandle& ve);
 
-std::vector<Gradient> face_area_grad(TriMesh& mesh, HalfedgeHandle he);
-
-real face_volume(TriMesh& mesh, HalfedgeHandle he);
-
-std::vector<Gradient> face_volume_grad(TriMesh& mesh, HalfedgeHandle he);
-
-real dihedral_angle(TriMesh& mesh, HalfedgeHandle& he);
-
-std::vector<Gradient> dihedral_angle_grad(TriMesh& mesh, HalfedgeHandle& he);
-
-// vector of some Gradients to numpy
-template<class Row>
-py::array_t<typename Row::value_type> tonumpy(Row& _vec, size_t _n = 1) {
-	typedef typename Row::value_type dtype;
-	std::vector<size_t> shape;
-	std::vector<size_t> strides;
-	if (_n == 1) {
-		shape = {_vec.size()};
-		strides = {sizeof(dtype)};
-	}
-	else {
-		shape = {_n, _vec.size()};
-		strides = {_vec.size() * sizeof(dtype), sizeof(dtype)};
-	}
-	return py::array_t<dtype>(shape, strides, _vec.data());
-}
+void vertex_properties_grad(const TriMesh& mesh,
+                            const BondPotential& bonds,
+                            const VertexHandle& ve,
+                            std::vector<VertexPropertiesGradient>& d_props);
 
 void expose_properties(py::module& m);
 

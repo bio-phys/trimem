@@ -1,75 +1,114 @@
+import helfrich as m
 import helfrich.openmesh as om
-import helfrich.energy as pyenergy
-import helfrich as cppenergy
 import numpy as np
 import meshzoo
+from collections import namedtuple
 
-import time
+import pytest
 
 
-def sphere(radius, n):
+# -----------------------------------------------------------------------------
+#                                                             test constants --
+# -----------------------------------------------------------------------------
+n   = 32      # discretization size
+eps = 1.0e-2  # relative acceptance error
+
+# -----------------------------------------------------------------------------
+#                                                                       util --
+# -----------------------------------------------------------------------------
+def sphere(r, n):
     """Get sphere mesh with analytical reference values."""
     points, cells = meshzoo.icosa_sphere(n)
-    tri = om.TriMesh(points*r, cells)
-    print("\nGenerating sphere with {} vertices.".format(tri.n_vertices()))
-    # mesh, energy/kappa, surf, vol, curv
-    return tri, 8*np.pi, 4*np.pi*r**2, 4/3*np.pi*r**3, 4*np.pi*r
+    mesh = om.TriMesh(points*r, cells)
+    # mesh, area, vol, curv, bending
+    return mesh, 4*np.pi*r**2, 4/3*np.pi*r**3, 4*np.pi*r, 8*np.pi
 
-def tube(radius, n):
+def tube(r, n):
     """Get tube mesh with analytical reference values."""
-    points, cells = meshzoo.tube(length=1, radius=radius, n=n)
-    tri = om.TriMesh(points, cells)
-    print("\nGenerating tube with {} vertices.".format(tri.n_vertices()))
-    # mesh, energy/kappa, surf, vol, curv
-    return tri, np.pi/r, 2*np.pi*r, 2/3*np.pi*r**2, np.pi
+    points, cells = meshzoo.tube(length=1, radius=r, n=n)
+    mesh = om.TriMesh(points, cells)
+    # mesh, area, vol, curv, bending
+    return mesh, 2*np.pi*r, 2/3*np.pi*r**2, np.pi, np.pi/r
 
-r = 1.0
-n = 32
 
-tri, e_ref, s_ref, v_ref, c_ref = sphere(r, n)
-#tri, e_ref, s_ref, v_ref, c_ref = tube(r, n)
+TParams = namedtuple("TParams", "name radius")
 
-# write mesh for debugging
-om.write_mesh("test.stl", tri)
+# -----------------------------------------------------------------------------
+#                                                                     pytest --
+# -----------------------------------------------------------------------------
+@pytest.fixture(params=[TParams("sphere", 1.0), TParams("sphere", 0.5),
+                        TParams("tube", 1.0), TParams("tube", 0.5)])
+def data(request):
+    """facet-pair with properties for testing."""
 
-# ---------------------------------------------------------------------------- #
-# edge based evaluation in python
-start = time.time()
-for i in range(10):
-    m,s,v,c = pyenergy.calc_energy(tri, 1.0)
-dt = time.time()-start
+    fun = globals()[request.param.name]
+    mesh, a, v, c, b = fun(float(request.param.radius),n)
 
-print("\n-- edge-based (python) (wrong energy)")
-print("Energy:    {} (={})".format(m, e_ref))
-print("Surface:   {} (={})".format(s, s_ref))
-print("Volume:    {} (={}".format(v, v_ref))
-print("Curvature: {} (={})".format(c, c_ref))
-print("time elapsed: {}".format(dt))
+    results = {}
+    results["area"]      = a
+    results["volume"]    = v
+    results["curvature"] = c
+    results["bending"]   = b
 
-# ---------------------------------------------------------------------------- #
-# vertex based evaluation in python
-start = time.time()
-for i in range(10):
-    m,s,v,c = pyenergy.calc_energy_v(tri, 1.0)
-dt = time.time()-start
+    class Data:
+        pass
 
-print("\n-- vertex-based (python)")
-print("Energy:    {} (={})".format(m, e_ref))
-print("Surface:   {} (={})".format(s, s_ref))
-print("Volume:    {} (={}".format(v, v_ref))
-print("Curvature: {} (={})".format(c, c_ref))
-print("time elapsed: {}".format(dt))
+    d = Data()
+    d.mesh = mesh
+    d.ref  = results
 
-# ---------------------------------------------------------------------------- #
-# vertex based evaluation in c++
-start = time.time()
-for i in range(10):
-    m,s,v,c = cppenergy.calc_properties(tri)
-dt = time.time()-start
+    yield d
 
-print("\n-- vertex-based (c++) (version 2)")
-print("Energy:    {} (={})".format(m, e_ref))
-print("Surface:   {} (={})".format(s, s_ref))
-print("Volume:    {} (={}".format(v, v_ref))
-print("Curvature: {} (={})".format(c, c_ref))
-print("time elapsed: {}".format(dt))
+@pytest.fixture()
+def params(data):
+    """Energy parameters."""
+
+    mesh = data.mesh
+
+    l = np.mean([mesh.calc_edge_length(he) for he in mesh.halfedges()])
+    params = m.BondParams()
+    params.type = m.BondType.Edge
+    params.r = 2
+    params.lc0 = 1.15*l
+    params.lc1 = 0.85*l
+    params.a0   = m.area(mesh)/mesh.n_faces()
+
+    eparams = m.EnergyParams()
+    eparams.kappa_b        = 1.0
+    eparams.kappa_a        = 1.0
+    eparams.kappa_v        = 1.0
+    eparams.kappa_c        = 1.0
+    eparams.kappa_t        = 1.0
+    eparams.bond_params    = params
+
+    cparams = m.ContinuationParams()
+    cparams.area_frac      = 1.0
+    cparams.volume_frac    = 1.0
+    cparams.curvature_frac = 1.0
+    cparams.delta          = 1.0
+    cparams.lam            = 0.0
+
+    estore = m.EnergyManager(mesh, eparams, cparams)
+
+    data.estore = estore
+
+    yield data
+
+# -----------------------------------------------------------------------------
+#                                                                       test --
+# -----------------------------------------------------------------------------
+def test_properties(params):
+    """Test values of global properties."""
+
+    e = params.estore.energy()
+    p = params.estore.properties
+
+    ref = params.ref
+
+    def cmp(a,b):
+        return np.abs(a-b)/b
+
+    assert cmp(p.area, ref["area"]) < eps
+    assert cmp(p.volume, ref["volume"]) < eps
+    assert cmp(p.curvature, ref["curvature"]) < eps
+    assert cmp(p.bending, ref["bending"]) < eps
