@@ -1,4 +1,5 @@
-image: python:3.9
+default:
+  image: python:3.9
 
 tests:
   script:
