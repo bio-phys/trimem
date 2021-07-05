@@ -1,8 +1,11 @@
-default:
-  image: python:3.9
+image: gitlab-registry.mpcdf.mpg.de/mpcdf/module-image
 
 tests:
   script:
-    - python setup.py
-    - pip install numpy meshzoo pytest
+    - module load git gcc/9 anaconda/3/2020.02
+    - export CXX=g++
+    - export CC=gcc
+    - git submodule update --init --recursive
+    - pip install -v .
+    - pip install meshzoo autograd
     - pytest -v tests/
