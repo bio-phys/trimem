@@ -1,0 +1,7 @@
+image: python:3.9
+
+tests:
+  script:
+    - python setup.py
+    - pip install numpy meshzoo pytest
+    - pytest -v tests/
