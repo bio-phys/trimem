@@ -31,19 +31,18 @@ def vv(x0, v0, force, m, dt, N):
 
 def hybrid_move(x, force, m, dt, L, T=1):
     """Hybrid move."""
-    v = np.random.normal(size=x.shape)*np.sqrt(m)
+    v = np.random.normal(size=x.shape)*np.sqrt(m*T)
     tforce = lambda q,p: force(q,p,T)
     xn, vn = vv(x, v, tforce, m, dt, L)
     return xn[-1], v, vn[-1]
 
-def hmc(x0, nlog_hamil, force, m, N, dt, L, info=None, istep=10):
+def hmc(x0, nlog_hamil, force, m, N, dt, L, cT, info=None, istep=10):
     """Hybrid monte carlo."""
 
     x = x0.copy()
     xx = []
     acc = 0
     T = 1.0
-    dT = T/N
     for i in range(N):
 
         # move around
@@ -62,7 +61,7 @@ def hmc(x0, nlog_hamil, force, m, N, dt, L, info=None, istep=10):
         if i>0 and (i%istep) == 0 and not info is None:
             info(i,xn,vn,T,acc/(i+1))
 
-        T -= dT
+        T = 1.0 * np.exp(-cT*i)
 
     rate = acc/N
     print("acc-rate: {}".format(rate))
@@ -102,7 +101,7 @@ def test_integration():
     mesh = om.TriMesh(points, cells)
 
     estore = get_energy_manager(mesh, m.BondType.Edge,
-                                1.0, 1.0e4, 1.0e4, 0.0, 100,
+                                1.0, 1.0e4, 1.0e4, 0.0, 10,
                                 1.0, 0.8, 1.0)
     estore.print_info()
 
@@ -116,11 +115,14 @@ def test_integration():
         g = estore.gradient()
         return -g-gamma*v
 
-    xn, vn = vv(x, v, force, sigma, 0.001, 1600)
+    xn, vn = vv(x, v, force, sigma, 0.001, 20000)
 
+    n = 0
     for i,xi in enumerate(xn):
-        np.copyto(x,xi)
-        om.write_mesh("out/test_"+str(i)+".stl", mesh)
+        if i%200 == 0:
+            np.copyto(x,xi)
+            om.write_mesh("out/test_"+str(n)+".stl", mesh)
+            n += 1
 
     estore.print_info()
 
@@ -131,7 +133,7 @@ def test_hmc():
     mesh = om.TriMesh(points, cells)
 
     estore = get_energy_manager(mesh, m.BondType.Edge,
-                                1.0, 1.0e4, 1.0e4, 0.0, 100,
+                                1.0, 1.0e4, 1.0e4, 0.0, 10,
                                 1.0, 0.8, 1.0)
     estore.print_info()
 
@@ -143,7 +145,7 @@ def test_hmc():
         points = mesh.points()
         np.copyto(points, x)
         vr = v.ravel()
-        e = estore.energy()/T + 0.5*vr.dot(vr)/sigma
+        e = estore.energy()/T + 0.5*vr.dot(vr)/sigma/T
         np.copyto(points,x0)
         return e
 
@@ -160,16 +162,16 @@ def test_hmc():
         print("  ----- acc-rate:   ", acc)
         p = mesh.points()
         np.copyto(p,x)
-        m.energy(mesh, estore)
-        estore.print_info("  ")
+        estore.energy()
+        estore.print_info()
 
     def flip():
         m.flip_edges(mesh)
 
-    xn = hmc(x0, hamiltonian, force, sigma, 4000, 0.001, 10, info=print_info)
+    xn = hmc(x0, hamiltonian, force, sigma, 5000, 0.001, 10, 0.001, info=print_info)
 
     for i,xi in enumerate(xn):
-        if i%10 == 0:
+        if i%100 == 0:
           x = mesh.points()
           np.copyto(x,xi)
           om.write_mesh("out/test_"+str(i)+".stl", mesh)
@@ -181,7 +183,7 @@ def test_minimization():
     mesh = om.TriMesh(points, cells)
 
     estore = get_energy_manager(mesh, m.BondType.Edge,
-                                1.0, 1.0e4, 1.0e4, 0.0, 100,
+                                1.0, 1.0e4, 1.0e4, 0.0, 10,
                                 1.0, 0.8, 1.0)
     estore.print_info()
 
@@ -200,7 +202,7 @@ def test_minimization():
         return g.ravel()
 
     x0 = np.zeros_like(points).ravel()
-    res = minimize(fun, x0, jac=jac, options={"maxiter": 2000})
+    res = minimize(fun, x0, jac=jac, options={"maxiter": 1000})
     print(res.nit, res.message)
 
     om.write_mesh("out/test0.stl", mesh)
