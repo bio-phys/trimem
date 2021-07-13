@@ -12,6 +12,10 @@ setup(
     license="MIT",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
+    entry_points="""
+        [console_scripts]
+        mc_app=helfrich.mc.app:cli
+    """,
     cmake_install_dir="src/helfrich",
     include_package_data=True,
 )
