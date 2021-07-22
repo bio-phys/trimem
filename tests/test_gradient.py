@@ -30,16 +30,12 @@ def get_energy_manager(mesh, bond_type, kb, ka, kv, kc, kt):
     eparams.kappa_v        = kv
     eparams.kappa_c        = kc
     eparams.kappa_t        = kt
+    eparams.area_frac      = 0.8
+    eparams.volume_frac    = 0.8
+    eparams.curvature_frac = 0.8
     eparams.bond_params    = bparams
 
-    cparams = m.ContinuationParams()
-    cparams.area_frac      = 0.8
-    cparams.volume_frac    = 0.8
-    cparams.curvature_frac = 0.8
-    cparams.delta          = 1.0
-    cparams.lam            = 0.0
-
-    return m.EnergyManager(mesh, eparams, cparams)
+    return m.EnergyManager(mesh, eparams)
 
 # -----------------------------------------------------------------------------
 #                                                                     pytest --

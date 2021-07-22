@@ -16,49 +16,57 @@
 namespace trimem {
 
 //! energy contributions
-real area_penalty(const EnergyParams& params, const VertexProperties& props)
+real area_penalty(const EnergyParams& params,
+                  const VertexProperties& props,
+                  const VertexProperties& ref_props)
 {
-    real d = props.area / params.ref_area - 1.0;
+    real d = props.area / ref_props.area - 1.0;
     return params.kappa_a * d * d;
 }
 
 Point area_penalty_grad(const EnergyParams& params,
                         const VertexProperties& props,
+                        const VertexProperties& ref_props,
                         const Point& d_area)
 {
-    real d   = props.area / params.ref_area - 1.0;
-    real fac = 2.0 * params.kappa_a / params.ref_area * d;
+    real d   = props.area / ref_props.area - 1.0;
+    real fac = 2.0 * params.kappa_a / ref_props.area * d;
     return fac * d_area;
 }
 
-real volume_penalty(const EnergyParams& params, const VertexProperties& props)
+real volume_penalty(const EnergyParams& params,
+                    const VertexProperties& props,
+                    const VertexProperties& ref_props)
 {
-    real d = props.volume / params.ref_volume - 1.0;
+    real d = props.volume / ref_props.volume - 1.0;
     return params.kappa_v * d * d;
 }
 
 Point volume_penalty_grad(const EnergyParams& params,
                           const VertexProperties& props,
+                          const VertexProperties& ref_props,
                           const Point& d_volume)
 {
-    real d = props.volume / params.ref_volume - 1.0;
-    real fac = 2.0 * params.kappa_v / params.ref_volume * d;
+    real d = props.volume / ref_props.volume - 1.0;
+    real fac = 2.0 * params.kappa_v / ref_props.volume * d;
     return fac * d_volume;
 }
 
 real curvature_penalty(const EnergyParams& params,
-                       const VertexProperties& props)
+                       const VertexProperties& props,
+                       const VertexProperties& ref_props)
 {
-    real d = props.curvature / params.ref_curvature - 1.0;
+    real d = props.curvature / ref_props.curvature - 1.0;
     return params.kappa_c * d * d;
 }
 
 Point curvature_penalty_grad(const EnergyParams& params,
                              const VertexProperties& props,
+                             const VertexProperties& ref_props,
                              const Point& d_curvature)
 {
-    real d = props.curvature / params.ref_curvature - 1.0;
-    real fac = 2.0 * params.kappa_c / params.ref_curvature * d;
+    real d = props.curvature / ref_props.curvature - 1.0;
+    real fac = 2.0 * params.kappa_c / ref_props.curvature * d;
     return fac * d_curvature;
 }
 
@@ -86,12 +94,14 @@ Point helfrich_energy_grad(const EnergyParams& params,
     return params.kappa_b * d_bending;
 }
 
-real trimem_energy(const EnergyParams& params, const VertexProperties& props)
+real trimem_energy(const EnergyParams& params,
+                   const VertexProperties& props,
+                   const VertexProperties& ref_props)
 {
     real energy = 0.0;
-    energy += area_penalty(params, props);
-    energy += volume_penalty(params, props);
-    energy += curvature_penalty(params, props);
+    energy += area_penalty(params, props, ref_props);
+    energy += volume_penalty(params, props, ref_props);
+    energy += curvature_penalty(params, props, ref_props);
     energy += tether_potential(params, props);
     energy += helfrich_energy(params, props);
     return energy;
@@ -99,12 +109,13 @@ real trimem_energy(const EnergyParams& params, const VertexProperties& props)
 
 Point trimem_gradient(const EnergyParams& params,
                       const VertexProperties& props,
+                      const VertexProperties& ref_props,
                       const VertexPropertiesGradient& gprops)
 {
     Point grad(0.0);
-    grad += area_penalty_grad(params, props, gprops.area);
-    grad += volume_penalty_grad(params, props, gprops.volume);
-    grad += curvature_penalty_grad(params, props, gprops.curvature);
+    grad += area_penalty_grad(params, props, ref_props, gprops.area);
+    grad += volume_penalty_grad(params, props, ref_props,  gprops.volume);
+    grad += curvature_penalty_grad(params, props, ref_props, gprops.curvature);
     grad += tether_potential_grad(params, props, gprops.tethering);
     grad += helfrich_energy_grad(params, props, gprops.bending);
     return grad;
@@ -115,15 +126,18 @@ struct TrimemEnergy
 {
     TrimemEnergy(const EnergyParams& params,
                  const TriMesh& mesh,
-                 const BondPotential& bonds) :
+                 const BondPotential& bonds,
+                 const VertexProperties& ref_props) :
         params_(params),
         mesh_(mesh),
-        bonds_(bonds) {}
+        bonds_(bonds),
+        ref_props_(ref_props) {}
 
     //parameters
     const EnergyParams& params_;
     const TriMesh& mesh_;
     const BondPotential& bonds_;
+    const VertexProperties& ref_props_;
 
     void operator() (const int i, VertexProperties& contrib)
     {
@@ -138,7 +152,7 @@ struct TrimemEnergy
 
     real final(const VertexProperties& props)
     {
-        return trimem_energy(params_, props);
+        return trimem_energy(params_, props, ref_props_);
     }
 };
 
@@ -169,16 +183,19 @@ struct TrimemGradient
 {
     TrimemGradient(const EnergyParams& params,
                    const VertexProperties& props,
+                   const VertexProperties& ref_props,
                    const std::vector<VertexPropertiesGradient>& gprops,
                    std::vector<Point>& gradient) :
         params_(params),
         props_(props),
+        ref_props_(ref_props),
         gprops_(gprops),
         gradient_(gradient) {}
 
     // parameters
     const EnergyParams& params_;
     const VertexProperties& props_;
+    const VertexProperties& ref_props_;
     const std::vector<VertexPropertiesGradient>& gprops_;
 
     // result
@@ -186,7 +203,7 @@ struct TrimemGradient
 
     void operator() (const int i)
     {
-        gradient_[i] += trimem_gradient(params_, props_, gprops_[i]);
+        gradient_[i] += trimem_gradient(params_, props_, ref_props_, gprops_[i]);
     }
 
 };

@@ -1,8 +1,8 @@
 build
 _skbuild
+dist
 *.egg-info
 .eggs
 *.so
 __pycache__
-tests/test.stl
 *.swp

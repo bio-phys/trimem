@@ -153,11 +153,31 @@ void vertex_properties_grad(const TriMesh& mesh,
 void expose_properties(py::module& m)
 {
     py::class_<VertexProperties>(m, "VertexProperties")
-       .def(py::init())
-       .def_readwrite("area", &VertexProperties::area)
-       .def_readwrite("volume", &VertexProperties::volume)
-       .def_readwrite("curvature", &VertexProperties::curvature)
-       .def_readwrite("bending", &VertexProperties::bending)
-       .def_readwrite("tethering", &VertexProperties::tethering);
+        .def(py::init())
+        .def_readwrite("area", &VertexProperties::area)
+        .def_readwrite("volume", &VertexProperties::volume)
+        .def_readwrite("curvature", &VertexProperties::curvature)
+        .def_readwrite("bending", &VertexProperties::bending)
+        .def_readwrite("tethering", &VertexProperties::tethering)
+        .def(py::pickle(
+           [](const VertexProperties &p) { // __getstate__
+               return py::make_tuple(
+                   p.area,
+                   p.volume,
+                   p.curvature,
+                   p.bending,
+                   p.tethering);
+           },
+           [](py::tuple t) { // __setstate__
+               if (t.size() != 5)
+                   throw std::runtime_error("Invalid state!");
+               VertexProperties p = {
+                   t[0].cast<real>(),
+                   t[1].cast<real>(),
+                   t[2].cast<real>(),
+                   t[3].cast<real>(),
+                   t[4].cast<real>() };
+               return p;
+           }));
 }
 }

@@ -79,16 +79,12 @@ def params(data):
     eparams.kappa_v        = 1.0
     eparams.kappa_c        = 1.0
     eparams.kappa_t        = 1.0
+    eparams.area_frac      = 1.0
+    eparams.volume_frac    = 1.0
+    eparams.curvature_frac = 1.0
     eparams.bond_params    = params
 
-    cparams = m.ContinuationParams()
-    cparams.area_frac      = 1.0
-    cparams.volume_frac    = 1.0
-    cparams.curvature_frac = 1.0
-    cparams.delta          = 1.0
-    cparams.lam            = 0.0
-
-    estore = m.EnergyManager(mesh, eparams, cparams)
+    estore = m.EnergyManager(mesh, eparams)
 
     data.estore = estore
 

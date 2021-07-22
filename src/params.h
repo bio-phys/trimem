@@ -37,21 +37,17 @@ struct EnergyParams
   real kappa_c = 1.0;
   real kappa_t = 1.0;
 
-  real ref_area;
-  real ref_volume;
-  real ref_curvature;
+  real area_frac;
+  real volume_frac;
+  real curvature_frac;
 
   BondParams bond_params;
 };
 
 struct ContinuationParams
 {
-    real area_frac;
-    real volume_frac;
-    real curvature_frac;
-
-    real delta = 1.0;
-    real lambda = 0.0;
+    real delta = 0.0;
+    real lambda = 1.0;
 };
 
 

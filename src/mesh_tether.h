@@ -114,5 +114,19 @@ struct HarmonicTriAreaPenalty : BondPotential
 
 };
 
+inline std::unique_ptr<BondPotential> make_bonds(const BondParams& params)
+{
+    if (params.type == BondType::Edge)
+    {
+        return std::make_unique<FlatBottomEdgePenalty>(params);
+    }
+    else if (params.type == BondType::Area)
+    {
+        return std::make_unique<HarmonicTriAreaPenalty>(params);
+    }
+    else
+        throw std::runtime_error("Unknown bond potential");
+};
+
 }
 #endif

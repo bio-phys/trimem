@@ -19,8 +19,8 @@ void expose_parameters(py::module& m)
         .def_readwrite("lc1", &BondParams::lc1)
 //        .def_readwrite("lmax", &BondParams::lmax)
 //        .def_readwrite("lmin", &BondParams::lmin)
-        .def_readwrite("r", &BondParams::r)
         .def_readwrite("a0", &BondParams::a0)
+        .def_readwrite("r", &BondParams::r)
         .def_readwrite("type", &BondParams::type);
 
     py::class_<EnergyParams>(m, "EnergyParams")
@@ -30,20 +30,29 @@ void expose_parameters(py::module& m)
         .def_readwrite("kappa_v", &EnergyParams::kappa_v)
         .def_readwrite("kappa_c", &EnergyParams::kappa_c)
         .def_readwrite("kappa_t", &EnergyParams::kappa_t)
-
-        .def_readwrite("ref_volume", &EnergyParams::ref_volume)
-        .def_readwrite("ref_area", &EnergyParams::ref_area)
-        .def_readwrite("ref_curvature", &EnergyParams::ref_curvature)
-
+        .def_readwrite("area_frac", &EnergyParams::area_frac)
+        .def_readwrite("volume_frac", &EnergyParams::volume_frac)
+        .def_readwrite("curvature_frac", &EnergyParams::curvature_frac)
         .def_readwrite("bond_params", &EnergyParams::bond_params);
 
     py::class_<ContinuationParams>(m, "ContinuationParams")
         .def(py::init())
-        .def_readwrite("area_frac", &ContinuationParams::area_frac)
-        .def_readwrite("volume_frac", &ContinuationParams::volume_frac)
-        .def_readwrite("curvature_frac", &ContinuationParams::curvature_frac)
         .def_readwrite("delta", &ContinuationParams::delta)
-        .def_readwrite("lam", &ContinuationParams::lambda);
+        .def_readwrite("lam", &ContinuationParams::lambda)
+        .def(py::pickle(
+            [](const ContinuationParams &p) { // __getstate__
+                return py::make_tuple(
+                    p.delta,
+                    p.lambda);
+            },
+            [](py::tuple t) { // __setstate__
+                if (t.size() != 2)
+                    throw std::runtime_error("Invalid state!");
+                ContinuationParams p = {
+                    t[0].cast<real>(),
+                    t[1].cast<real>() };
+                return p;
+            }));
 }
 
 }

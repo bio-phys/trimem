@@ -5,20 +5,16 @@ def _vv_integration(x0, p0, force, m, dt, N):
 
     x = x0
     p = p0
-    a = force(x,p)
-    xx = [p.copy()]
-    pp = [p.copy()]
+    a = force(x)
     for i in range(N):
-        x += (p * dt + 0.5 * a * dt**2) / m
+        x  = x + (p * dt + 0.5 * a * dt**2) / m
         an = force(x)
-        p += 0.5 * (a + an) * dt
+        p  = p + 0.5 * (a + an) * dt
         a  = an
-        xx.append(x.copy())
-        pp.append(p.copy())
 
-    return np.array(xx),np.array(pp)
+    return x, p
 
-def hmc(x0, nlog_prob, grad_nlog_prob, m, N, dt, L, cooling, callback):
+def hmc(x0, nlog_prob, grad_nlog_prob, m, N, dt, L, callback, thin=1):
     """Hybrid monte carlo.
 
     Parameters:
@@ -30,38 +26,39 @@ def hmc(x0, nlog_prob, grad_nlog_prob, m, N, dt, L, cooling, callback):
     N:              numper of samples to generate
     dt:             time step for integration of hamiltonian system
     L:              number of integration steps of hamiltonian system
-    cooling:        callable cooling schedule that takes step as argument
-    callback:       callback which takes step and acceptance rate as args
+    cb:             callback which signature {state, step, step_accepted}
+    thin:           keep only every thin'th sample
     """
 
-    x = x0.copy()
+    def hamiltonian(x,p):
+        return nlog_prob(x) + 0.5 * p.ravel().dot(p.ravel()) / m
+
+    x = x0
     xx = []
     acc = 0
-    T = cooling(0)
     for i in range(N):
 
         # sample momenta
-        p = np.random.normal(size=x.shape)*np.sqrt(m*T)
+        p = np.random.normal(size=x.shape)*np.sqrt(m)
 
         # integrate trajectory
-        force = lambda x: -grad_nlog_prob(x,T)
-        xn, pn = vv(x, p, force, m, dt, L)
+        force = lambda x: -grad_nlog_prob(x)
+        xn, pn = _vv_integration(x, p, force, m, dt, L)
 
         # evaluate energies
-        de  = nlog_prob(xn,T) - nlog_prob(x,T)
-        de += 0.5 * ( pn.dot(pn) - p.dot(p) ) / m / T
+        dh = hamiltonian(xn, pn) - hamiltonian(x,p)
 
-        # compute acceptance probability
-        a = min(1, np.exp(-de))
+        # compute acceptance probability: min(1, np.exp(-de))
+        a = 1.0 if dh<=0 else np.exp(-dh)
         u = np.random.uniform()
-        if u<=a:
+        acc = u<=a
+        if acc:
             x = xn
-            xx.append(xn.copy())
-            acc += 1
 
-        T = cooling(i)
+        if i%thin == 0:
+            xx.append(x.copy())
 
-        # perform user defined things
-        callback(i, acc/i)
+        # user callback
+        callback(x, i, acc)
 
-    return np.array(xx)
+    return x, np.array(xx)

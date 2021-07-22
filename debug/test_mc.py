@@ -168,7 +168,8 @@ def test_hmc():
     def flip():
         m.flip_edges(mesh)
 
-    xn = hmc(x0, hamiltonian, force, sigma, 5000, 0.001, 10, 0.001, info=print_info)
+    # break somewhere > 7000
+    xn = hmc(x0, hamiltonian, force, sigma, 10000, 0.001, 10, 0.001, info=print_info, istep=100)
 
     for i,xi in enumerate(xn):
         if i%100 == 0:
@@ -202,7 +203,7 @@ def test_minimization():
         return g.ravel()
 
     x0 = np.zeros_like(points).ravel()
-    res = minimize(fun, x0, jac=jac, options={"maxiter": 1000})
+    res = minimize(fun, x0, jac=jac, options={"maxiter": 5000, "disp": 1})
     print(res.nit, res.message)
 
     om.write_mesh("out/test0.stl", mesh)
