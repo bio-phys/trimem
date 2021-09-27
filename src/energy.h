@@ -40,6 +40,7 @@ public:
 
     // energy and gradient evaluation
     real energy();
+    real energy(VertexProperties& props);
     std::vector<Point> gradient();
 
     // print status information
@@ -54,13 +55,16 @@ public:
     VertexProperties initial_props;
     VertexProperties ref_props;
 
+    // bond potential
+    std::unique_ptr<BondPotential> bonds;
+
+    // set mesh
+    void set_mesh(const TriMesh* mesh);
+
 private:
 
     // mesh reference (??)
     const TriMesh* mesh_;
-
-    // bond potential
-    std::unique_ptr<BondPotential> bonds_;
 };
 
 void expose_energy(py::module& m);

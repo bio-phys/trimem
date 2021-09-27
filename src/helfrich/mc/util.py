@@ -1,6 +1,8 @@
 import numpy as np
 import pickle
+
 from scipy.optimize import minimize
+import meshio
 
 from .. import _core as m
 from .. import openmesh as om
@@ -13,6 +15,7 @@ info = 1
 input = "test.stl"
 output_prefix = out/test_
 restart_prefix = out/restart_
+output_format = vtu
 [BONDS]
 bond_type = Edge
 [ENERGY]
@@ -29,6 +32,7 @@ num_steps = 10
 step_size = 1.0
 momentum_variance = 1.0
 thin = 10
+flip_ratio = 0.1
 [MINIMIZATION]
 maxiter = 10
 
@@ -42,7 +46,9 @@ def om_helfrich_energy(mesh, estore, config):
 
     istep  = config["DEFAULT"].getint("info")
     N      = config["DEFAULT"].getint("num_steps")
-    prefix = config["DEFAULT"]["restart_prefix"]
+    fr     = config["HMC"].getfloat("flip_ratio")
+    prefix = config["DEFAULT"]["output_prefix"]
+    thin   = config["HMC"].getint("thin")
 
     x0 = mesh.points().copy()
 
@@ -60,20 +66,34 @@ def om_helfrich_energy(mesh, estore, config):
         np.copyto(points, x0)
         return g
 
+    def _flip(x):
+        points = mesh.points()
+        np.copyto(points, x)
+        flips = m.flip(mesh, estore, fr)
+        np.copyto(points, x0)
+        return flips
+
     def _callback(x, i, acc):
         _callback.acc += acc
+        flips = _flip(x)
         if i%istep == 0:
             print("\n-- Step ",i)
-            print("----- acc-rate:", _callback.acc/istep)
+            print("----- acc-rate: ", _callback.acc/istep)
+            print("----- acc-flips:", flips/mesh.n_edges())
             p = mesh.points()
             np.copyto(p, x)
             estore.energy()
             estore.print_info()
             np.copyto(p, x0)
             _callback.acc = 0
+        if i%thin == 0:
+            write_output(x, mesh, _callback.count, config)
+            _callback.count += 1
         estore.update_reference_properties()
 
-    _callback.acc = 0
+    # init callback
+    _callback.acc   = 0
+    _callback.count = 0
 
     return _fun, _grad, _callback
 
@@ -114,31 +134,54 @@ def setup_energy_manager(config, cparams=None):
 
     return estore, mesh
 
+def write_output(x, mesh, step, config):
+    """Write trajectory output."""
 
-def write_trajectory(x, mesh, prefix):
-    """Write trajectory to files."""
+    fmt    = config["DEFAULT"]["output_format"]
+    prefix = config["DEFAULT"]["output_prefix"]
+    if fmt == "vtu":
+        fn = prefix + str(step) + ".vtu"
+        meshio.write_points_cells(fn, x, [("triangle", mesh.fv_indices())])
+    elif fmt == "xyz":
+        fn = prefix + ".xyz"
+        rw = "w" if step == 0 else "a"
+        with open(fn, rw) as fp:
+            np.savetxt(fp,
+                       x,
+                       fmt=["C\t%.6f", "%.6f", "%.6f"],
+                       header="{}\n#".format(mesh.n_vertices()),
+                       comments="",
+                       delimiter="\t")
+    else:
+        raise ValueError("Unknown file format for output.")
 
-    for i,xi in enumerate(x):
-        x = mesh.points()
-        np.copyto(x,xi)
-        om.write_mesh(prefix+str(i)+".stl", mesh, binary=True)
-
-def write_restart(x, estore, step, prefix):
+def write_restart(x, mesh, estore, step, config):
     """Write restart checkpoint."""
 
-    # write nececessary data from energy manager
-    with open(prefix+str(step)+"_.cpt", "wb") as fp:
+    prefix = config["DEFAULT"]["restart_prefix"]
+
+    # write params
+    with open(prefix + str(step) + "_params_.cpt", "wb") as fp:
         pickle.dump(estore.cparams, fp)
-        pickle.dump(x, fp)
+
+    # write mesh
+    fn = prefix + str(step) + "_mesh_.vtu"
+    meshio.write_points_cells(fn, x, [("triangle", mesh.fv_indices())])
 
 def read_restart(restart, config):
-    """Read energy manager from restart."""
-    prefix = config["DEFAULT"]["restart_prefix"]
-    with open(prefix+str(restart)+"_.cpt", "rb") as fp:
-        cparams = pickle.load(fp)
-        x       = pickle.load(fp)
+    """Read energy manager and mesh from restart."""
 
-    return x, cparams
+    prefix = config["DEFAULT"]["restart_prefix"]
+
+    # read params
+    with open(prefix+str(restart)+"_params_.cpt", "rb") as fp:
+        cparams = pickle.load(fp)
+
+    # read mesh
+    fn = prefix + str(restart) + "_mesh_.vtu"
+    mesh = meshio.read(fn)
+
+    return om.TriMesh(mesh.points, mesh.cells[0].data), cparams
 
 def run(config, restart=-1):
     """Run algorithm."""
@@ -147,10 +190,9 @@ def run(config, restart=-1):
     if restart == -1:
         estore, mesh = setup_energy_manager(config)
     else:
-        x, cparams = read_restart(restart, config)
-        estore, mesh = setup_energy_manager(config, cparams)
-        p = mesh.points()
-        np.copyto(p, x)
+        mesh, cparams = read_restart(restart, config)
+        estore, o_mesh = setup_energy_manager(config, cparams)
+        estore.set_mesh(mesh)
 
     # run algorithm
     algo    = config["DEFAULT"]["algorithm"]
@@ -177,13 +219,8 @@ def run_hmc(mesh, estore, config, restart):
     thin = cmc.getint("thin")
     x, traj = hmc(x0, fun, grad, m, N, dt, L, cb, thin)
 
-    # write output
-    prefix = config["DEFAULT"]["output_prefix"]
-    write_trajectory(traj, mesh, prefix)
-
     # write restart
-    prefix = config["DEFAULT"]["restart_prefix"]
-    write_restart(x, estore, restart+1, prefix)
+    write_restart(x, mesh, estore, restart+1, config)
 
 def run_minim(mesh, estore, config, restart):
     """Run minimization."""
@@ -201,13 +238,11 @@ def run_minim(mesh, estore, config, restart):
 
     # run minimization
     res = minimize(sfun, x0.ravel(), jac=sgrad, options={"maxiter": N})
+    x   = res.x.reshape(x0.shape)
     print(res.message)
 
     # write output
-    prefix = config["DEFAULT"]["output_prefix"]
-    write_trajectory([res.x.reshape(x0.shape)], mesh, prefix)
+    write_output(x, mesh, 0, config)
 
     # write restart
-    prefix = config["DEFAULT"]["restart_prefix"]
-    x = res.x.reshape(x0.shape)
-    write_restart(x, estore, restart+1, prefix)
+    write_restart(x, mesh, estore, restart+1, config)

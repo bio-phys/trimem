@@ -11,6 +11,7 @@
 #include "defs.h"
 #include "mesh_util.h"
 #include "energy.h"
+#include "flips.h"
 
 namespace trimem {
 
@@ -69,6 +70,9 @@ PYBIND11_MODULE(_core, m) {
 
     // expose energy
     expose_energy(m);
+
+    // expose flips
+    expose_flips(m);
 
     // energy stuff
     m.def("gradient", &gradient, "Finite difference gradient of energy");

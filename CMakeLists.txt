@@ -13,7 +13,8 @@ pybind11_add_module(_core MODULE src/bindings.cpp
                           src/params.cpp
                           src/mesh_properties.cpp
                           src/mesh_util.cpp
-                          src/energy.cpp)
+                          src/energy.cpp
+                          src/flips.cpp)
 target_include_directories(_core PRIVATE openmesh-python/src)
 target_include_directories(_core PRIVATE openmesh-python/OpenMesh/src)
 

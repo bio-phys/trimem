@@ -18,7 +18,7 @@ EnergyManager::EnergyManager(const TriMesh* mesh,
   cparams({0.0, 1.0})
 {
     // setup bond potential
-    bonds_ = make_bonds(params.bond_params);
+    bonds = make_bonds(params.bond_params);
 
     // evaluate properties from mesh
     auto dump = energy();
@@ -38,7 +38,7 @@ EnergyManager::EnergyManager(const TriMesh* mesh,
   cparams(continuation_params)
 {
     // setup bond potential
-    bonds_ = make_bonds(params.bond_params);
+    bonds = make_bonds(params.bond_params);
 
     // evaluate properties from mesh
     auto dump = energy();
@@ -48,6 +48,11 @@ EnergyManager::EnergyManager(const TriMesh* mesh,
 
     // set reference properties
     interpolate_reference_properties();
+}
+
+void EnergyManager::set_mesh(const TriMesh* mesh)
+{
+    mesh_ = mesh;
 }
 
 void EnergyManager::interpolate_reference_properties()
@@ -73,12 +78,18 @@ void EnergyManager::update_reference_properties()
 
 real EnergyManager::energy()
 {
-    TrimemEnergy kernel(params, *mesh_, *bonds_, ref_props);
+    TrimemEnergy kernel(params, *mesh_, *bonds, ref_props);
 
     VertexProperties props{ 0.0, 0.0, 0.0, 0.0, 0.0 };
     parallel_reduction(mesh_->n_vertices(), kernel, props);
 
     properties = props;
+    return kernel.final(props);
+}
+
+real EnergyManager::energy(VertexProperties& props)
+{
+    TrimemEnergy kernel(params, *mesh_, *bonds, ref_props);
     return kernel.final(props);
 }
 
@@ -93,7 +104,7 @@ std::vector<Point> EnergyManager::gradient()
     VertexPropertiesGradient zeros
       { Point(0), Point(0), Point(0), Point(0), Point(0) };
     std::vector<VertexPropertiesGradient> gprops(n, zeros);
-    TrimemPropsGradient pg_kernel(*mesh_, *bonds_, gprops);
+    TrimemPropsGradient pg_kernel(*mesh_, *bonds, gprops);
     parallel_for(n, pg_kernel);
 
     // evaluate gradient
@@ -141,7 +152,11 @@ void expose_energy(py::module& m){
     py::class_<EnergyManager>(m, "EnergyManager")
         .def(py::init<TriMesh*, EnergyParams>())
         .def(py::init<TriMesh*, EnergyParams, ContinuationParams>())
-        .def("energy", &EnergyManager::energy)
+        .def("set_mesh", &EnergyManager::set_mesh)
+        .def("energy", static_cast<real (EnergyManager::*)()>
+                (&EnergyManager::energy))
+        .def("energy", static_cast<real (EnergyManager::*)(VertexProperties&)>
+                (&EnergyManager::energy))
         .def("gradient", [](EnergyManager& _self){
             auto grad = _self.gradient();
             return tonumpy(grad[0], grad.size());})

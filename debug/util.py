@@ -13,6 +13,7 @@ def get_energy_manager(mesh, bond_type, kb, ka, kv, kc, kt, af=1., vf=1., cf=1.)
     bparams.type = bond_type
     bparams.lc0  = 1.15*l
     bparams.lc1  = 0.85*l
+    bparams.r    = 2
     bparams.a0   = a
 
     eparams = m.EnergyParams()
@@ -21,14 +22,10 @@ def get_energy_manager(mesh, bond_type, kb, ka, kv, kc, kt, af=1., vf=1., cf=1.)
     eparams.kappa_v        = kv
     eparams.kappa_c        = kc
     eparams.kappa_t        = kt
+    eparams.area_frac      = af
+    eparams.volume_frac    = vf
+    eparams.curvature_frac = cf
     eparams.bond_params    = bparams
 
-    cparams = m.ContinuationParams()
-    cparams.area_frac      = af
-    cparams.volume_frac    = vf
-    cparams.curvature_frac = cf
-    cparams.delta          = 1.0
-    cparams.lam            = 0.0
-
-    return m.EnergyManager(mesh, eparams, cparams)
+    return m.EnergyManager(mesh, eparams)
 

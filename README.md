@@ -40,6 +40,7 @@ info = 100
 input = input.stl
 output_prefix = out/test_
 restart_prefix = out/restart_
+output_format = vtu
 [BONDS]
 bond_type = Edge
 r = 2
@@ -58,6 +59,7 @@ traj_steps = 100
 step_size = 1.0e-4
 momentum_variance = 1.0
 thin = 100
+flip_ratio = 0.1
 [MINIMIZATION]
 maxiter = 2000" > inp.conf
 
@@ -71,3 +73,5 @@ mc_app run --conf inp.conf
 sed -i 's/= minimize/= hmc/g' inp.conf
 mc_app run --conf inp.conf --restart 0
 ```
+By setting `output_format = xyz`, a plain ascii xyz-coordinate trajectory
+is written instead of a series of vtk unstructured-grid files.
