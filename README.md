@@ -10,6 +10,20 @@ this is not recommended and it is better to set the compiler explicitly.
 git clone --recurse-submodules https://gitlab.mpcdf.mpg.de/sebak/om-helfrich.git`
 pip install ./om-helfrich
 ```
+
+### Development installation
+
+The above installation creates a temporary build environment that is populated
+with all dependencies as specified in `pyproject.toml` and which is deleted
+afterwards. However during development, it might be more convenient to directly
+call `setup.py`:
+```bash
+python setup.py install -v --build-type DEBUG
+```
+This creates a local build (with cache) in `_skbuild` and copies the package
+manually to the current python's `side-packages` destination. But installation 
+of build-dependencies is not taken care of.
+
 ## Usage on the mpcdf clusters
 
 No particular adaptions are necessary when using the intel compilers. However,
