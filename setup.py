@@ -1,7 +1,7 @@
 import sys
 
-from skbuild import setup
 from setuptools import find_packages
+from skbuild import setup
 
 
 setup(
