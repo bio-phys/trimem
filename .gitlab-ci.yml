@@ -7,5 +7,6 @@ tests:
     - export CC=gcc
     - git submodule update --init --recursive
     - pip install -v .
+    - pip install --upgrade numpy
     - pip install meshzoo autograd
     - pytest -v tests/
