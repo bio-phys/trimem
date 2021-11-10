@@ -236,8 +236,11 @@ def run_minim(mesh, estore, config, restart):
     sfun  = lambda x: fun(x.reshape(x0.shape))
     sgrad = lambda x: grad(x.reshape(x0.shape)).ravel()
 
+    # minimization options
+    mopt = {"maxiter": N, "disp": 0}
+
     # run minimization
-    res = minimize(sfun, x0.ravel(), jac=sgrad, options={"maxiter": N})
+    res = minimize(sfun, x0.ravel(), jac=sgrad, method="L-BFGS-B", options=mopt)
     x   = res.x.reshape(x0.shape)
     print(res.message)
 
