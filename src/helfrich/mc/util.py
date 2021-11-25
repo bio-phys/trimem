@@ -35,6 +35,7 @@ step_size = 1.0
 momentum_variance = 1.0
 thin = 10
 flip_ratio = 0.1
+flip_type = serial
 [MINIMIZATION]
 maxiter = 10
 
@@ -49,8 +50,23 @@ def om_helfrich_energy(mesh, estore, config):
     istep  = config["DEFAULT"].getint("info")
     N      = config["DEFAULT"].getint("num_steps")
     fr     = config["HMC"].getfloat("flip_ratio")
+    ft     = config["HMC"]["flip_type"]
     prefix = config["DEFAULT"]["output_prefix"]
     thin   = config["HMC"].getint("thin")
+
+
+    if ft == "serial":
+        _tflips = lambda mh,e,r: m.flip(mh,e,r)
+    elif ft == "parallel":
+        _tflips = lambda mh,e,r: m.pflip(mh,e,r)
+    elif ft == "none":
+        _tflips = lambda mh,e,r: 0
+    else:
+        raise ValueError("Wrong flip-type")
+
+    # take a short-cut in case
+    if fr == 0.0:
+        _tflips = lambda mh,e,r: 0
 
     x0 = mesh.points().copy()
 
@@ -71,7 +87,7 @@ def om_helfrich_energy(mesh, estore, config):
     def _flip(x):
         points = mesh.points()
         np.copyto(points, x)
-        flips = m.flip(mesh, estore, fr)
+        flips = _tflips(mesh, estore, fr)
         np.copyto(points, x0)
         return flips
 

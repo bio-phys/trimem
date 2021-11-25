@@ -1,6 +1,7 @@
 /** \file flips.cpp
  * \brief Performing edge flips on openmesh.
  */
+#include <omp.h>
 #include <algorithm>
 #include <chrono>
 #include <random>
@@ -8,8 +9,10 @@
 #include "defs.h"
 
 #include "flips.h"
+#include "flip_utils.h"
 #include "energy.h"
 #include "mesh_properties.h"
+#include "omp_guard.h"
 
 #include <pybind11/stl.h>
 
@@ -18,27 +21,6 @@ namespace trimem {
 typedef std::chrono::high_resolution_clock myclock;
 static std::mt19937 generator_(myclock::now().time_since_epoch().count());
 
-VertexProperties edge_vertex_properties(TriMesh& mesh,
-                                       const EdgeHandle& eh,
-                                       const BondPotential& bonds)
-{
-    VertexProperties props{ 0.0, 0.0, 0.0, 0.0, 0.0 };
-
-    for (int i=0; i<2; i++)
-    {
-        // vertex properties of the first face
-        auto heh = mesh.halfedge_handle(eh, i);
-
-        auto ve = mesh.to_vertex_handle(heh);
-        props += vertex_properties(mesh, bonds, ve);
-
-        auto next_heh = mesh.next_halfedge_handle(heh);
-        ve = mesh.to_vertex_handle(next_heh);
-        props += vertex_properties(mesh, bonds, ve);
-    }
-
-    return props;
-}
 
 int flip_serial(TriMesh& mesh, EnergyManager& estore, real& flip_ratio)
 {
@@ -99,10 +81,110 @@ int flip_serial(TriMesh& mesh, EnergyManager& estore, real& flip_ratio)
     return acc;
 }
 
+int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, real& flip_ratio)
+{
+    if (flip_ratio > 1.0)
+        throw std::range_error("flip_ratio must be <= 1.0");
+
+    int nedges = mesh.n_edges();
+    int nflips = (int) (nedges * flip_ratio);
+
+    // get initial energy and associated vertex properties
+    real e0 = estore.energy();
+    VertexProperties props = estore.properties;
+
+    // set-up lock on edges
+    std::vector<OmpGuard> l_edges(nedges);
+
+    int acc  = 0;
+#pragma omp parallel reduction(+:acc)
+    {
+        int ithread = omp_get_thread_num();
+        int nthread = omp_get_num_threads();
+
+        int itime   = myclock::now().time_since_epoch().count();
+        std::mt19937 prng((ithread + 1) * itime);
+        std::uniform_real_distribution<real> accept(0.0,1.0);
+
+        //  get this thread's edges
+        int iedges = (int) std::ceil(nedges / nthread);
+        int ilow   = ithread * iedges;
+        int iupp   = (ithread + 1) * iedges;
+        iupp   = iupp < nedges ? iupp : nedges;
+        iedges = iupp > ilow ? iupp - ilow : 0;
+        std::vector<int> edges;
+        edges.reserve(iedges);
+        for (int i=ilow; i<iupp; i++)
+        {
+            edges.push_back(i);
+        }
+
+        // shuffle locally
+        std::shuffle(edges.begin(), edges.end(), prng);
+
+        // result vector
+        int iflips = (int) std::ceil(nflips / nthread);
+
+        for (int i=0; i<iflips; i++)
+        {
+#pragma omp barrier
+            bool locked = false;
+            EdgeHandle eh(-1);
+            if (i<iedges)
+            {
+                int idx = edges[i];
+                eh = mesh.edge_handle(idx);
+                locked = test_guards(mesh, idx, l_edges);
+            }
+#pragma omp barrier
+            if (locked)
+            {
+                auto patch = flip_patch(mesh, eh);
+                for (const int& i: patch) l_edges[i].release();            
+            }
+            else
+            {
+                continue;
+            }
+
+            
+            // compute differential properties
+            auto dprops = edge_vertex_properties(mesh, eh, *(estore.bonds));
+            mesh.flip(eh);
+            dprops -= edge_vertex_properties(mesh, eh, *(estore.bonds));
+
+            real u = accept(prng);
+
+            // evaluate energy
+#pragma omp critical
+            {
+                props -= dprops;
+                real en  = estore.energy(props);
+                real de = en - e0;
+
+                // evaluate acceptance probability
+                real alpha = de < 0.0 ? 1.0 : std::exp(-de);
+                if (u <= alpha)
+                {
+                    e0 = en;
+                    acc += 1;
+                }
+                else
+                {
+                    mesh.flip(eh);
+                    props += dprops;
+                }
+            }
+        }
+    } // parallel
+
+    return acc;
+}
 
 void expose_flips(py::module& m)
 {
     m.def("flip", &flip_serial);
+    m.def("pflip", &flip_parallel_batches);
 }
 
 }
