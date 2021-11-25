@@ -29,6 +29,12 @@ struct BondParams
   BondType type = BondType::Edge;
 };
 
+struct ContinuationParams
+{
+    real delta  = 0.0;
+    real lambda = 1.0;
+};
+
 struct EnergyParams
 {
   real kappa_b = 1.0;
@@ -42,14 +48,8 @@ struct EnergyParams
   real curvature_frac;
 
   BondParams bond_params;
+  ContinuationParams continuation_params;
 };
-
-struct ContinuationParams
-{
-    real delta = 0.0;
-    real lambda = 1.0;
-};
-
 
 void expose_parameters(py::module& m);
 

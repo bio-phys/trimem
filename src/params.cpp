@@ -23,18 +23,6 @@ void expose_parameters(py::module& m)
         .def_readwrite("r", &BondParams::r)
         .def_readwrite("type", &BondParams::type);
 
-    py::class_<EnergyParams>(m, "EnergyParams")
-        .def(py::init())
-        .def_readwrite("kappa_b", &EnergyParams::kappa_b)
-        .def_readwrite("kappa_a", &EnergyParams::kappa_a)
-        .def_readwrite("kappa_v", &EnergyParams::kappa_v)
-        .def_readwrite("kappa_c", &EnergyParams::kappa_c)
-        .def_readwrite("kappa_t", &EnergyParams::kappa_t)
-        .def_readwrite("area_frac", &EnergyParams::area_frac)
-        .def_readwrite("volume_frac", &EnergyParams::volume_frac)
-        .def_readwrite("curvature_frac", &EnergyParams::curvature_frac)
-        .def_readwrite("bond_params", &EnergyParams::bond_params);
-
     py::class_<ContinuationParams>(m, "ContinuationParams")
         .def(py::init())
         .def_readwrite("delta", &ContinuationParams::delta)
@@ -53,6 +41,20 @@ void expose_parameters(py::module& m)
                     t[1].cast<real>() };
                 return p;
             }));
+
+    py::class_<EnergyParams>(m, "EnergyParams")
+        .def(py::init())
+        .def_readwrite("kappa_b", &EnergyParams::kappa_b)
+        .def_readwrite("kappa_a", &EnergyParams::kappa_a)
+        .def_readwrite("kappa_v", &EnergyParams::kappa_v)
+        .def_readwrite("kappa_c", &EnergyParams::kappa_c)
+        .def_readwrite("kappa_t", &EnergyParams::kappa_t)
+        .def_readwrite("area_frac", &EnergyParams::area_frac)
+        .def_readwrite("volume_frac", &EnergyParams::volume_frac)
+        .def_readwrite("curvature_frac", &EnergyParams::curvature_frac)
+        .def_readwrite("bond_params", &EnergyParams::bond_params)
+        .def_readwrite("continuation_params", &EnergyParams::continuation_params);
+
 }
 
 }

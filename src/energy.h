@@ -30,9 +30,6 @@ public:
     // constructors
     EnergyManager(const TriMesh* mesh,
                   const EnergyParams& params);
-    EnergyManager(const TriMesh* mesh,
-                  const EnergyParams& params,
-                  const ContinuationParams& cparams);
 
     // update reference properties
     void update_reference_properties();
@@ -51,7 +48,6 @@ public:
     EnergyParams params;
 
     // management of reference properties
-    ContinuationParams cparams;
     VertexProperties initial_props;
     VertexProperties ref_props;
 

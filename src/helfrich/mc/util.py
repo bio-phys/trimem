@@ -27,6 +27,8 @@ kappa_t = 1.0
 area_fraction = 1.0
 volume_fraction = 1.0
 curvature_fraction = 1.0
+continuation_delta = 0.0
+continuation_lambda = 1.0
 [HMC]
 num_steps = 10
 step_size = 1.0
@@ -127,10 +129,16 @@ def setup_energy_manager(config, cparams=None):
     eparams.curvature_frac = ec.getfloat("curvature_fraction")
     eparams.bond_params    = bparams
 
+    # continuation params might come from restarts instead as from input
     if cparams is None:
-        estore = m.EnergyManager(mesh, eparams)
+        cp = m.ContinuationParams()
+        cp.delta = ec.getfloat("continuation_delta")
+        cp.lam   = ec.getfloat("continuation_lambda")
     else:
-        estore = m.EnergyManager(mesh, eparams, cparams)
+        cp = cparams
+    eparams.continuation_params = cp
+
+    estore = m.EnergyManager(mesh, eparams)
 
     return estore, mesh
 
@@ -162,7 +170,7 @@ def write_restart(x, mesh, estore, step, config):
 
     # write params
     with open(prefix + str(step) + "_params_.cpt", "wb") as fp:
-        pickle.dump(estore.cparams, fp)
+        pickle.dump(estore.eparams.continuation_params, fp)
 
     # write mesh
     fn = prefix + str(step) + "_mesh_.vtu"

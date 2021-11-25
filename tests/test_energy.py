@@ -73,12 +73,11 @@ def params(data):
     params.lc1 = 0.85*l
     params.a0   = m.area(mesh)/mesh.n_faces()
 
+    cparams = m.ContinuationParams()
+    cparams.delta = 0.0
+    cparams.lam   = 1.0
+
     eparams = m.EnergyParams()
-    eparams.kappa_b        = 1.0
-    eparams.kappa_a        = 1.0
-    eparams.kappa_v        = 1.0
-    eparams.kappa_c        = 1.0
-    eparams.kappa_t        = 1.0
     eparams.area_frac      = 1.0
     eparams.volume_frac    = 1.0
     eparams.curvature_frac = 1.0

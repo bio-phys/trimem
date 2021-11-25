@@ -14,28 +14,7 @@ namespace trimem {
 EnergyManager::EnergyManager(const TriMesh* mesh,
                              const EnergyParams& energy_params) :
   mesh_(mesh),
-  params(energy_params),
-  cparams({0.0, 1.0})
-{
-    // setup bond potential
-    bonds = make_bonds(params.bond_params);
-
-    // evaluate properties from mesh
-    auto dump = energy();
-
-    // set initial properties
-    initial_props = properties;
-
-    // set reference properties
-    interpolate_reference_properties();
-}
-
-EnergyManager::EnergyManager(const TriMesh* mesh,
-                             const EnergyParams& energy_params,
-                             const ContinuationParams& continuation_params) :
-  mesh_(mesh),
-  params(energy_params),
-  cparams(continuation_params)
+  params(energy_params)
 {
     // setup bond potential
     bonds = make_bonds(params.bond_params);
@@ -57,11 +36,13 @@ void EnergyManager::set_mesh(const TriMesh* mesh)
 
 void EnergyManager::interpolate_reference_properties()
 {
+    auto& cparams = params.continuation_params;
+
     real i_af = 1.0 - params.area_frac;
     real i_vf = 1.0 - params.volume_frac;
     real i_cf = 1.0 - params.curvature_frac;
     real& lam = cparams.lambda;
-    
+
     ref_props.area      = ( 1.0 - lam * i_af ) * initial_props.area;
     ref_props.volume    = ( 1.0 - lam * i_vf ) * initial_props.volume;
     ref_props.curvature = ( 1.0 - lam * i_cf ) * initial_props.curvature;
@@ -69,6 +50,8 @@ void EnergyManager::interpolate_reference_properties()
 
 void EnergyManager::update_reference_properties()
 {
+    auto& cparams = params.continuation_params;
+
     if (cparams.lambda < 1.0)
     {
         cparams.lambda += cparams.delta;
@@ -151,7 +134,6 @@ void expose_energy(py::module& m){
 
     py::class_<EnergyManager>(m, "EnergyManager")
         .def(py::init<TriMesh*, EnergyParams>())
-        .def(py::init<TriMesh*, EnergyParams, ContinuationParams>())
         .def("set_mesh", &EnergyManager::set_mesh)
         .def("energy", static_cast<real (EnergyManager::*)()>
                 (&EnergyManager::energy))
@@ -168,7 +150,6 @@ void expose_energy(py::module& m){
             py::scoped_estream_redirect>())
         .def_readwrite("properties", &EnergyManager::properties)
         .def_readonly("eparams", &EnergyManager::params)
-        .def_readonly("cparams", &EnergyManager::cparams)
         .def_readonly("initial_props", &EnergyManager::initial_props)
         .def_readonly("ref_props", &EnergyManager::ref_props);
 
