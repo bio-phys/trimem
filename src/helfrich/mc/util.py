@@ -36,6 +36,9 @@ momentum_variance = 1.0
 thin = 10
 flip_ratio = 0.1
 flip_type = serial
+initial_temperature = 1.0
+cooling_factor = 1.0e-4
+start_cooling = 0
 [MINIMIZATION]
 maxiter = 10
 
@@ -91,13 +94,14 @@ def om_helfrich_energy(mesh, estore, config):
         np.copyto(points, x0)
         return flips
 
-    def _callback(x, i, acc):
+    def _callback(x, i, acc, T):
         _callback.acc += acc
         flips = _flip(x)
         if i%istep == 0:
             print("\n-- Step ",i)
-            print("----- acc-rate: ", _callback.acc/istep)
-            print("----- acc-flips:", flips/mesh.n_edges())
+            print("----- acc-rate:   ", _callback.acc/istep)
+            print("----- acc-flips:  ", flips/mesh.n_edges())
+            print("----- temperature:", T)
             p = mesh.points()
             np.copyto(p, x)
             estore.energy()
@@ -236,12 +240,17 @@ def run_hmc(mesh, estore, config, restart):
     # run hmc
     x0   = mesh.points()
     cmc  = config["HMC"]
-    N    = cmc.getint("num_steps")
-    m    = cmc.getfloat("momentum_variance")
-    dt   = cmc.getfloat("step_size")
-    L    = cmc.getint("traj_steps")
-    thin = cmc.getint("thin")
-    x, traj = hmc(x0, fun, grad, m, N, dt, L, cb, thin)
+    options = { "number_of_steps": cmc.getint("num_steps"),
+                "mass": cmc.getfloat("momentum_variance"),
+                "time_step": cmc.getfloat("step_size"),
+                "num_integration_steps": cmc.getint("traj_steps"),
+                "thin": cmc.getint("thin"),
+                "initial_temperature": cmc.getfloat("initial_temperature"),
+                "cooling_factor": cmc.getfloat("cooling_factor"),
+                "cooling_start_step": cmc.getint("start_cooling"),
+                "callback": cb,
+              }
+    x, traj = hmc(x0, fun, grad, options)
 
     # write restart
     write_restart(x, mesh, estore, restart+1, config)
