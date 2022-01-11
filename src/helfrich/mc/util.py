@@ -133,8 +133,8 @@ def setup_energy_manager(config, cparams=None):
     bparams = m.BondParams()
     bparams.type = str_to_enum[config["BONDS"]["bond_type"]]
     bparams.r    = config["BONDS"].getint("r")
-    bparams.lc0  = 1.15*l
-    bparams.lc1  = 0.85*l
+    bparams.lc0  = 1.25*l
+    bparams.lc1  = 0.75*l
     bparams.a0   = a
 
     ec = config["ENERGY"]
