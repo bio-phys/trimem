@@ -37,7 +37,7 @@ def test_flips():
     mesh = om.TriMesh(p, c)
 
     estore = get_energy_manager(mesh, m.BondType.Edge,
-                                10.0, 1.0e4, 1.0e4, 0.0, 0.0,
+                                10.0, 1.0e4, 1.0e4, 0.0, 0.0, 1.0,
                                 1.0, 1.0, 1.0)
     estore.print_info()
 

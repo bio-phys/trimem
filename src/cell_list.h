@@ -7,24 +7,11 @@
 #include <vector>
 #include <map>
 
-#include "MeshTypes.hh"
+#include "defs.h"
 
 namespace trimem {
 
-template<class real>
-real distance(const real* avec, const real* bvec, int n)
-{
-    real dist=0.0;
-    for (int i=0; i<n; i++)
-    {
-        real di = avec[i] - bvec[i];
-        dist += di * di;
-    }
-    return std::sqrt(dist);
-}
-
-template<class real>
-real squ_distance(const real* avec, const real* bvec, int n)
+static real squ_distance(const real* avec, const real* bvec, int n)
 {
     real dist=0.0;
     for (int i=0; i<n; i++)
@@ -35,7 +22,12 @@ real squ_distance(const real* avec, const real* bvec, int n)
     return dist;
 }
 
-template<bool exclude_self=true, bool exclude_one_ring=true>
+static real distance(const real* avec, const real* bvec, int n)
+{
+    return std::sqrt(squ_distance(avec, bvec, n));
+}
+
+template<int exclusion = 0>
 struct CellList
 {
   //! cells -> points lookup
@@ -99,9 +91,9 @@ struct CellList
 
   void compute_cell_pairs()
   {
-      for (auto it=cells.begin(); it!=cells.end(); ++it)
+      for (auto it: cells)
       {
-          int icell = it->first;
+          int icell = it.first;
 
           // get icell's grid coordinates
           int kicell = icell / strides[2];
@@ -148,52 +140,67 @@ struct CellList
 
       int ni = 0;
       // loop over all cell pairs
-      for (auto it=cell_pairs.begin(); it!=cell_pairs.end(); ++it)
+      for (auto pair: cell_pairs)
       {
-          const std::vector<int>& icell = cells.at(it->first);
-          const std::vector<int>& ocell = cells.at(it->second);
+          const std::vector<int>& icell = cells.at(pair.first);
+          const std::vector<int>& ocell = cells.at(pair.second);
 
           // symmetric (i.e. *i_it>*o_it) interactions can only be skipped
           // for interactions within a cell.
-          bool is_same_cell = ( it->first == it->second );
+          bool is_same_cell = ( pair.first == pair.second );
 
           // vertices in icell
-          for (auto i_it=icell.begin(); i_it!=icell.end(); ++i_it)
+          for (auto i: icell)
           {
               // this vertex's coordinates
-              const double* idata = data+*i_it*3;
+              const double* idata = data+i*3;
 
               // vertices in ocell
-              for (auto o_it=ocell.begin(); o_it!=ocell.end(); ++o_it)
+              for (auto j: ocell)
               {
-                  if (exclude_self)
+                  if constexpr (exclusion >= 0)
                   {
-                      if (*i_it == *o_it) continue;
+                      // exclude self
+                      if (i == j) continue;
                   }
-                  if (exclude_one_ring)
+                  if constexpr (exclusion > 0)
                   {
+                      // exclude direct neighbourhood
                       bool in_ring = false;
-                      auto vh = mesh.vertex_handle(*i_it);
-                      for (auto vit=mesh.cvv_iter(vh); vit.is_valid(); vit++)
+                      auto vh = mesh.vertex_handle(i);
+                      for (auto vii: mesh.vv_range(vh))
                       {
-                          if (vit->idx() == *o_it)
+                          if (vii.idx() == j)
                           {
                               in_ring = true;
                               break;
+                          }
+                          else if constexpr (exclusion > 1)
+                          {
+                              // exclude indirect neighbourhood
+                              for (auto viii: mesh.vv_range(vii))
+                              {
+                                  if (viii.idx() == j)
+                                  {
+                                      in_ring = true;
+                                      break;
+                                  }
+                              }
+                              if (in_ring) break;
                           }
                       }
                       if (in_ring) continue;
                   }
 
                   // save some time since the distance is symmetric
-                  if (is_same_cell and *i_it > *o_it) continue;
+                  if (is_same_cell and i > j) continue;
 
                   // other vertex's coordinates
-                  const double* odata = data+*o_it*3;
+                  const double* odata = data+j*3;
 
                   // compute distance and count in case
-                  double  dist  = squ_distance<double>(idata, odata, 3);
-                  if (dist <= dmax2)
+                  double  dist  = squ_distance(idata, odata, 3);
+                  if (dist < dmax2)
                   {
                       ni+=2;
                   }
@@ -201,28 +208,23 @@ struct CellList
           }
       }
 
-      return (exclude_self) ? ni : ni - mesh.n_vertices();
+      return (exclusion >= 0) ? ni : ni - mesh.n_vertices();
   }
 
-  int point_distance_counts(const TriMesh& mesh,
-                            const int& pid,
-                            const double& dmax) const
+  std::tuple<std::vector<Point>, std::vector<int> >
+  point_distances(const TriMesh& mesh, const int& pid, const double& dmax) const
   {
-      // get pid's cell's grid coordinates
       auto point = mesh.point(mesh.vertex_handle(pid));
+
+      // get pid's cell's grid coordinates
       std::array<int,3> coords;
       for (int k=0; k<3; k++)
       {
           coords[k] = int((point[k] - box[0][k]) / r_list[k]);
       }
 
-      double dmax2 = dmax * dmax;
-
-      const TriMesh::Point& tmp = mesh.point(mesh.vertex_handle(0));
-      const double *data = tmp.data();
-      const double* idata = data+pid*3;
-
-      int ni = 0;
+      std::vector<Point> distances;
+      std::vector<int>  neighbours;
       // loop over all neighbouring cells
       for (int i=-1; i<2; i++)
       {
@@ -246,42 +248,64 @@ struct CellList
                   if (oit==cells.end()) continue;
 
                   auto& vertices = oit->second;
-                  for (auto vit=vertices.begin(); vit!=vertices.end(); ++vit)
+                  for (auto jid: vertices)
                   {
-                      if (exclude_self)
+                      if constexpr (exclusion >= 0)
                       {
-                          if (pid == *vit) continue;
+                          // exclude self
+                          if (pid == jid) continue;
                       }
-                      if (exclude_one_ring)
+                      if constexpr (exclusion > 0)
                       {
+                          // exclude direct neighbourhood
                           bool in_ring = false;
                           auto vh = mesh.vertex_handle(pid);
-                          for (auto vjt=mesh.cvv_iter(vh); vjt.is_valid(); vjt++)
+                          for (auto vii: mesh.vv_range(vh))
                           {
-                              if (vjt->idx() == *vit)
+                              if (vii.idx() == jid)
                               {
                                   in_ring = true;
                                   break;
+                              }
+                              else if constexpr (exclusion > 1)
+                              {
+                                  // exclude indirect neighbourhood
+                                  for (auto viii: mesh.vv_range(vii))
+                                  {
+                                      if (viii.idx() == jid)
+                                      {
+                                          in_ring = true;
+                                          break;
+                                      }
+                                  }
+                                  if (in_ring) break;
                               }
                           }
                           if (in_ring) continue;
                       }
 
-                      // other vertex's coordinates
-                      const double* odata = data+*vit*3;
+                      // distance
+                      Point dist = point - mesh.point(mesh.vertex_handle(jid));
 
-                      // compute distance and count in case
-                      double  dist  = squ_distance<double>(idata, odata, 3);
-                      if (dist <= dmax2)
+                      if (dist.norm() < dmax)
                       {
-                          ni += 1;
+                          distances.push_back(dist);
+                          neighbours.push_back(jid);
                       }
                   }
               }
           }
       }
 
-      return ni;
+      return std::make_tuple(std::move(distances), std::move(neighbours));
+  }
+
+  int point_distance_counts(const TriMesh& mesh,
+                            const int& pid,
+                            const double& dmax) const
+  {
+      auto res = point_distances(mesh, pid, dmax);
+      return std::get<0>(res).size();
   }
 
   std::tuple<std::vector<double>, std::vector<int>, std::vector<int> >
@@ -314,20 +338,35 @@ struct CellList
               // vertices in ocell
               for (auto o_it=ocell.begin(); o_it!=ocell.end(); ++o_it)
               {
-                  if (exclude_self)
+                  if constexpr (exclusion >= 0)
                   {
+                      // exclude self
                       if (*i_it == *o_it) continue;
                   }
-                  if (exclude_one_ring)
+                  if constexpr (exclusion > 0)
                   {
+                      // exclude direct neighbourhood
                       bool in_ring = false;
                       auto vh = mesh.vertex_handle(*i_it);
-                      for (auto vit=mesh.cvv_iter(vh); vit.is_valid(); vit++)
+                      for (auto vii: mesh.vv_range(vh))
                       {
-                          if (vit->idx() == *o_it)
+                          if (vii.idx() == *o_it)
                           {
                               in_ring = true;
                               break;
+                          }
+                          else if constexpr (exclusion > 1)
+                          {
+                              // exclude indirect neighbourhood
+                              for (auto viii: mesh.vv_range(vii))
+                              {
+                                  if (viii.idx() == *o_it)
+                                  {
+                                      in_ring = true;
+                                      break;
+                                  }
+                              }
+                              if (in_ring) break;
                           }
                       }
                       if (in_ring) continue;
@@ -340,7 +379,7 @@ struct CellList
                   const double* odata = data+*o_it*3;
 
                   // compute distance and count in case
-                  double dist = distance<double>(idata, odata, 3);
+                  double dist = distance(idata, odata, 3);
                   if (dist <= rlist)
                   {
                       dists.push_back(dist);
@@ -362,9 +401,6 @@ struct CellList
   }
 
 };
-
-typedef CellList<true, true>   rCellList;
-typedef CellList<false, false> fCellList;
 
 }
 #endif

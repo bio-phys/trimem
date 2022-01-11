@@ -14,6 +14,7 @@
 namespace trimem {
 
 struct BondPotential;
+struct SurfaceRepulsion;
 
 struct Foo
 {
@@ -35,6 +36,9 @@ public:
     void update_reference_properties();
     void interpolate_reference_properties();
 
+    // update repulsion potential
+    void update_repulsion();
+
     // energy and gradient evaluation
     real energy();
     real energy(VertexProperties& props);
@@ -53,6 +57,9 @@ public:
 
     // bond potential
     std::unique_ptr<BondPotential> bonds;
+
+    // repulsion penalty
+    std::unique_ptr<SurfaceRepulsion> repulse;
 
     // set mesh
     void set_mesh(const TriMesh* mesh);

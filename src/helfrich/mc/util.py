@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pickle
 
@@ -18,12 +20,20 @@ restart_prefix = out/restart_
 output_format = vtu
 [BONDS]
 bond_type = Edge
+[SURFACEREPULSION]
+n_search = "cell-list"
+rlist = 0.1
+exclusion_level = 2
+refresh = 1
+lc1 = 0.0
+r = 2
 [ENERGY]
 kappa_b = 1.0
 kappa_a = 1.0
 kappa_v = 1.0
 kappa_c = 1.0
 kappa_t = 1.0
+kappa_r = 1.0
 area_fraction = 1.0
 volume_fraction = 1.0
 curvature_fraction = 1.0
@@ -41,6 +51,7 @@ cooling_factor = 1.0e-4
 start_cooling = 0
 [MINIMIZATION]
 maxiter = 10
+out_every = 0
 
 """
 
@@ -56,6 +67,7 @@ def om_helfrich_energy(mesh, estore, config):
     ft     = config["HMC"]["flip_type"]
     prefix = config["DEFAULT"]["output_prefix"]
     thin   = config["HMC"].getint("thin")
+    rfrsh  = config["SURFACEREPULSION"].getint("refresh")
 
 
     if ft == "serial":
@@ -111,6 +123,10 @@ def om_helfrich_energy(mesh, estore, config):
         if i%thin == 0:
             write_output(x, mesh, _callback.count, config)
             _callback.count += 1
+        if i%rfrsh == 0:
+            p = mesh.points()
+            np.copyto(p, x)
+            estore.update_repulsion()
         estore.update_reference_properties()
 
     # init callback
@@ -137,6 +153,13 @@ def setup_energy_manager(config, cparams=None):
     bparams.lc1  = 0.75*l
     bparams.a0   = a
 
+    rparams = m.SurfaceRepulsionParams()
+    rparams.n_search        = config["SURFACEREPULSION"]["n_search"]
+    rparams.rlist           = config["SURFACEREPULSION"].getfloat("rlist")
+    rparams.exclusion_level = config["SURFACEREPULSION"].getint("exclusion_level")
+    rparams.lc1             = config["SURFACEREPULSION"].getfloat("lc1")
+    rparams.r               = config["SURFACEREPULSION"].getint("r")
+
     ec = config["ENERGY"]
     eparams = m.EnergyParams()
     eparams.kappa_b        = ec.getfloat("kappa_b")
@@ -144,10 +167,12 @@ def setup_energy_manager(config, cparams=None):
     eparams.kappa_v        = ec.getfloat("kappa_v")
     eparams.kappa_c        = ec.getfloat("kappa_c")
     eparams.kappa_t        = ec.getfloat("kappa_t")
+    eparams.kappa_r        = ec.getfloat("kappa_r")
     eparams.area_frac      = ec.getfloat("area_fraction")
     eparams.volume_frac    = ec.getfloat("volume_fraction")
     eparams.curvature_frac = ec.getfloat("curvature_fraction")
     eparams.bond_params    = bparams
+    eparams.repulse_params = rparams
 
     # continuation params might come from restarts instead as from input
     if cparams is None:
@@ -258,27 +283,66 @@ def run_hmc(mesh, estore, config, restart):
 def run_minim(mesh, estore, config, restart):
     """Run minimization."""
 
-    # function and gradient
-    fun, grad, _ = om_helfrich_energy(mesh, estore, config)
-
     # parameters
-    x0 = mesh.points()
-    N  = config["MINIMIZATION"].getint("maxiter")
+    x0   = mesh.points().copy()
+    N    = config["MINIMIZATION"].getint("maxiter")
+    outi = config["MINIMIZATION"].getint("out_every")
+    info = config["DEFAULT"].getint("info")
 
-    # adjust callables to scipy interface
-    sfun  = lambda x: fun(x.reshape(x0.shape))
-    sgrad = lambda x: grad(x.reshape(x0.shape)).ravel()
+    # generic minimization requires surface repulsion refresh at every step
+    refresh = config["SURFACEREPULSION"].getint("refresh")
+    if not (refresh == 1 or refresh is None):
+        wstr = "SURFACEREPULSION::refresh is set to {}, ".format(refresh) + \
+               "which is ignored in in minimization."
+        warnings.warn(wstr)
+
+    # generate energy, gradient and callback callables to scipy interface
+    def _fun(x):
+        p = mesh.points()
+        np.copyto(p, x.reshape(x0.shape))
+        estore.update_repulsion()
+        return estore.energy()
+
+    def _grad(x):
+        p = mesh.points()
+        np.copyto(p, x.reshape(x0.shape))
+        estore.update_repulsion()
+        return estore.gradient().ravel()
+
+    def _cb(x, force_info=False):
+        if force_info or (info > 0 and _cb.i % info == 0):
+            print("\niter:",_cb.i)
+            p = mesh.points()
+            np.copyto(p, x.reshape(x0.shape))
+            estore.energy()
+            estore.print_info()
+        if outi > 0 and _cb.i % outi == 0:
+            p = mesh.points()
+            np.copyto(p, x.reshape(x0.shape))
+            write_output(p, mesh, _cb.count, config)
+            _cb.count += 1
+        _cb.i += 1
+    _cb.i = 0
+    _cb.count = 0
 
     # minimization options
     mopt = {"maxiter": N, "disp": 0}
 
     # run minimization
-    res = minimize(sfun, x0.ravel(), jac=sgrad, method="L-BFGS-B", options=mopt)
+    res = minimize(_fun,
+                   x0.ravel(),
+                   jac=_grad,
+                   callback=_cb,
+                   method="L-BFGS-B",
+                   options=mopt)
     x   = res.x.reshape(x0.shape)
     print(res.message)
 
+    # print info
+    _cb(x, force_info=True)
+
     # write output
-    write_output(x, mesh, 0, config)
+    write_output(x, mesh, _cb.count, config)
 
     # write restart
     write_restart(x, mesh, estore, restart+1, config)

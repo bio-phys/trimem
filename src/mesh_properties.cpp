@@ -5,14 +5,16 @@
 
 #include "mesh_util.h"
 #include "mesh_tether.h"
+#include "mesh_repulsion.h"
 
 namespace trimem {
 
 VertexProperties vertex_properties(const TriMesh& mesh,
                                    const BondPotential& bonds,
+                                   const SurfaceRepulsion& constraint,
                                    const VertexHandle& ve)
 {
-    VertexProperties p{ 0.0, 0.0, 0.0, 0.0, 0.0 };
+    VertexProperties p{ 0, 0, 0, 0, 0, 0 };
 
     for (auto he : mesh.voh_range(ve))
     {
@@ -40,17 +42,21 @@ VertexProperties vertex_properties(const TriMesh& mesh,
 
     p.bending    = 2 * p.curvature * p.curvature / p.area;
 
+    // mesh repulsion
+    p.repulsion = constraint.vertex_property(mesh, ve.idx());
+
     return p;
 }
 
 void vertex_properties_grad(const TriMesh& mesh,
                             const BondPotential& bonds,
+                            const SurfaceRepulsion& repulse,
                             const VertexHandle& ve,
                             std::vector<VertexPropertiesGradient>& d_props)
 {
     // pre-compute vertex-curvature to vertex-area ratio (needed for bending)
-    real curvature = 0.0;
-    real area      = 0.0;
+    real curvature = 0;
+    real area      = 0;
     for (auto he : mesh.voh_range(ve))
     {
         real l  = edge_length(mesh, he);
@@ -146,8 +152,25 @@ void vertex_properties_grad(const TriMesh& mesh,
                     d_props[idx[i]].tethering[j] += val[j];
                 }
             }
+        } // not boundary
+    } // outgoing halfedges
+
+    // repulsion penalty
+    std::vector<Point> d_repulse;
+    std::vector<int> idx;
+    std::tie(d_repulse, idx) = repulse.vertex_property_grad(mesh, ve.idx());
+    for (size_t i=0; i<d_repulse.size(); i++)
+    {
+        auto val = d_repulse[i];
+        for (int j=0; j<3; j++)
+        {
+#pragma omp atomic
+            d_props[idx[i]].repulsion[j] -= val[j];
+#pragma omp atomic
+            d_props[ve.idx()].repulsion[j] += val[j];
         }
     }
+
 }
 
 void expose_properties(py::module& m)
@@ -159,6 +182,7 @@ void expose_properties(py::module& m)
         .def_readwrite("curvature", &VertexProperties::curvature)
         .def_readwrite("bending", &VertexProperties::bending)
         .def_readwrite("tethering", &VertexProperties::tethering)
+        .def_readwrite("repulsion", &VertexProperties::repulsion)
         .def(py::pickle(
            [](const VertexProperties &p) { // __getstate__
                return py::make_tuple(
@@ -166,17 +190,19 @@ void expose_properties(py::module& m)
                    p.volume,
                    p.curvature,
                    p.bending,
-                   p.tethering);
+                   p.tethering,
+                   p.repulsion);
            },
            [](py::tuple t) { // __setstate__
-               if (t.size() != 5)
+               if (t.size() != 6)
                    throw std::runtime_error("Invalid state!");
                VertexProperties p = {
                    t[0].cast<real>(),
                    t[1].cast<real>(),
                    t[2].cast<real>(),
                    t[3].cast<real>(),
-                   t[4].cast<real>() };
+                   t[4].cast<real>(),
+                   t[5].cast<real>() };
                return p;
            }));
 }

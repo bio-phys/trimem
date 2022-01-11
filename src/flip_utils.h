@@ -11,12 +11,14 @@ namespace trimem {
 
 class EnergyManager;
 class BondPotential;
+class SurfaceRepulsion;
 class OmpGuard;
 
 //! Compute vertex properties of a mesh patch associated to an edge.
 VertexProperties edge_vertex_properties(TriMesh& mesh,
                                        const EdgeHandle& eh,
-                                       const BondPotential& bonds);
+                                       const BondPotential& bonds,
+                                       const SurfaceRepulsion& repulse);
 
 //! Compute neighbourhood patch of edges blocked by a flip of eh
 std::unordered_set<int> flip_patch(TriMesh& mesh, const EdgeHandle& eh);

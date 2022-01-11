@@ -11,6 +11,7 @@
 namespace trimem {
 
 struct BondPotential;
+struct SurfaceRepulsion;
 
 template<class T>
 struct TVertexProperties
@@ -20,6 +21,7 @@ struct TVertexProperties
     T curvature;
     T bending;
     T tethering;
+    T repulsion;
 
     TVertexProperties<T>& operator+=(const TVertexProperties<T>& lhs)
     {
@@ -28,6 +30,7 @@ struct TVertexProperties
         curvature += lhs.curvature;
         bending   += lhs.bending;
         tethering += lhs.tethering;
+        repulsion += lhs.repulsion;
         return *this;
     }
 
@@ -38,6 +41,7 @@ struct TVertexProperties
         curvature -= lhs.curvature;
         bending   -= lhs.bending;
         tethering -= lhs.tethering;
+        repulsion -= lhs.repulsion;
         return *this;
     }
 };
@@ -47,10 +51,12 @@ typedef TVertexProperties<Point> VertexPropertiesGradient;
 
 VertexProperties vertex_properties(const TriMesh& mesh,
                                    const BondPotential& bonds,
+                                   const SurfaceRepulsion& constraint,
                                    const VertexHandle& ve);
 
 void vertex_properties_grad(const TriMesh& mesh,
                             const BondPotential& bonds,
+                            const SurfaceRepulsion& constraint,
                             const VertexHandle& ve,
                             std::vector<VertexPropertiesGradient>& d_props);
 

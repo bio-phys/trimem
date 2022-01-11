@@ -21,7 +21,6 @@ namespace trimem {
 typedef std::chrono::high_resolution_clock myclock;
 static std::mt19937 generator_(myclock::now().time_since_epoch().count());
 
-
 int flip_serial(TriMesh& mesh, EnergyManager& estore, real& flip_ratio)
 {
     if (flip_ratio > 1.0)
@@ -49,12 +48,14 @@ int flip_serial(TriMesh& mesh, EnergyManager& estore, real& flip_ratio)
         if (mesh.is_flip_ok(eh) and !mesh.is_boundary(eh))
         {
             // remove old properties
-            auto oprops = edge_vertex_properties(mesh, eh, *(estore.bonds));
+            auto oprops = edge_vertex_properties(mesh, eh, *(estore.bonds),
+                                                 *(estore.repulse));
             props -= oprops;
 
             // update with new properties
             mesh.flip(eh);
-            auto nprops = edge_vertex_properties(mesh, eh, *(estore.bonds));
+            auto nprops = edge_vertex_properties(mesh, eh, *(estore.bonds),
+                                                 *(estore.repulse));
             props += nprops;
 
             // evaluate energy
@@ -140,18 +141,19 @@ int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, real& flip_ratio
             if (locked)
             {
                 auto patch = flip_patch(mesh, eh);
-                for (const int& i: patch) l_edges[i].release();            
+                for (const int& i: patch) l_edges[i].release();
             }
             else
             {
                 continue;
             }
 
-            
             // compute differential properties
-            auto dprops = edge_vertex_properties(mesh, eh, *(estore.bonds));
+            auto dprops = edge_vertex_properties(mesh, eh, *(estore.bonds),
+                                                 *(estore.repulse));
             mesh.flip(eh);
-            dprops -= edge_vertex_properties(mesh, eh, *(estore.bonds));
+            dprops -= edge_vertex_properties(mesh, eh, *(estore.bonds),
+                                             *(estore.repulse));
 
             real u = accept(prng);
 

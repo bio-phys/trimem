@@ -13,14 +13,14 @@
 
 namespace trimem {
 
-template<bool exclude_self=true, bool exclude_one_ring=true>
+template<int exclusion = 0>
 struct NeighbourLists
 {
     std::vector<std::vector<int> >neighbours;
 
     NeighbourLists(const TriMesh& mesh, double rlist, double box_eps=1.e-6)
     {
-        CellList<exclude_self, exclude_one_ring> clist(mesh, rlist, box_eps);
+        CellList<exclusion> clist(mesh, rlist, box_eps);
 
         // get indices of vertices in the rlist-ball
         auto res = clist.distance_matrix(mesh, rlist);
@@ -32,6 +32,8 @@ struct NeighbourLists
         auto jt = jdx.begin();
         for (auto it=idx.begin(); it!=idx.end(); ++it, ++jt)
         {
+// TODO: the following should actually be superfluous!
+/*
             if (exclude_self)
             {
                 if (*it==*jt) continue;
@@ -50,7 +52,7 @@ struct NeighbourLists
                 }
                 if (in_ring) continue;
             }
-
+*/
             neighbours[*it].push_back(*jt);
             neighbours[*jt].push_back(*it);
         }
@@ -80,8 +82,8 @@ struct NeighbourLists
                 const double* odata = data+*it*3;
 
                 // compute distance and count in case
-                double dist = distance<double>(idata, odata, 3);
-                if (dist <= dmax)
+                double dist = distance(idata, odata, 3);
+                if (dist < dmax)
                 {
                     dists.push_back(dist);
                     idx.push_back(i);
@@ -115,8 +117,8 @@ struct NeighbourLists
                 const double* odata = data+*it*3;
 
                 // compute distance and count in case
-                double dist = squ_distance<double>(idata, odata, 3);
-                if (dist <= dmax2)
+                double dist = squ_distance(idata, odata, 3);
+                if (dist < dmax2)
                 {
                     ni += 1;
                 }
@@ -126,44 +128,43 @@ struct NeighbourLists
         return ni;
     }
 
+    std::tuple<std::vector<Point>, std::vector<int> >
+    point_distances(const TriMesh& mesh, const int& pid, const double& dmax) const
+    {
+        std::vector<Point> dist;
+        std::vector<int>   jdx;
+
+        // check whether there are any neighbours in the list for this point
+        auto& neighs = neighbours.at(pid);
+        if (neighs.size() == 0)
+        {
+            return std::make_tuple(dist, neighs);
+        }
+
+        const auto& point = mesh.point(mesh.vertex_handle(pid));
+
+        for (auto jid: neighs)
+        {
+            Point di = point - mesh.point(mesh.vertex_handle(jid));
+            if (di.norm() < dmax)
+            {
+                dist.push_back(di);
+                jdx.push_back(jid);
+            }
+        }
+
+        return std::make_tuple(std::move(dist), std::move(jdx));
+    }
+
     int point_distance_counts(const TriMesh& mesh,
                               const int& pid,
                               const double& dmax) const
     {
-        // check whether there are any neighbours in the list for this point
-        auto neighs = neighbours.at(pid);
-        if (neighs.size() == 0) return 0;
-
-        double dmax2 = dmax * dmax;
-
-        const TriMesh::Point& tmp = mesh.point(mesh.vertex_handle(0));
-        const double *data = tmp.data();
-
-        int ni=0;
-
-        // this vertex's coordinates
-        const double* idata = data+pid*3;
-
-        for (auto jt=neighs.begin(); jt!=neighs.end(); ++jt)
-        {
-            // other vertex's coordinates
-            const double* odata = data+*jt*3;
-
-            // compute distance and count in case
-            double dist = squ_distance<double>(idata, odata, 3);
-            if (dist <= dmax2)
-            {
-                ni += 1;
-            }
-        }
-
-        return ni;
+        auto res = point_distances(mesh, pid, dmax);
+        return std::get<0>(res).size();
     }
 
 };
-
-typedef NeighbourLists<true, true> rNeighbourLists;
-typedef NeighbourLists<false, false> fNeighbourLists;
 
 }
 #endif

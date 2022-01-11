@@ -15,8 +15,10 @@ def test_energy():
     print("Num vertices:",len(points))
 
     estore = get_energy_manager(mesh, m.BondType.Edge,
-                                1.0, 1.0e4, 1.0e4, 1.0, 1.0, # weights
-                                0.5, 1.0, 1.0)               # fractions
+                                0.1, 1.0e2, 1.0e2, 1.0e2, 1.0e3, 0.1, # weights
+                                0.8, .8, 0.8)                 # fractions
+
+    estore.print_info()
 
     print("Time to solution:")
 
@@ -28,9 +30,9 @@ def test_energy():
 
     gradient1 = np.empty(points.shape)
 
-    # method 1 (using locality of energy functional but not parallelized)
+    # method 1 (fd)
     start = time.time()
-    m.gradient(mesh, estore, gradient1, 1.0e-6)
+    m.gradient(mesh, estore, gradient1, 1.0e-8)
     dt2 = time.time() - start
     print(" gradient (fd)    :", dt2)
     print("-")
@@ -44,7 +46,8 @@ def test_energy():
 
     plt.plot(gradient1.ravel())
     plt.plot(gradient2.ravel())
-    print(np.linalg.norm(gradient1-gradient2))
+    plt.savefig("res.pdf")
+    print(np.linalg.norm(gradient1-gradient2)/np.linalg.norm(gradient1))
     plt.show()
 
 if __name__ == "__main__":

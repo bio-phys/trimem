@@ -215,7 +215,6 @@ def check_constraint():
     x = mesh.points()
 
     mc = m.MeshConstraintCL(mesh, 0.2, 0.2)
-    print(mc.nlist)
 
     counts = mc.check_local(mesh, 50)
     print("Any violation detected from cell list?:", not counts)
@@ -228,8 +227,8 @@ if __name__ == "__main__":
     #valid_cell_list()
     #valid_nlist()
 
-    check_scaling()
+    #check_scaling()
 
-    #check_constraint()
+    check_constraint()
 
     #test_3d()

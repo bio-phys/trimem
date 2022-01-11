@@ -5,6 +5,7 @@
 
 #include "numpy_util.h"
 #include "mesh_tether.h"
+#include "mesh_repulsion.h"
 #include "kernel.h"
 
 #include "pybind11/iostream.h"
@@ -18,6 +19,9 @@ EnergyManager::EnergyManager(const TriMesh* mesh,
 {
     // setup bond potential
     bonds = make_bonds(params.bond_params);
+
+    // setup mesh repulsion
+    update_repulsion();
 
     // evaluate properties from mesh
     auto dump = energy();
@@ -59,11 +63,16 @@ void EnergyManager::update_reference_properties()
     interpolate_reference_properties();
 }
 
+void EnergyManager::update_repulsion()
+{
+    repulse = make_repulsion(*mesh_, params.repulse_params);
+}
+
 real EnergyManager::energy()
 {
-    TrimemEnergy kernel(params, *mesh_, *bonds, ref_props);
+    TrimemEnergy kernel(params, *mesh_, *bonds, *repulse, ref_props);
 
-    VertexProperties props{ 0.0, 0.0, 0.0, 0.0, 0.0 };
+    VertexProperties props{ 0, 0, 0, 0, 0, 0};
     parallel_reduction(mesh_->n_vertices(), kernel, props);
 
     properties = props;
@@ -72,7 +81,7 @@ real EnergyManager::energy()
 
 real EnergyManager::energy(VertexProperties& props)
 {
-    TrimemEnergy kernel(params, *mesh_, *bonds, ref_props);
+    TrimemEnergy kernel(params, *mesh_, *bonds, *repulse, ref_props);
     return kernel.final(props);
 }
 
@@ -85,9 +94,9 @@ std::vector<Point> EnergyManager::gradient()
 
     // properties gradients
     VertexPropertiesGradient zeros
-      { Point(0), Point(0), Point(0), Point(0), Point(0) };
+      { Point(0), Point(0), Point(0), Point(0), Point(0), Point(0) };
     std::vector<VertexPropertiesGradient> gprops(n, zeros);
-    TrimemPropsGradient pg_kernel(*mesh_, *bonds, gprops);
+    TrimemPropsGradient pg_kernel(*mesh_, *bonds, *repulse, gprops);
     parallel_for(n, pg_kernel);
 
     // evaluate gradient
@@ -118,7 +127,8 @@ std::ostream& operator<<(std::ostream& out, const EnergyManager& lhs)
   out << "  volume:    " << volume_penalty(params, props, ref_props) << "\n";
   out << "  area diff: " << curvature_penalty(params, props, ref_props) << "\n";
   out << "  bending:   " << helfrich_energy(params, props) << "\n";
-  out << "  tether:    " << tether_potential(params, props) << "\n";
+  out << "  tether:    " << tether_penalty(params, props) << "\n";
+  out << "  repulsion: " << repulsion_penalty(params, props) << "\n";
   out << "  total:     " << trimem_energy(params, props, ref_props) << "\n";
   out << std::endl;
 
@@ -144,6 +154,7 @@ void expose_energy(py::module& m){
             return tonumpy(grad[0], grad.size());})
         .def("update_reference_properties",
             &EnergyManager::update_reference_properties)
+        .def("update_repulsion", &EnergyManager::update_repulsion)
         .def("print_info",
             &EnergyManager::print_info,
             py::call_guard<py::scoped_ostream_redirect,

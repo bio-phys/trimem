@@ -18,7 +18,9 @@ typedef std::chrono::high_resolution_clock myclock;
 
 VertexProperties edge_vertex_properties(TriMesh& mesh,
                                        const EdgeHandle& eh,
-                                       const BondPotential& bonds)
+                                       const BondPotential& bonds,
+                                       const SurfaceRepulsion& repulse)
+
 {
     VertexProperties props{ 0.0, 0.0, 0.0, 0.0, 0.0 };
 
@@ -28,11 +30,11 @@ VertexProperties edge_vertex_properties(TriMesh& mesh,
         auto heh = mesh.halfedge_handle(eh, i);
 
         auto ve = mesh.to_vertex_handle(heh);
-        props += vertex_properties(mesh, bonds, ve);
+        props += vertex_properties(mesh, bonds, repulse, ve);
 
         auto next_heh = mesh.next_halfedge_handle(heh);
         ve = mesh.to_vertex_handle(next_heh);
-        props += vertex_properties(mesh, bonds, ve);
+        props += vertex_properties(mesh, bonds, repulse, ve);
     }
 
     return props;
