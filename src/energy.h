@@ -16,14 +16,6 @@ namespace trimem {
 struct BondPotential;
 struct SurfaceRepulsion;
 
-struct Foo
-{
-  Foo(const TriMesh& mesh) :
-    mesh_(mesh) {}
-
-  const TriMesh& mesh_;
-};
-
 class EnergyManager
 {
 public:
