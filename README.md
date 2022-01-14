@@ -41,10 +41,9 @@ sampling with hamiltonian monte carlo can, e.g., be performed with
 ```bash
 # mesh generation
 python -c "import meshzoo; \
-           import helfrich.openmesh as om; \
+           import meshio; \
            p,c = meshzoo.icosa_sphere(8); \
-           mesh = om.TriMesh(p,c); \
-           om.write_mesh('input.stl', mesh, binary=True)"
+           meshio.write_points_cells('input.stl', p, [('triangle', c)])"
 
 # input file
 echo -n "\
@@ -58,24 +57,39 @@ output_format = vtu
 [BONDS]
 bond_type = Edge
 r = 2
+[SURFACEREPULSION]
+n_search = cell-list
+rlist = 0.2
+exclusion_level = 2
+refresh = 10
+r = 2
+lc1 = 0.15
 [ENERGY]
-kappa_b = 10.0
-kappa_a = 1.0e4
-kappa_v = 1.0e4
+kappa_b = 300.0
+kappa_a = 1.0e6
+kappa_v = 1.0e6
 kappa_c = 0.0
-kappa_t = 1.0e2
+kappa_t = 1.0e5
+kappa_r = 1.0e3
 area_fraction = 1.0
 volume_fraction = 0.8
 curvature_fraction = 1.0
+continuation_delta = 0.0
+continuation_lambda = 1.0
 [HMC]
 num_steps = 10000
 traj_steps = 100
-step_size = 1.0e-4
+step_size = 2.5e-5
 momentum_variance = 1.0
 thin = 100
 flip_ratio = 0.1
+flip_type = parallel
+initial_temperature = 1.0
+cooling_factor = 1.0e-3
+start_cooling = 10000
 [MINIMIZATION]
-maxiter = 2000" > inp.conf
+maxiter = 2000
+out_every = 0" > inp.conf
 
 # prepare output folder
 mkdir -p out
