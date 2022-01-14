@@ -39,7 +39,7 @@ TParams = namedtuple("TParams", "name radius")
 @pytest.fixture(params=[TParams("sphere", 1.0), TParams("sphere", 0.5),
                         TParams("tube", 1.0), TParams("tube", 0.5)])
 def data(request):
-    """facet-pair with properties for testing."""
+    """test meshes with reference properties for testing."""
 
     fun = globals()[request.param.name]
     mesh, a, v, c, b = fun(float(request.param.radius),n)
@@ -72,10 +72,6 @@ def params(data):
     params.lc0 = 1.15*l
     params.lc1 = 0.85*l
     params.a0   = m.area(mesh)/mesh.n_faces()
-
-    cparams = m.ContinuationParams()
-    cparams.delta = 0.0
-    cparams.lam   = 1.0
 
     eparams = m.EnergyParams()
     eparams.area_frac      = 1.0
