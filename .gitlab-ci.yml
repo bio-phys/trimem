@@ -8,5 +8,6 @@ tests:
     - git submodule update --init --recursive
     - pip install -v .
     - pip install --upgrade numpy
-    - pip install meshzoo autograd
+    - pip install meshio meshzoo autograd
+    - export PATH=$PATH:/root/.local/bin
     - pytest -v tests/

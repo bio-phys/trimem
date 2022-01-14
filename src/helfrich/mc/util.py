@@ -12,16 +12,16 @@ from .hmc import hmc
 
 CONF = """[DEFAULT]
 algorithm = hmc
-num_steps = 1000
 info = 1
-input = "test.stl"
+input = test.stl
 output_prefix = out/test_
 restart_prefix = out/restart_
 output_format = vtu
 [BONDS]
 bond_type = Edge
+r = 2
 [SURFACEREPULSION]
-n_search = "cell-list"
+n_search = cell-list
 rlist = 0.1
 exclusion_level = 2
 refresh = 1
@@ -42,6 +42,7 @@ continuation_lambda = 1.0
 [HMC]
 num_steps = 10
 step_size = 1.0
+traj_steps = 10
 momentum_variance = 1.0
 thin = 10
 flip_ratio = 0.1
