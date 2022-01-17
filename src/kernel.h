@@ -139,25 +139,22 @@ Point trimem_gradient(const EnergyParams& params,
 }
 
 //! energy
-struct TrimemEnergy
+struct TrimemProperties
 {
-    TrimemEnergy(const EnergyParams& params,
-                 const TriMesh& mesh,
-                 const BondPotential& bonds,
-                 const SurfaceRepulsion& repulse,
-                 const VertexProperties& ref_props) :
+    TrimemProperties(const EnergyParams& params,
+                     const TriMesh& mesh,
+                     const BondPotential& bonds,
+                     const SurfaceRepulsion& repulse) :
         params_(params),
         mesh_(mesh),
         bonds_(bonds),
-        repulse_(repulse),
-        ref_props_(ref_props) {}
+        repulse_(repulse) {}
 
     //parameters
     const EnergyParams& params_;
     const TriMesh& mesh_;
     const BondPotential& bonds_;
     const SurfaceRepulsion& repulse_;
-    const VertexProperties& ref_props_;
 
     void operator() (const int i, VertexProperties& contrib)
     {
@@ -168,11 +165,6 @@ struct TrimemEnergy
     void operator() (const VertexHandle& vh, VertexProperties& contrib)
     {
         contrib += vertex_properties(mesh_, bonds_, repulse_, vh);
-    }
-
-    real final(const VertexProperties& props)
-    {
-        return trimem_energy(params_, props, ref_props_);
     }
 };
 

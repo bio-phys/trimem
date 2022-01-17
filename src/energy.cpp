@@ -70,19 +70,19 @@ void EnergyManager::update_repulsion()
 
 real EnergyManager::energy()
 {
-    TrimemEnergy kernel(params, *mesh_, *bonds, *repulse, ref_props);
+    TrimemProperties kernel(params, *mesh_, *bonds, *repulse);
 
     VertexProperties props{ 0, 0, 0, 0, 0, 0};
     parallel_reduction(mesh_->n_vertices(), kernel, props);
 
     properties = props;
-    return kernel.final(props);
+    return trimem_energy(params, props, ref_props);
 }
 
 real EnergyManager::energy(VertexProperties& props)
 {
-    TrimemEnergy kernel(params, *mesh_, *bonds, *repulse, ref_props);
-    return kernel.final(props);
+    TrimemProperties kernel(params, *mesh_, *bonds, *repulse);
+    return trimem_energy(params, props, ref_props);
 }
 
 std::vector<Point> EnergyManager::gradient()
