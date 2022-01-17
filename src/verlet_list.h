@@ -1,8 +1,8 @@
-/** \file neighbour_list.h
- * \brief Neighbour list tools to be used with openmesh.
+/** \file verlet_list.h
+ * \brief Verlet list to be used with openmesh.
  */
-#ifndef NEIGHBOURS_H
-#define NEIGHBOURS_H
+#ifndef VERLET_LIST_H
+#define VERLET_LIST_H
 
 #include <vector>
 #include <map>
@@ -14,11 +14,11 @@
 namespace trimem {
 
 template<int exclusion = 0>
-struct NeighbourLists
+struct VerletList
 {
     std::vector<std::vector<int> >neighbours;
 
-    NeighbourLists(const TriMesh& mesh, double rlist, double box_eps=1.e-6)
+    VerletList(const TriMesh& mesh, double rlist, double box_eps=1.e-6)
     {
         CellList<exclusion> clist(mesh, rlist, box_eps);
 

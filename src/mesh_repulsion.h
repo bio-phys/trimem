@@ -7,7 +7,7 @@
 #include "defs.h"
 
 #include "cell_list.h"
-#include "neighbour_list.h"
+#include "verlet_list.h"
 #include "params.h"
 
 namespace trimem {
@@ -100,8 +100,8 @@ make_repulsion(const TriMesh& mesh, const SurfaceRepulsionParams& params)
     // neighbour search with exclusions
     typedef CellList<1> CL1;
     typedef CellList<2> CL2;
-    typedef NeighbourLists<1> NL1;
-    typedef NeighbourLists<2> NL2;
+    typedef VerletList<1> VL1;
+    typedef VerletList<2> VL2;
 
     if (params.n_search == "cell-list")
     {
@@ -120,11 +120,11 @@ make_repulsion(const TriMesh& mesh, const SurfaceRepulsionParams& params)
     {
       if (params.exclusion_level == 1)
       {
-        return std::make_unique<SurfaceRepulsionFlatBottom<NL1>>(mesh, params);
+        return std::make_unique<SurfaceRepulsionFlatBottom<VL1>>(mesh, params);
       }
       else if (params.exclusion_level == 2)
       {
-        return std::make_unique<SurfaceRepulsionFlatBottom<NL2>>(mesh, params);
+        return std::make_unique<SurfaceRepulsionFlatBottom<VL2>>(mesh, params);
       }
       else
         throw std::runtime_error("Unsupported exclusion level");
