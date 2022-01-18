@@ -16,9 +16,11 @@ pybind11_add_module(_core MODULE src/bindings.cpp
                           src/energy.cpp
                           src/flips.cpp
                           src/flip_utils.cpp
-                          src/omp_guard.cpp)
-target_include_directories(_core PRIVATE openmesh-python/src)
-target_include_directories(_core PRIVATE openmesh-python/OpenMesh/src)
+                          src/omp_guard.cpp
+                          src/nlists/nlist.cpp)
+target_include_directories(_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+                                         openmesh-python/src
+                                         openmesh-python/OpenMesh/src)
 
 target_link_libraries(_core PUBLIC OpenMeshToolsStatic
                                    OpenMeshCoreStatic

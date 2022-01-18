@@ -5,6 +5,7 @@
 
 #include "numpy_util.h"
 #include "mesh_tether.h"
+#include "nlists/nlist.h"
 #include "mesh_repulsion.h"
 #include "kernel.h"
 
@@ -65,7 +66,8 @@ void EnergyManager::update_reference_properties()
 
 void EnergyManager::update_repulsion()
 {
-    repulse = make_repulsion(*mesh_, params.repulse_params);
+    nlist   = make_nlist(*mesh_, params);
+    repulse = make_repulsion(*nlist, params.repulse_params);
 }
 
 real EnergyManager::energy()

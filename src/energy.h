@@ -15,6 +15,7 @@ namespace trimem {
 
 struct BondPotential;
 struct SurfaceRepulsion;
+struct NeighbourList;
 
 class EnergyManager
 {
@@ -52,6 +53,9 @@ public:
 
     // repulsion penalty
     std::unique_ptr<SurfaceRepulsion> repulse;
+
+    // neighbour list
+    std::unique_ptr<NeighbourList> nlist;
 
     // set mesh
     void set_mesh(const TriMesh* mesh);

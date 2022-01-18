@@ -19,115 +19,83 @@ def get_mesh(n, constant_density=False):
         l = l/20*n
 
     points, cells = meshzoo.rectangle_tri(
-        (0.0, 0.0),
-        (l, l),
-        n=n,  # or (11, 11)
+        np.linspace(0.0, l, n),
+        np.linspace(0.0, l, n),
         variant="zigzag",  # or "up", "down", "center"
     )
     x = np.append(points, np.zeros((len(points),1)), axis=1)
     return om.TriMesh(x, cells)
 
+def get_nlist(mesh, ltype, rlist, excl):
+    """Get a neighbour list."""
+
+    params = m.EnergyParams()
+    params.repulse_params.n_search        = ltype
+    params.repulse_params.rlist           = rlist
+    params.repulse_params.exclusion_level = excl
+
+    return m.make_nlist(mesh, params)
+
 # -----------------------------------------------------------------------------
 #                                                                      checks -
 # -----------------------------------------------------------------------------
-def valid_cell_list():
-    """Visualize cells."""
+def valid_lists(ltype="cell-list"):
+    """Validate neighbour lists."""
     mesh = get_mesh(20)
     x = mesh.points()
 
-    c = m.CellList(mesh, 0.2)
-    print("Cells::shape:", c.shape)
-    print("Cells::stride:", c.strides)
-    print("Cells::r_list:", c.r_list)
-    print("Cells::pairs:", c.cell_pairs)
-    print("len(Cells::pairs):", len(c.cell_pairs))
+    nl = get_nlist(mesh, ltype, 0.2, 0)
 
-    for vi in c.cells.values():
-        plt.plot(x[vi,0], x[vi,1], '.')
-
-    # check distance counts
-    d = c.distance_counts(mesh, 0.2)
-    print("num pairs in r:",d)
-
-    # compare against kd-tree distance counts
-    tree = KDTree(x)
-    d = tree.count_neighbors(tree, 0.2)
-    print("num pairs in r from tree:", d)
-
-    # check distance computation
-    d,i,j = c.distance_matrix(mesh, 0.2)
-    A = coo_matrix((d,(i,j)))
-    B = coo_matrix((d,(j,i)))
-    M = A + B
-
-    plt.matshow(M.toarray())
-    plt.show()
+    # compute distance matrix
+    d,i,j = nl.distance_matrix(mesh, 0.123)
+    A = coo_matrix((d,(i,j)), shape=(len(x),len(x)))
+    M = A + A.T # kdtree gives full matrix
 
     # compare against kd-tree distance computation
-    C = tree.sparse_distance_matrix(tree, 0.2)
-    plt.matshow(M.toarray()-C.toarray())
-    plt.show()
+    tree = KDTree(x)
+    C = tree.sparse_distance_matrix(tree, 0.123)
 
+    assert (C-M).max() == 0.0
 
-def valid_nlist():
+def vis_neighbourhood(ltype="cell-list"):
     """Check nlists."""
     mesh = get_mesh(20)
     x = mesh.points()
 
-    n = m.rNeighbourList(mesh, 0.2)
+    nl = get_nlist(mesh, ltype, 0.2, 0)
 
     # plot some neighbourhood
     idx = 151
-    nn = n.point_distance_counts(mesh, idx, 0.2)
-    plt.plot(x[:,0], x[:,1], '.')
-    plt.plot(x[idx,0], x[idx,1], 'o', color='b')
-    p = n.neighbours[idx]
-    plt.plot(x[p,0], x[p,1], 'o', color='orange', alpha=0.3)
-    plt.title("Should be {} neighbours".format(nn))
+    _,jdx = nl.point_distances(mesh, idx, 0.123)
+    plt.plot(x[:,0], x[:,1], '.', color='k', alpha=0.3)
+    plt.plot(x[idx,0], x[idx,1], 'o', color='b', alpha=0.7)
+    plt.plot(x[jdx,0], x[jdx,1], 'o', color='orange', alpha=0.5)
+    plt.title("{} neighbours".format(len(jdx)))
     plt.show()
 
-    # check distance computation
-    d,i,j = n.distance_matrix(mesh, 0.2)
-    A = coo_matrix((d,(i,j)), shape=(len(x),len(x)))
-
-    plt.matshow(A.toarray())
-    plt.show()
-
-    # validate against direct cell based computation
-    c = m.rCellList(mesh, 0.2)
-    d,i,j = c.distance_matrix(mesh, 0.2)
-    assert nn == c.point_distance_counts(mesh, idx, 0.2)
-    B = coo_matrix((d,(i,j)), shape=(len(x),len(x)))
-    B = B+B.transpose()
-
-    plt.matshow(A.toarray()-B.toarray())
-    plt.show()
-
-def check_scaling():
+def check_scaling(ltype="cell-list", dimp2=8):
     """Check linear order of distance computation."""
 
     dts_trimem = []
     dts_kdtree = []
-    dims = [2**3, 2**4, 2**5, 2**6, 2**7, 2**8, 2**9, 2**10]
+    dims = [2**p2 for p2 in range(3,dimp2+1)]
     N    = [d**2 for d in dims] # mesh gen takes sqrt(n) as input
     for n in dims:
         mesh = get_mesh(n, constant_density=True)
         points = mesh.points()
 
         start = time()
-        nl = m.rNeighbourList(mesh, 0.2)
+        nl = get_nlist(mesh, ltype, 0.2, 0)
         secl = time()-start
         for i in range(10):
-            d = nl.distance_counts(mesh, 0.2)
-#        d,i,j = m.distance_matrix(mesh, nl, 0.2)
+            d,i,j = nl.distance_matrix(mesh, 0.2)
         dts_trimem.append(time()-start)
 
         start = time()
         tree = KDTree(points)
         setr = time()-start
         for i in range(10):
-            d = tree.count_neighbors(tree, 0.2)
-#        d = tree.sparse_distance_matrix(tree, 0.2, output_type="coo_matrix")
+            d = tree.sparse_distance_matrix(tree, 0.2, output_type="coo_matrix")
         dts_kdtree.append(time()-start)
 
         print("Compute distances for {} vertices took:".format(n**2))
@@ -138,11 +106,8 @@ def check_scaling():
 
     # references
     cli = dts_trimem[0]/N[0]
-    csq = dts_trimem[0]/N[0]**2
-    squ = [csq*x**2 for x in N]
     lin = [cli*x for x in N]
 
-#    plt.plot(N, squ, "--", label=r'x^2', alpha=0.5)
     plt.plot(N, dts_trimem, "o-", label="trimem")
     plt.plot(N, dts_kdtree, "o-", label="kdtree")
     plt.plot(N, lin, "--", label=r'O(N)', alpha=0.5, color="gray")
@@ -154,81 +119,12 @@ def check_scaling():
     plt.legend()
     plt.show()
 
-def test_3d():
-    """Test in 3d."""
-    points, cells = meshzoo.icosa_sphere(20)
-    mesh = om.TriMesh(points, cells)
-    x = mesh.points()
-
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-
-    # cell list
-    c = m.CellList(mesh, 0.2)
-    print("Cells::shape:", c.shape)
-    print("Cells::stride:", c.strides)
-    print("Cells::r_list:", c.r_list)
-    print("len(Cells::pairs):", len(c.cell_pairs))
-
-    start = time()
-    d = c.distance_counts(mesh, 0.2)
-    dt = time()-start
-    print("Cells::count_distances (timeing):", dt)
-
-    #for vi in c.cells.values():
-    for vi in c.cells.values():
-        plt.plot(x[vi,0], x[vi,1], x[vi,2], '.')
-    plt.show()
-
-    # check distances
-    d,i,j = c.distance_matrix(mesh, 0.2)
-    A = coo_matrix((d,(i,j)), shape=(len(x),len(x)))
-    M = A + A.transpose()
-
-    tree = KDTree(x)
-    B = tree.sparse_distance_matrix(tree, 0.2)
-    plt.matshow(M.toarray()-B.toarray())
-    plt.show()
-
-    # check neighbour lists
-    c = m.rNeighbourList(mesh, 0.2)
-
-    start = time()
-    d = c.distance_counts(mesh, 0.2)
-    dt = time()-start
-    print("Nlist count distances:", dt)
-
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-
-    x = points
-    plt.plot(x[:,0], x[:,1], x[:,2], '.')
-    plt.plot(x[25,0], x[25,1], x[25,2], 'o', color='b')
-    for p in c.neighbours[25]:
-        plt.plot(x[p,0], x[p,1], x[p,2], 'o', color='orange', alpha=0.3)
-    plt.show()
-
-def check_constraint():
-    """Check mesh constraints."""
-
-    mesh = get_mesh(20)
-    x = mesh.points()
-
-    mc = m.MeshConstraintCL(mesh, 0.2, 0.2)
-
-    counts = mc.check_local(mesh, 50)
-    print("Any violation detected from cell list?:", not counts)
-
-    mc = m.MeshConstraintNL(mesh, 0.2, 0.2)
-    counts = mc.check_local(mesh, 50)
-    print("Any violation detected from neighbour lists?:", not counts)
-
 if __name__ == "__main__":
-    #valid_cell_list()
-    #valid_nlist()
+    valid_lists(ltype="cell-list")
+    valid_lists(ltype="verlet-list")
 
-    #check_scaling()
+    vis_neighbourhood(ltype="cell-list")
+    vis_neighbourhood(ltype="verlet-list")
 
-    check_constraint()
-
-    #test_3d()
+    check_scaling(ltype="cell-list")
+    check_scaling(ltype="verlet-list")

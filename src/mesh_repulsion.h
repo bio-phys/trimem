@@ -6,8 +6,7 @@
 
 #include "defs.h"
 
-#include "cell_list.h"
-#include "verlet_list.h"
+#include "nlists/nlist.h"
 #include "params.h"
 
 namespace trimem {
@@ -23,33 +22,16 @@ struct SurfaceRepulsion
     vertex_property_grad(const TriMesh &mesh, const int &pid) const = 0;
 };
 
-//! SurfaceRepulsion with template on neighbour search.
-// TODO: assert valid template types at compile time
-template <class ListType>
-struct SurfaceRepulsionT : SurfaceRepulsion
-{
-    ListType nlist;
-
-    SurfaceRepulsionT(const TriMesh &mesh, const double &rlist)
-        : nlist(mesh, rlist) {}
-
-    virtual real vertex_property(const TriMesh &mesh, const int &pid) const = 0;
-
-    virtual std::tuple<std::vector<Point>, std::vector<int>>
-    vertex_property_grad(const TriMesh &mesh, const int &pid) const = 0;
-};
-
 //!  SurfaceRepulsion with flat bottom potential.
-template <class ListType>
-struct SurfaceRepulsionFlatBottom : SurfaceRepulsionT<ListType>
+struct SurfaceRepulsionFlatBottom : SurfaceRepulsion
 {
-    int r_;
-    real lc1_;
+    const int           r_;
+    const real          lc1_;
+    const NeighbourList& nlist_;
 
-    SurfaceRepulsionFlatBottom(const TriMesh &mesh,
-                               const SurfaceRepulsionParams &params)
-        : SurfaceRepulsionT<ListType>(mesh, params.rlist),
-          r_(params.r), lc1_(params.lc1) {}
+    SurfaceRepulsionFlatBottom(const NeighbourList& nlist,
+                               const SurfaceRepulsionParams &params) :
+          r_(params.r), lc1_(params.lc1), nlist_(nlist) {}
 
     virtual real
     vertex_property(const TriMesh& mesh, const int& pid) const override
@@ -57,7 +39,7 @@ struct SurfaceRepulsionFlatBottom : SurfaceRepulsionT<ListType>
         // distances of vertex i (vid) to every other vertex j
         std::vector<Point> dij;
         std::vector<int> jdx;
-        std::tie(dij,jdx) = this->nlist.point_distances(mesh, pid, lc1_);
+        std::tie(dij,jdx) = nlist_.point_distances(mesh, pid, lc1_);
 
         // penality potential for vertex vid
         real pot = 0;
@@ -76,7 +58,7 @@ struct SurfaceRepulsionFlatBottom : SurfaceRepulsionT<ListType>
         std::vector<Point> dij;
         // vertex_j indices
         std::vector<int> jdx;
-        std::tie(dij, jdx) = this->nlist.point_distances(mesh, pid, lc1_);
+        std::tie(dij, jdx) = nlist_.point_distances(mesh, pid, lc1_);
 
         for (auto &d : dij)
         {
@@ -95,42 +77,9 @@ struct SurfaceRepulsionFlatBottom : SurfaceRepulsionT<ListType>
 };
 
 inline std::unique_ptr<SurfaceRepulsion>
-make_repulsion(const TriMesh& mesh, const SurfaceRepulsionParams& params)
+make_repulsion(const NeighbourList& nlist, const SurfaceRepulsionParams& params)
 {
-    // neighbour search with exclusions
-    typedef CellList<1> CL1;
-    typedef CellList<2> CL2;
-    typedef VerletList<1> VL1;
-    typedef VerletList<2> VL2;
-
-    if (params.n_search == "cell-list")
-    {
-      if (params.exclusion_level == 1)
-      {
-        return std::make_unique<SurfaceRepulsionFlatBottom<CL1>>(mesh, params);
-      }
-      else if (params.exclusion_level == 2)
-      {
-        return std::make_unique<SurfaceRepulsionFlatBottom<CL2>>(mesh, params);
-      }
-      else
-        throw std::runtime_error("Unsupported exclusion level");
-    }
-    else if (params.n_search == "verlet-list")
-    {
-      if (params.exclusion_level == 1)
-      {
-        return std::make_unique<SurfaceRepulsionFlatBottom<VL1>>(mesh, params);
-      }
-      else if (params.exclusion_level == 2)
-      {
-        return std::make_unique<SurfaceRepulsionFlatBottom<VL2>>(mesh, params);
-      }
-      else
-        throw std::runtime_error("Unsupported exclusion level");
-    }
-    else
-        throw std::runtime_error("Unknown neighbour search algorithm.");
+    return std::make_unique<SurfaceRepulsionFlatBottom>(nlist, params);
 };
 
 }
