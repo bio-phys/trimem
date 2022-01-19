@@ -7,8 +7,8 @@ from scipy.optimize import minimize
 import meshio
 
 from .. import _core as m
-from .. import openmesh as om
 from .hmc import hmc
+from .mesh import Mesh, read_trimesh
 
 CONF = """[DEFAULT]
 algorithm = hmc
@@ -84,50 +84,32 @@ def om_helfrich_energy(mesh, estore, config):
     if fr == 0.0:
         _tflips = lambda mh,e,r: 0
 
-    x0 = mesh.points().copy()
-
     def _fun(x):
-        points = mesh.points()
-        np.copyto(points, x)
-        e = estore.energy(mesh)
-        np.copyto(points, x0)
+        mesh.x = x
+        e = estore.energy(mesh.trimesh)
         return e
 
     def _grad(x):
-        points = mesh.points()
-        np.copyto(points, x)
-        g = estore.gradient(mesh)
-        np.copyto(points, x0)
+        mesh.x = x
+        g = estore.gradient(mesh.trimesh)
         return g
-
-    def _flip(x):
-        points = mesh.points()
-        np.copyto(points, x)
-        flips = _tflips(mesh, estore, fr)
-        np.copyto(points, x0)
-        return flips
 
     def _callback(x, i, acc, T):
         _callback.acc += acc
-        flips = _flip(x)
+        mesh.x = x
+        flips = _tflips(mesh.trimesh, estore, fr)
         if i%istep == 0:
             print("\n-- Step ",i)
             print("----- acc-rate:   ", _callback.acc/istep)
-            print("----- acc-flips:  ", flips/mesh.n_edges())
+            print("----- acc-flips:  ", flips/mesh.trimesh.n_edges())
             print("----- temperature:", T)
-            p = mesh.points()
-            np.copyto(p, x)
-            estore.energy(mesh)
-            estore.print_info(mesh)
-            np.copyto(p, x0)
+            estore.print_info(mesh.trimesh)
             _callback.acc = 0
         if i%thin == 0:
-            write_output(x, mesh, _callback.count, config)
+            write_output(mesh, _callback.count, config)
             _callback.count += 1
         if i%rfrsh == 0:
-            p = mesh.points()
-            np.copyto(p, x)
-            estore.update_repulsion(mesh)
+            estore.update_repulsion(mesh.trimesh)
         estore.update_reference_properties()
 
     # init callback
@@ -139,11 +121,12 @@ def om_helfrich_energy(mesh, estore, config):
 def setup_energy_manager(config, cparams=None):
     """Setup energy manager."""
 
-    mesh = om.read_trimesh(config["DEFAULT"]["input"])
+    mesh = read_trimesh(config["DEFAULT"]["input"])
 
     # reference values for edge_length and face_area
-    l = np.mean([mesh.calc_edge_length(he) for he in mesh.halfedges()])
-    a = m.area(mesh)/mesh.n_faces();
+    l = np.mean([mesh.trimesh.calc_edge_length(he)
+                 for he in mesh.trimesh.halfedges()])
+    a = m.area(mesh.trimesh)/mesh.trimesh.n_faces();
 
     str_to_enum = {"Edge": m.BondType.Edge, "Area": m.BondType.Area}
 
@@ -184,32 +167,32 @@ def setup_energy_manager(config, cparams=None):
         cp = cparams
     eparams.continuation_params = cp
 
-    estore = m.EnergyManager(mesh, eparams)
+    estore = m.EnergyManager(mesh.trimesh, eparams)
 
     return estore, mesh
 
-def write_output(x, mesh, step, config):
+def write_output(mesh, step, config):
     """Write trajectory output."""
 
     fmt    = config["DEFAULT"]["output_format"]
     prefix = config["DEFAULT"]["output_prefix"]
     if fmt == "vtu":
         fn = prefix + str(step) + ".vtu"
-        meshio.write_points_cells(fn, x, [("triangle", mesh.fv_indices())])
+        meshio.write_points_cells(fn, mesh.x, [("triangle", mesh.f)])
     elif fmt == "xyz":
         fn = prefix + ".xyz"
         rw = "w" if step == 0 else "a"
         with open(fn, rw) as fp:
             np.savetxt(fp,
-                       x,
+                       mesh.x,
                        fmt=["C\t%.6f", "%.6f", "%.6f"],
-                       header="{}\n#".format(mesh.n_vertices()),
+                       header="{}\n#".format(len(mesh.x)),
                        comments="",
                        delimiter="\t")
     else:
         raise ValueError("Unknown file format for output.")
 
-def write_restart(x, mesh, estore, step, config):
+def write_restart(mesh, estore, step, config):
     """Write restart checkpoint."""
 
     prefix = config["DEFAULT"]["restart_prefix"]
@@ -220,7 +203,7 @@ def write_restart(x, mesh, estore, step, config):
 
     # write mesh
     fn = prefix + str(step) + "_mesh_.vtu"
-    meshio.write_points_cells(fn, x, [("triangle", mesh.fv_indices())])
+    meshio.write_points_cells(fn, mesh.x, [("triangle", mesh.f)])
 
 def read_restart(restart, config):
     """Read energy manager and mesh from restart."""
@@ -235,7 +218,7 @@ def read_restart(restart, config):
     fn = prefix + str(restart) + "_mesh_.vtu"
     mesh = meshio.read(fn)
 
-    return om.TriMesh(mesh.points, mesh.cells[0].data), cparams
+    return Mesh(mesh.points, mesh.cells[0].data), cparams
 
 def run(config, restart=-1):
     """Run algorithm."""
@@ -263,7 +246,6 @@ def run_hmc(mesh, estore, config, restart):
     fun, grad, cb = om_helfrich_energy(mesh, estore, config)
 
     # run hmc
-    x0   = mesh.points()
     cmc  = config["HMC"]
     options = { "number_of_steps": cmc.getint("num_steps"),
                 "mass": cmc.getfloat("momentum_variance"),
@@ -275,16 +257,17 @@ def run_hmc(mesh, estore, config, restart):
                 "cooling_start_step": cmc.getint("start_cooling"),
                 "callback": cb,
               }
-    x, traj = hmc(x0, fun, grad, options)
+    x, traj = hmc(mesh.x, fun, grad, options)
 
     # write restart
-    write_restart(x, mesh, estore, restart+1, config)
+    mesh.x = x
+    write_restart(mesh, estore, restart+1, config)
 
 def run_minim(mesh, estore, config, restart):
     """Run minimization."""
 
     # parameters
-    x0   = mesh.points().copy()
+    x0   = mesh.x.copy()
     N    = config["MINIMIZATION"].getint("maxiter")
     outi = config["MINIMIZATION"].getint("out_every")
     info = config["DEFAULT"].getint("info")
@@ -298,28 +281,22 @@ def run_minim(mesh, estore, config, restart):
 
     # generate energy, gradient and callback callables to scipy interface
     def _fun(x):
-        p = mesh.points()
-        np.copyto(p, x.reshape(x0.shape))
-        estore.update_repulsion(mesh)
-        return estore.energy(mesh)
+        mesh.x = x.reshape(x0.shape)
+        estore.update_repulsion(mesh.trimesh)
+        return estore.energy(mesh.trimesh)
 
     def _grad(x):
-        p = mesh.points()
-        np.copyto(p, x.reshape(x0.shape))
-        estore.update_repulsion(mesh)
-        return estore.gradient(mesh).ravel()
+        mesh.x = x.reshape(x0.shape)
+        estore.update_repulsion(mesh.trimesh)
+        return estore.gradient(mesh.trimesh).ravel()
 
     def _cb(x, force_info=False):
+        mesh.x = x.reshape(x0.shape)
         if force_info or (info > 0 and _cb.i % info == 0):
             print("\niter:",_cb.i)
-            p = mesh.points()
-            np.copyto(p, x.reshape(x0.shape))
-            estore.energy(mesh)
-            estore.print_info(mesh)
+            estore.print_info(mesh.trimesh)
         if outi > 0 and _cb.i % outi == 0:
-            p = mesh.points()
-            np.copyto(p, x.reshape(x0.shape))
-            write_output(p, mesh, _cb.count, config)
+            write_output(mesh, _cb.count, config)
             _cb.count += 1
         _cb.i += 1
     _cb.i = 0
@@ -338,11 +315,11 @@ def run_minim(mesh, estore, config, restart):
     x   = res.x.reshape(x0.shape)
     print(res.message)
 
-    # print info
+    # print info (also updates the mesh)
     _cb(x, force_info=True)
 
     # write output
-    write_output(x, mesh, _cb.count, config)
+    write_output(mesh, _cb.count, config)
 
     # write restart
-    write_restart(x, mesh, estore, restart+1, config)
+    write_restart(mesh, estore, restart+1, config)
