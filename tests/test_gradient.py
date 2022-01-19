@@ -87,6 +87,6 @@ def test_gradient(data):
     m.gradient(mesh, estore, ref_grad, 1.0e-8)
 
     # analytic gradient
-    grad = estore.gradient()
+    grad = estore.gradient(mesh)
 
     assert np.linalg.norm(grad - ref_grad)/np.linalg.norm(ref_grad) < 1.0e-4

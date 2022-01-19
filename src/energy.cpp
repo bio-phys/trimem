@@ -13,44 +13,38 @@
 
 namespace trimem {
 
-EnergyManager::EnergyManager(const TriMesh* mesh,
+EnergyManager::EnergyManager(const TriMesh& mesh,
                              const EnergyParams& energy_params) :
-  mesh_(mesh),
   params(energy_params)
 {
     // setup bond potential
     bonds = make_bonds(params.bond_params);
 
+    // setup neighbour list
+    nlist = make_nlist(mesh, params);
+
     // setup mesh repulsion
-    update_repulsion();
+    repulse = make_repulsion(*nlist, params.repulse_params);
 
     // evaluate properties from mesh
-    auto dump = energy();
-
-    // set initial properties
-    initial_props = properties;
-
-    // set reference properties
-    interpolate_reference_properties();
+    initial_props = properties(mesh);
 }
 
-void EnergyManager::set_mesh(const TriMesh* mesh)
-{
-    mesh_ = mesh;
-}
-
-void EnergyManager::interpolate_reference_properties()
+VertexProperties EnergyManager::interpolate_reference_properties() const
 {
     auto& cparams = params.continuation_params;
 
     real i_af = 1.0 - params.area_frac;
     real i_vf = 1.0 - params.volume_frac;
     real i_cf = 1.0 - params.curvature_frac;
-    real& lam = cparams.lambda;
+    const real& lam = cparams.lambda;
 
+    VertexProperties ref_props{0, 0, 0, 0, 0, 0};
     ref_props.area      = ( 1.0 - lam * i_af ) * initial_props.area;
     ref_props.volume    = ( 1.0 - lam * i_vf ) * initial_props.volume;
     ref_props.curvature = ( 1.0 - lam * i_cf ) * initial_props.curvature;
+
+    return ref_props;
 }
 
 void EnergyManager::update_reference_properties()
@@ -61,59 +55,67 @@ void EnergyManager::update_reference_properties()
     {
         cparams.lambda += cparams.delta;
     }
-    interpolate_reference_properties();
 }
 
-void EnergyManager::update_repulsion()
+void EnergyManager::update_repulsion(const TriMesh& mesh)
 {
-    nlist   = make_nlist(*mesh_, params);
+    nlist   = make_nlist(mesh, params);
     repulse = make_repulsion(*nlist, params.repulse_params);
 }
 
-real EnergyManager::energy()
+VertexProperties EnergyManager::properties(const TriMesh& mesh)
 {
-    TrimemProperties kernel(params, *mesh_, *bonds, *repulse);
+    TrimemProperties kernel(params, mesh, *bonds, *repulse);
 
     VertexProperties props{ 0, 0, 0, 0, 0, 0};
-    parallel_reduction(mesh_->n_vertices(), kernel, props);
+    parallel_reduction(mesh.n_vertices(), kernel, props);
 
-    properties = props;
+    return props;
+}
+
+real EnergyManager::energy(const TriMesh& mesh)
+{
+    auto ref_props = interpolate_reference_properties();
+    auto props     = properties(mesh);
+
     return trimem_energy(params, props, ref_props);
 }
 
-real EnergyManager::energy(VertexProperties& props)
+real EnergyManager::energy(const VertexProperties& props)
 {
-    TrimemProperties kernel(params, *mesh_, *bonds, *repulse);
+    auto ref_props = interpolate_reference_properties();
     return trimem_energy(params, props, ref_props);
 }
 
-std::vector<Point> EnergyManager::gradient()
+std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
 {
-    size_t n = mesh_->n_vertices();
+    size_t n = mesh.n_vertices();
 
     // update global properties
-    auto dump = energy();
+    auto props     = properties(mesh);
+    auto ref_props = interpolate_reference_properties();
 
     // properties gradients
     VertexPropertiesGradient zeros
       { Point(0), Point(0), Point(0), Point(0), Point(0), Point(0) };
     std::vector<VertexPropertiesGradient> gprops(n, zeros);
-    TrimemPropsGradient pg_kernel(*mesh_, *bonds, *repulse, gprops);
+    TrimemPropsGradient pg_kernel(mesh, *bonds, *repulse, gprops);
     parallel_for(n, pg_kernel);
 
     // evaluate gradient
     std::vector<Point> gradient(n, Point(0));
-    TrimemGradient g_kernel(params, properties, ref_props, gprops, gradient);
+    TrimemGradient g_kernel(params, props, ref_props, gprops, gradient);
     parallel_for(n, g_kernel);
 
     return gradient;
 }
 
-std::ostream& operator<<(std::ostream& out, const EnergyManager& lhs)
+void EnergyManager::print_info(const TriMesh& mesh)
 {
-  const EnergyParams& params = lhs.params;
-  const VertexProperties& props = lhs.properties;
-  const VertexProperties& ref_props = lhs.ref_props;
+  auto props     = properties(mesh);
+  auto ref_props = interpolate_reference_properties();
+
+  std::ostream& out = std::cout;
 
   out << "----- EnergyManager info\n";
   out << "reference properties:\n";
@@ -133,26 +135,19 @@ std::ostream& operator<<(std::ostream& out, const EnergyManager& lhs)
   out << "  repulsion: " << repulsion_penalty(params, props) << "\n";
   out << "  total:     " << trimem_energy(params, props, ref_props) << "\n";
   out << std::endl;
-
-  return out;
-}
-
-void EnergyManager::print_info()
-{
-    std::cout << *this;
 }
 
 void expose_energy(py::module& m){
 
     py::class_<EnergyManager>(m, "EnergyManager")
-        .def(py::init<TriMesh*, EnergyParams>())
-        .def("set_mesh", &EnergyManager::set_mesh)
-        .def("energy", static_cast<real (EnergyManager::*)()>
+        .def(py::init<const TriMesh&, const EnergyParams&>())
+        .def("properties", &EnergyManager::properties)
+        .def("energy", static_cast<real (EnergyManager::*)(const TriMesh&)>
                 (&EnergyManager::energy))
-        .def("energy", static_cast<real (EnergyManager::*)(VertexProperties&)>
+        .def("energy", static_cast<real (EnergyManager::*)(const VertexProperties&)>
                 (&EnergyManager::energy))
-        .def("gradient", [](EnergyManager& _self){
-            auto grad = _self.gradient();
+        .def("gradient", [](EnergyManager& _self, const TriMesh& mesh){
+            auto grad = _self.gradient(mesh);
             return tonumpy(grad[0], grad.size());})
         .def("update_reference_properties",
             &EnergyManager::update_reference_properties)
@@ -161,11 +156,8 @@ void expose_energy(py::module& m){
             &EnergyManager::print_info,
             py::call_guard<py::scoped_ostream_redirect,
             py::scoped_estream_redirect>())
-        .def_readwrite("properties", &EnergyManager::properties)
         .def_readonly("eparams", &EnergyManager::params)
-        .def_readonly("initial_props", &EnergyManager::initial_props)
-        .def_readonly("ref_props", &EnergyManager::ref_props);
-
+        .def_readonly("initial_props", &EnergyManager::initial_props);
 }
 
 }

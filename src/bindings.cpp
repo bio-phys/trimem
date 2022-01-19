@@ -37,7 +37,7 @@ void gradient(TriMesh& mesh,
               real eps=1.0e-6)
 {
     // unperturbed energy
-    real e0 = estore.energy();
+    real e0 = estore.energy(mesh);
 
     auto r_grad = grad.mutable_unchecked<2>();
     for (int i=0; i<mesh.n_vertices(); i++)
@@ -49,7 +49,7 @@ void gradient(TriMesh& mesh,
             point[j] += eps;
 
             // evaluate differential energy
-            real de = ( estore.energy() - e0 ) / eps;
+            real de = ( estore.energy(mesh) - e0 ) / eps;
             r_grad(i,j) = de;
 
             // undo perturbation

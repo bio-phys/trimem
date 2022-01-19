@@ -35,8 +35,8 @@ int flip_serial(TriMesh& mesh, EnergyManager& estore, real& flip_ratio)
     std::shuffle(idx.begin(), idx.end(), generator_);
 
     // get initial vertex properties
-    real e0 = estore.energy();
-    VertexProperties props = estore.properties;
+    VertexProperties props = estore.properties(mesh);
+    real             e0    = estore.energy(props);
 
     // acceptance probability distribution
     std::uniform_real_distribution<real> accept(0.0,1.0);
@@ -91,8 +91,8 @@ int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, real& flip_ratio
     int nflips = (int) (nedges * flip_ratio);
 
     // get initial energy and associated vertex properties
-    real e0 = estore.energy();
-    VertexProperties props = estore.properties;
+    VertexProperties props = estore.properties(mesh);
+    real             e0    = estore.energy(props);
 
     // set-up lock on edges
     std::vector<OmpGuard> l_edges(nedges);

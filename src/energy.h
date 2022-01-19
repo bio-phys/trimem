@@ -22,31 +22,30 @@ class EnergyManager
 public:
 
     // constructors
-    EnergyManager(const TriMesh* mesh,
+    EnergyManager(const TriMesh& mesh,
                   const EnergyParams& params);
 
     // update reference properties
     void update_reference_properties();
-    void interpolate_reference_properties();
+    VertexProperties interpolate_reference_properties() const;
 
     // update repulsion potential
-    void update_repulsion();
+    void update_repulsion(const TriMesh& mesh);
 
     // energy and gradient evaluation
-    real energy();
-    real energy(VertexProperties& props);
-    std::vector<Point> gradient();
+    VertexProperties properties(const TriMesh& mesh);
+    real energy(const TriMesh& mesh);
+    real energy(const VertexProperties& props);
+    std::vector<Point> gradient(const TriMesh& mesh);
 
     // print status information
-    void print_info();
+    void print_info(const TriMesh& mesh);
 
-    // mesh properties and parameters
-    VertexProperties properties;
+    // energy parameters
     EnergyParams params;
 
     // management of reference properties
     VertexProperties initial_props;
-    VertexProperties ref_props;
 
     // bond potential
     std::unique_ptr<BondPotential> bonds;
@@ -56,14 +55,6 @@ public:
 
     // neighbour list
     std::unique_ptr<NeighbourList> nlist;
-
-    // set mesh
-    void set_mesh(const TriMesh* mesh);
-
-private:
-
-    // mesh reference (??)
-    const TriMesh* mesh_;
 };
 
 void expose_energy(py::module& m);

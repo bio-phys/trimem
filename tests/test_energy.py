@@ -91,8 +91,8 @@ def params(data):
 def test_properties(params):
     """Test values of global properties."""
 
-    e = params.estore.energy()
-    p = params.estore.properties
+    p = params.estore.properties(params.mesh)
+    e = params.estore.energy(p)
 
     ref = params.ref
 

@@ -89,14 +89,14 @@ def om_helfrich_energy(mesh, estore, config):
     def _fun(x):
         points = mesh.points()
         np.copyto(points, x)
-        e = estore.energy()
+        e = estore.energy(mesh)
         np.copyto(points, x0)
         return e
 
     def _grad(x):
         points = mesh.points()
         np.copyto(points, x)
-        g = estore.gradient()
+        g = estore.gradient(mesh)
         np.copyto(points, x0)
         return g
 
@@ -117,8 +117,8 @@ def om_helfrich_energy(mesh, estore, config):
             print("----- temperature:", T)
             p = mesh.points()
             np.copyto(p, x)
-            estore.energy()
-            estore.print_info()
+            estore.energy(mesh)
+            estore.print_info(mesh)
             np.copyto(p, x0)
             _callback.acc = 0
         if i%thin == 0:
@@ -127,7 +127,7 @@ def om_helfrich_energy(mesh, estore, config):
         if i%rfrsh == 0:
             p = mesh.points()
             np.copyto(p, x)
-            estore.update_repulsion()
+            estore.update_repulsion(mesh)
         estore.update_reference_properties()
 
     # init callback
@@ -245,8 +245,7 @@ def run(config, restart=-1):
         estore, mesh = setup_energy_manager(config)
     else:
         mesh, cparams = read_restart(restart, config)
-        estore, o_mesh = setup_energy_manager(config, cparams)
-        estore.set_mesh(mesh)
+        estore, _ = setup_energy_manager(config, cparams)
 
     # run algorithm
     algo    = config["DEFAULT"]["algorithm"]
@@ -301,22 +300,22 @@ def run_minim(mesh, estore, config, restart):
     def _fun(x):
         p = mesh.points()
         np.copyto(p, x.reshape(x0.shape))
-        estore.update_repulsion()
-        return estore.energy()
+        estore.update_repulsion(mesh)
+        return estore.energy(mesh)
 
     def _grad(x):
         p = mesh.points()
         np.copyto(p, x.reshape(x0.shape))
-        estore.update_repulsion()
-        return estore.gradient().ravel()
+        estore.update_repulsion(mesh)
+        return estore.gradient(mesh).ravel()
 
     def _cb(x, force_info=False):
         if force_info or (info > 0 and _cb.i % info == 0):
             print("\niter:",_cb.i)
             p = mesh.points()
             np.copyto(p, x.reshape(x0.shape))
-            estore.energy()
-            estore.print_info()
+            estore.energy(mesh)
+            estore.print_info(mesh)
         if outi > 0 and _cb.i % outi == 0:
             p = mesh.points()
             np.copyto(p, x.reshape(x0.shape))
