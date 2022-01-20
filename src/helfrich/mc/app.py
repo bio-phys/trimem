@@ -1,21 +1,18 @@
 import argparse
-import configparser
 
 from ..openmesh import read_trimesh
-from .util import default_config
+from .config import write_default_config, read_config
 from .util import run as irun
 
 # helpers
 def run(args):
     """Command action to run hmc."""
-    config = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
-    with open(args.conf, "r") as fp:
-        config.read_file(fp)
+    config = read_config(args.conf)
     irun(config, args.restart)
 
 def config(args):
     """Command action to write default config."""
-    default_config(args.conf)
+    write_default_config(args.conf)
 
 def cli():
     """command line interface."""
