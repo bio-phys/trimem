@@ -9,6 +9,7 @@ import meshio
 from .. import _core as m
 from .hmc import hmc
 from .mesh import Mesh, read_trimesh
+from .config import update_config_defaults, config_to_params
 
 def om_helfrich_energy(mesh, estore, config):
 
@@ -78,44 +79,12 @@ def setup_energy_manager(config, cparams=None):
                  for he in mesh.trimesh.halfedges()])
     a = m.area(mesh.trimesh)/mesh.trimesh.n_faces();
 
-    str_to_enum = {"Edge": m.BondType.Edge, "Area": m.BondType.Area}
-
-    bparams = m.BondParams()
-    bparams.type = str_to_enum[config["BONDS"]["bond_type"]]
-    bparams.r    = config["BONDS"].getint("r")
-    bparams.lc0  = 1.25*l
-    bparams.lc1  = 0.75*l
-    bparams.a0   = a
-
-    rparams = m.SurfaceRepulsionParams()
-    rparams.n_search        = config["SURFACEREPULSION"]["n_search"]
-    rparams.rlist           = config["SURFACEREPULSION"].getfloat("rlist")
-    rparams.exclusion_level = config["SURFACEREPULSION"].getint("exclusion_level")
-    rparams.lc1             = config["SURFACEREPULSION"].getfloat("lc1")
-    rparams.r               = config["SURFACEREPULSION"].getint("r")
-
-    ec = config["ENERGY"]
-    eparams = m.EnergyParams()
-    eparams.kappa_b        = ec.getfloat("kappa_b")
-    eparams.kappa_a        = ec.getfloat("kappa_a")
-    eparams.kappa_v        = ec.getfloat("kappa_v")
-    eparams.kappa_c        = ec.getfloat("kappa_c")
-    eparams.kappa_t        = ec.getfloat("kappa_t")
-    eparams.kappa_r        = ec.getfloat("kappa_r")
-    eparams.area_frac      = ec.getfloat("area_fraction")
-    eparams.volume_frac    = ec.getfloat("volume_fraction")
-    eparams.curvature_frac = ec.getfloat("curvature_fraction")
-    eparams.bond_params    = bparams
-    eparams.repulse_params = rparams
+    update_config_defaults(config, lc0=1.25*l, lc1=0.75*l, a0=a)
+    eparams = config_to_params(config)
 
     # continuation params might come from restarts instead as from input
-    if cparams is None:
-        cp = m.ContinuationParams()
-        cp.delta = ec.getfloat("continuation_delta")
-        cp.lam   = ec.getfloat("continuation_lambda")
-    else:
-        cp = cparams
-    eparams.continuation_params = cp
+    if not cparams is None:
+        eparams.continuation_params = cparams
 
     estore = m.EnergyManager(mesh.trimesh, eparams)
 

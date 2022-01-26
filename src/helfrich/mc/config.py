@@ -1,4 +1,5 @@
 import configparser
+from .. import _core as m
 
 CONF = """[GENERAL]
 algorithm = hmc
@@ -46,6 +47,11 @@ out_every = 0
 
 """
 
+_bond_enums = {
+    "Edge": m.BondType.Edge,
+    "Area": m.BondType.Area
+}
+
 def write_default_config(fname):
     """Write default config to file."""
     with open(fname, "w") as fp:
@@ -56,3 +62,50 @@ def read_config(fname):
     config = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
     config.read(fname)
     return config
+
+def update_config_defaults(config, **kwargs):
+    """Update default section with kwargs."""
+    config.read_dict({"DEFAULT": kwargs})
+
+def config_to_params(config):
+    """Translate config to energy params."""
+
+    # translate bond params
+    bc      = config["BONDS"]
+    bparams = m.BondParams()
+    bparams.type = _bond_enums[bc["bond_type"]]
+    bparams.r    = bc.getint("r")
+    bparams.lc0  = bc.getfloat("lc0")
+    bparams.lc1  = bc.getfloat("lc1")
+    bparams.a0   = bc.getfloat("a0")
+
+    # translate repulsion params
+    rc      = config["SURFACEREPULSION"]
+    rparams = m.SurfaceRepulsionParams()
+    rparams.n_search        = rc["n_search"]
+    rparams.rlist           = rc.getfloat("rlist")
+    rparams.exclusion_level = rc.getint("exclusion_level")
+    rparams.lc1             = rc.getfloat("lc1")
+    rparams.r               = rc.getint("r")
+
+    # translate energy params
+    ec = config["ENERGY"]
+    cp = m.ContinuationParams()
+    cp.delta = ec.getfloat("continuation_delta")
+    cp.lam   = ec.getfloat("continuation_lambda")
+
+    eparams = m.EnergyParams()
+    eparams.kappa_b             = ec.getfloat("kappa_b")
+    eparams.kappa_a             = ec.getfloat("kappa_a")
+    eparams.kappa_v             = ec.getfloat("kappa_v")
+    eparams.kappa_c             = ec.getfloat("kappa_c")
+    eparams.kappa_t             = ec.getfloat("kappa_t")
+    eparams.kappa_r             = ec.getfloat("kappa_r")
+    eparams.area_frac           = ec.getfloat("area_fraction")
+    eparams.volume_frac         = ec.getfloat("volume_fraction")
+    eparams.curvature_frac      = ec.getfloat("curvature_fraction")
+    eparams.bond_params         = bparams
+    eparams.repulse_params      = rparams
+    eparams.continuation_params = cp
+
+    return eparams
