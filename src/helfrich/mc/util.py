@@ -75,9 +75,7 @@ def setup_energy_manager(config, cparams=None):
     mesh = read_trimesh(config["GENERAL"]["input"])
 
     # reference values for edge_length and face_area
-    l = np.mean([mesh.trimesh.calc_edge_length(he)
-                 for he in mesh.trimesh.halfedges()])
-    a = m.area(mesh.trimesh)/mesh.trimesh.n_faces();
+    a, l = m.avg_tri_props(mesh.trimesh)
 
     update_config_defaults(config, lc0=1.25*l, lc1=0.75*l, a0=a)
     eparams = config_to_params(config)
