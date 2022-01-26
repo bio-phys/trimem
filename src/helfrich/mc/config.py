@@ -1,6 +1,6 @@
 import configparser
 
-CONF = """[DEFAULT]
+CONF = """[GENERAL]
 algorithm = hmc
 info = 1
 input = test.stl

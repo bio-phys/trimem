@@ -47,7 +47,7 @@ python -c "import meshzoo; \
 
 # input file
 echo -n "\
-[DEFAULT]
+[GENERAL]
 algorithm = minimize
 info = 100
 input = input.stl

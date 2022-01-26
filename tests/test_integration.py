@@ -7,7 +7,7 @@ import meshio
 
 import pytest
 
-CONF = """[DEFAULT]
+CONF = """[GENERAL]
 algorithm = {algorithm}
 info = 1
 input = {stlfile!s}

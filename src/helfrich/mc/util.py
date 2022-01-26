@@ -12,11 +12,11 @@ from .mesh import Mesh, read_trimesh
 
 def om_helfrich_energy(mesh, estore, config):
 
-    istep  = config["DEFAULT"].getint("info")
-    N      = config["DEFAULT"].getint("num_steps")
+    istep  = config["GENERAL"].getint("info")
+    N      = config["GENERAL"].getint("num_steps")
     fr     = config["HMC"].getfloat("flip_ratio")
     ft     = config["HMC"]["flip_type"]
-    prefix = config["DEFAULT"]["output_prefix"]
+    prefix = config["GENERAL"]["output_prefix"]
     thin   = config["HMC"].getint("thin")
     rfrsh  = config["SURFACEREPULSION"].getint("refresh")
 
@@ -71,7 +71,7 @@ def om_helfrich_energy(mesh, estore, config):
 def setup_energy_manager(config, cparams=None):
     """Setup energy manager."""
 
-    mesh = read_trimesh(config["DEFAULT"]["input"])
+    mesh = read_trimesh(config["GENERAL"]["input"])
 
     # reference values for edge_length and face_area
     l = np.mean([mesh.trimesh.calc_edge_length(he)
@@ -124,8 +124,8 @@ def setup_energy_manager(config, cparams=None):
 def write_output(mesh, step, config):
     """Write trajectory output."""
 
-    fmt    = config["DEFAULT"]["output_format"]
-    prefix = config["DEFAULT"]["output_prefix"]
+    fmt    = config["GENERAL"]["output_format"]
+    prefix = config["GENERAL"]["output_prefix"]
     if fmt == "vtu":
         fn = prefix + str(step) + ".vtu"
         meshio.write_points_cells(fn, mesh.x, [("triangle", mesh.f)])
@@ -145,7 +145,7 @@ def write_output(mesh, step, config):
 def write_restart(mesh, estore, step, config):
     """Write restart checkpoint."""
 
-    prefix = config["DEFAULT"]["restart_prefix"]
+    prefix = config["GENERAL"]["restart_prefix"]
 
     # write params
     with open(prefix + str(step) + "_params_.cpt", "wb") as fp:
@@ -158,7 +158,7 @@ def write_restart(mesh, estore, step, config):
 def read_restart(restart, config):
     """Read energy manager and mesh from restart."""
 
-    prefix = config["DEFAULT"]["restart_prefix"]
+    prefix = config["GENERAL"]["restart_prefix"]
 
     # read params
     with open(prefix+str(restart)+"_params_.cpt", "rb") as fp:
@@ -181,7 +181,7 @@ def run(config, restart=-1):
         estore, _ = setup_energy_manager(config, cparams)
 
     # run algorithm
-    algo    = config["DEFAULT"]["algorithm"]
+    algo    = config["GENERAL"]["algorithm"]
     if algo == "hmc":
       run_hmc(mesh, estore, config, restart)
     elif algo == "minimize":
@@ -220,7 +220,7 @@ def run_minim(mesh, estore, config, restart):
     x0   = mesh.x.copy()
     N    = config["MINIMIZATION"].getint("maxiter")
     outi = config["MINIMIZATION"].getint("out_every")
-    info = config["DEFAULT"].getint("info")
+    info = config["GENERAL"].getint("info")
 
     # generic minimization requires surface repulsion refresh at every step
     refresh = config["SURFACEREPULSION"].getint("refresh")
