@@ -10,7 +10,7 @@ from .. import _core as m
 from .hmc import hmc
 from .mesh import Mesh, read_trimesh
 from .config import update_config_defaults, config_to_params
-from .output import make_output
+from .output import make_output, CheckpointWriter, CheckpointReader
 
 def om_helfrich_energy(mesh, estore, config, output):
 
@@ -68,7 +68,7 @@ def om_helfrich_energy(mesh, estore, config, output):
 
     return _fun, _grad, _callback
 
-def setup_energy_manager(config, cparams=None):
+def setup_energy_manager(config):
     """Setup energy manager."""
 
     mesh = read_trimesh(config["GENERAL"]["input"])
@@ -79,51 +79,44 @@ def setup_energy_manager(config, cparams=None):
     update_config_defaults(config, lc0=1.25*l, lc1=0.75*l, a0=a)
     eparams = config_to_params(config)
 
-    # continuation params might come from restarts instead as from input
-    if not cparams is None:
-        eparams.continuation_params = cparams
-
     estore = m.EnergyManager(mesh.trimesh, eparams)
 
     return estore, mesh
 
-def write_restart(mesh, estore, step, config):
-    """Write restart checkpoint."""
+def write_checkpoint(mesh, config, **kwargs):
+    """Write checkpoint file."""
 
     prefix = config["GENERAL"]["restart_prefix"]
 
-    # write params
-    with open(prefix + str(step) + "_params_.cpt", "wb") as fp:
-        pickle.dump(estore.eparams.continuation_params, fp)
+    cpt = CheckpointWriter(prefix)
+    cpt.write(mesh.x, mesh.f, config, **kwargs)
 
-    # write mesh
-    fn = prefix + str(step) + "_mesh_.vtu"
-    meshio.write_points_cells(fn, mesh.x, [("triangle", mesh.f)])
+    print("Writing checkpoint:", cpt.fname)
 
-def read_restart(restart, config):
-    """Read energy manager and mesh from restart."""
+def read_checkpoint(config, restartnum):
+    """Read data from checkpoint file."""
 
     prefix = config["GENERAL"]["restart_prefix"]
 
-    # read params
-    with open(prefix+str(restart)+"_params_.cpt", "rb") as fp:
-        cparams = pickle.load(fp)
+    cpt = CheckpointReader(prefix, restartnum)
+    points, cells, conf = cpt.read()
 
-    # read mesh
-    fn = prefix + str(restart) + "_mesh_.vtu"
-    mesh = meshio.read(fn)
+    # TODO: restart logic (see issue 10, 12)
+    ec = config["ENERGY"]
+    ec["continuation_delta"]  = conf["ENERGY"]["continuation_delta"]
+    ec["continuation_lambda"] = conf["ENERGY"]["continuation_lambda"]
 
-    return Mesh(mesh.points, mesh.cells[0].data), cparams
+    return Mesh(points, cells), config
 
 def run(config, restart=-1):
     """Run algorithm."""
 
-    # create energy manager and mesh
-    if restart == -1:
-        estore, mesh = setup_energy_manager(config)
+    # setup mesh and energy
+    if not restart == -1:
+        mesh, config = read_checkpoint(config, restart)
+        estore, _    = setup_energy_manager(config)
     else:
-        mesh, cparams = read_restart(restart, config)
-        estore, _ = setup_energy_manager(config, cparams)
+        estore, mesh = setup_energy_manager(config)
 
     # run algorithm
     algo    = config["GENERAL"]["algorithm"]
@@ -157,9 +150,12 @@ def run_hmc(mesh, estore, config, restart):
               }
     x, traj = hmc(mesh.x, fun, grad, options)
 
-    # write restart
+    # write checkpoint
     mesh.x = x
-    write_restart(mesh, estore, restart+1, config)
+    ec = config["ENERGY"]
+    ec["continuation_lambda"] = str(estore.eparams.continuation_params.lam)
+    ec["continuation_delta"]  = str(estore.eparams.continuation_params.delta)
+    write_checkpoint(mesh, config)
 
 def run_minim(mesh, estore, config, restart):
     """Run minimization."""
@@ -217,5 +213,5 @@ def run_minim(mesh, estore, config, restart):
     # print info (also updates the mesh)
     _cb(x, force_info=True, force_out=True)
 
-    # write restart
-    write_restart(mesh, estore, restart+1, config)
+    # write checkpoint
+    write_checkpoint(mesh, config)

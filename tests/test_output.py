@@ -1,12 +1,15 @@
 import numpy as np
 import pytest
 import h5py
+import configparser
 
 from xml.etree import ElementTree as ET
 
 import meshio
 
 from helfrich.mc.output import make_output
+from helfrich.mc.output.checkpoint import CheckpointWriter, CheckpointReader
+from helfrich.mc.config import CONF
 
 # -----------------------------------------------------------------------------
 #                                                                     pytest --
@@ -202,3 +205,24 @@ def test_output_versioning(outdir, data, writer_type):
         assert prefix.with_suffix(".p1.h5").exists()
     elif writer.fname.suffix == ".vtu":
         assert prefix.with_suffix(".0.p1.vtu").exists()
+
+def test_checkpoint(outdir, data):
+    """Test checkpoint write/read."""
+
+    conf = configparser.ConfigParser()
+    conf.read_string(CONF)
+
+    prefix = outdir.joinpath("tmp").resolve()
+    cptw = CheckpointWriter(prefix)
+
+    cptw.write(data[0], data[1], conf)
+
+    assert prefix.with_suffix(".p0.cpt").exists()
+    assert prefix.with_suffix(".cpt.p0.h5").exists()
+
+    cptr = CheckpointReader(prefix, 0)
+    points, cells, conf_r = cptr.read()
+
+    assert np.linalg.norm(points - data[0]) < 1.0e-8
+    assert np.linalg.norm(cells - data[1]) == 0.0
+    assert conf == conf_r
