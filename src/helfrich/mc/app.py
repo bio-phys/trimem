@@ -19,6 +19,7 @@ def cli():
 
     descr = "Monte Carlo Sampling on om-helfrich energy functional"
     parser = argparse.ArgumentParser(description=descr)
+    parser.set_defaults(func=lambda x: parser.print_usage())
     subparsers = parser.add_subparsers(title="subcommands")
 
     # config subparser
