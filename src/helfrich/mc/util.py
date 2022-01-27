@@ -10,8 +10,9 @@ from .. import _core as m
 from .hmc import hmc
 from .mesh import Mesh, read_trimesh
 from .config import update_config_defaults, config_to_params
+from .output import make_output
 
-def om_helfrich_energy(mesh, estore, config):
+def om_helfrich_energy(mesh, estore, config, output):
 
     istep  = config["GENERAL"].getint("info")
     N      = config["GENERAL"].getint("num_steps")
@@ -57,15 +58,13 @@ def om_helfrich_energy(mesh, estore, config):
             estore.print_info(mesh.trimesh)
             _callback.acc = 0
         if i%thin == 0:
-            write_output(mesh, _callback.count, config)
-            _callback.count += 1
+            output.write_points_cells(mesh.x, mesh.f)
         if i%rfrsh == 0:
             estore.update_repulsion(mesh.trimesh)
         estore.update_reference_properties()
 
     # init callback
-    _callback.acc   = 0
-    _callback.count = 0
+    _callback.acc = 0
 
     return _fun, _grad, _callback
 
@@ -87,27 +86,6 @@ def setup_energy_manager(config, cparams=None):
     estore = m.EnergyManager(mesh.trimesh, eparams)
 
     return estore, mesh
-
-def write_output(mesh, step, config):
-    """Write trajectory output."""
-
-    fmt    = config["GENERAL"]["output_format"]
-    prefix = config["GENERAL"]["output_prefix"]
-    if fmt == "vtu":
-        fn = prefix + str(step) + ".vtu"
-        meshio.write_points_cells(fn, mesh.x, [("triangle", mesh.f)])
-    elif fmt == "xyz":
-        fn = prefix + ".xyz"
-        rw = "w" if step == 0 else "a"
-        with open(fn, rw) as fp:
-            np.savetxt(fp,
-                       mesh.x,
-                       fmt=["C\t%.6f", "%.6f", "%.6f"],
-                       header="{}\n#".format(len(mesh.x)),
-                       comments="",
-                       delimiter="\t")
-    else:
-        raise ValueError("Unknown file format for output.")
 
 def write_restart(mesh, estore, step, config):
     """Write restart checkpoint."""
@@ -159,8 +137,11 @@ def run(config, restart=-1):
 def run_hmc(mesh, estore, config, restart):
     """Run hamiltonian monte carlo."""
 
+    # construct output writer
+    output = make_output(config)
+
     # function, gradient and callback
-    fun, grad, cb = om_helfrich_energy(mesh, estore, config)
+    fun, grad, cb = om_helfrich_energy(mesh, estore, config, output)
 
     # run hmc
     cmc  = config["HMC"]
@@ -196,6 +177,9 @@ def run_minim(mesh, estore, config, restart):
                "which is ignored in in minimization."
         warnings.warn(wstr)
 
+    # construct output writer
+    output = make_output(config)
+
     # generate energy, gradient and callback callables to scipy interface
     def _fun(x):
         mesh.x = x.reshape(x0.shape)
@@ -207,17 +191,15 @@ def run_minim(mesh, estore, config, restart):
         estore.update_repulsion(mesh.trimesh)
         return estore.gradient(mesh.trimesh).ravel()
 
-    def _cb(x, force_info=False):
+    def _cb(x, force_info=False, force_out=False):
         mesh.x = x.reshape(x0.shape)
         if force_info or (info > 0 and _cb.i % info == 0):
             print("\niter:",_cb.i)
             estore.print_info(mesh.trimesh)
-        if outi > 0 and _cb.i % outi == 0:
-            write_output(mesh, _cb.count, config)
-            _cb.count += 1
+        if force_out or (outi > 0 and _cb.i % outi == 0):
+            output.write_points_cells(mesh.x, mesh.f)
         _cb.i += 1
     _cb.i = 0
-    _cb.count = 0
 
     # minimization options
     mopt = {"maxiter": N, "disp": 0}
@@ -229,14 +211,11 @@ def run_minim(mesh, estore, config, restart):
                    callback=_cb,
                    method="L-BFGS-B",
                    options=mopt)
-    x   = res.x.reshape(x0.shape)
+    x   = res.x
     print(res.message)
 
     # print info (also updates the mesh)
-    _cb(x, force_info=True)
-
-    # write output
-    write_output(mesh, _cb.count, config)
+    _cb(x, force_info=True, force_out=True)
 
     # write restart
     write_restart(mesh, estore, restart+1, config)

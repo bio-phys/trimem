@@ -102,4 +102,6 @@ sed -i 's/= minimize/= hmc/g' inp.conf
 mc_app run --conf inp.conf --restart 0
 ```
 By setting `output_format = xyz`, a plain ascii xyz-coordinate trajectory
-is written instead of a series of vtk unstructured-grid files.
+is written instead of a series of vtk unstructured-grid files. As an
+alternative, the 'xdmf' format provides output for mesh trajectories
+with hdf5 storage.
