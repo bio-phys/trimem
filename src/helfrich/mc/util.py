@@ -1,10 +1,7 @@
 import warnings
 
 import numpy as np
-import pickle
-
 from scipy.optimize import minimize
-import meshio
 
 from .. import _core as m
 from .hmc import hmc
