@@ -4,7 +4,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from .. import _core as m
-from .hmc import hmc
+from .hmc import MeshHMC, MeshFlips, MeshMonteCarlo
 from .mesh import Mesh, read_trimesh
 from .config import update_config_defaults, config_to_params
 from .output import make_output, CheckpointWriter, CheckpointReader
@@ -12,26 +12,8 @@ from .output import make_output, CheckpointWriter, CheckpointReader
 def om_helfrich_energy(mesh, estore, config, output):
 
     istep  = config["GENERAL"].getint("info")
-    N      = config["GENERAL"].getint("num_steps")
-    fr     = config["HMC"].getfloat("flip_ratio")
-    ft     = config["HMC"]["flip_type"]
-    prefix = config["GENERAL"]["output_prefix"]
-    thin   = config["HMC"].getint("thin")
     rfrsh  = config["SURFACEREPULSION"].getint("refresh")
-
-
-    if ft == "serial":
-        _tflips = lambda mh,e,r: m.flip(mh,e,r)
-    elif ft == "parallel":
-        _tflips = lambda mh,e,r: m.pflip(mh,e,r)
-    elif ft == "none":
-        _tflips = lambda mh,e,r: 0
-    else:
-        raise ValueError("Wrong flip-type")
-
-    # take a short-cut in case
-    if fr == 0.0:
-        _tflips = lambda mh,e,r: 0
+    thin   = config["HMC"].getint("thin")
 
     def _fun(x):
         mesh.x = x
@@ -43,25 +25,20 @@ def om_helfrich_energy(mesh, estore, config, output):
         g = estore.gradient(mesh.trimesh)
         return g
 
-    def _callback(x, i, acc, T):
-        _callback.acc += acc
+    def _callback(x):
+        i = _callback.i
         mesh.x = x
-        flips = _tflips(mesh.trimesh, estore, fr)
         if i%istep == 0:
-            print("\n-- Step ",i)
-            print("----- acc-rate:   ", _callback.acc/istep)
-            print("----- acc-flips:  ", flips/mesh.trimesh.n_edges())
-            print("----- temperature:", T)
             estore.print_info(mesh.trimesh)
-            _callback.acc = 0
         if i%thin == 0:
             output.write_points_cells(mesh.x, mesh.f)
         if i%rfrsh == 0:
             estore.update_repulsion(mesh.trimesh)
         estore.update_reference_properties()
+        _callback.i += 1
 
     # init callback
-    _callback.acc = 0
+    _callback.i = 0
 
     return _fun, _grad, _callback
 
@@ -118,14 +95,14 @@ def run(config, restart=-1):
     # run algorithm
     algo    = config["GENERAL"]["algorithm"]
     if algo == "hmc":
-      run_hmc(mesh, estore, config, restart)
+      run_mc(mesh, estore, config, restart)
     elif algo == "minimize":
       run_minim(mesh, estore, config, restart)
     else:
       raise ValueError("Invalid algorithm")
 
-def run_hmc(mesh, estore, config, restart):
-    """Run hamiltonian monte carlo."""
+def run_mc(mesh, estore, config, restart):
+    """Run monte carlo sampling."""
 
     # construct output writer
     output = make_output(config)
@@ -133,22 +110,35 @@ def run_hmc(mesh, estore, config, restart):
     # function, gradient and callback
     fun, grad, cb = om_helfrich_energy(mesh, estore, config, output)
 
-    # run hmc
+    # setup hmc to sample vertex positions
     cmc  = config["HMC"]
-    options = { "number_of_steps": cmc.getint("num_steps"),
-                "mass": cmc.getfloat("momentum_variance"),
-                "time_step": cmc.getfloat("step_size"),
-                "num_integration_steps": cmc.getint("traj_steps"),
-                "thin": cmc.getint("thin"),
-                "initial_temperature": cmc.getfloat("initial_temperature"),
-                "cooling_factor": cmc.getfloat("cooling_factor"),
-                "cooling_start_step": cmc.getint("start_cooling"),
-                "callback": cb,
-              }
-    x, traj = hmc(mesh.x, fun, grad, options)
+    options = {
+        "mass":                  cmc.getfloat("momentum_variance"),
+        "time_step":             cmc.getfloat("step_size"),
+        "num_integration_steps": cmc.getint("traj_steps"),
+        "initial_temperature":   cmc.getfloat("initial_temperature"),
+        "cooling_factor":        cmc.getfloat("cooling_factor"),
+        "cooling_start_step":    cmc.getint("start_cooling"),
+        "info_step":             config["GENERAL"].getint("info"),
+    }
+    hmc = MeshHMC(mesh, fun, grad, options=options)
+
+    # setup edge flips
+    options = {
+        "flip_type":  cmc["flip_type"],
+        "flip_ratio": cmc.getfloat("flip_ratio"),
+        "info_step":  config["GENERAL"].getint("info"),
+    }
+    flips = MeshFlips(mesh, estore, options)
+
+    # setup combined-step markov chain
+    mmc = MeshMonteCarlo(hmc, flips, callback=cb)
+   
+    # run sampling 
+    mmc.run(cmc.getint("num_steps"))
 
     # write checkpoint
-    mesh.x = x
+    mesh.x = hmc.x
     ec = config["ENERGY"]
     ec["continuation_lambda"] = str(estore.eparams.continuation_params.lam)
     ec["continuation_delta"]  = str(estore.eparams.continuation_params.delta)
