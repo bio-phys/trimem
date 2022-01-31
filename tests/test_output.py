@@ -7,7 +7,7 @@ from xml.etree import ElementTree as ET
 
 import meshio
 
-from helfrich.mc.output import make_output
+from helfrich.mc.output import make_output, create_backup
 from helfrich.mc.output.checkpoint import CheckpointWriter, CheckpointReader
 from helfrich.mc.config import CONF
 
@@ -226,3 +226,31 @@ def test_checkpoint(outdir, data):
     assert np.linalg.norm(points - data[0]) < 1.0e-8
     assert np.linalg.norm(cells - data[1]) == 0.0
     assert conf == conf_r
+
+def test_backup(outdir, data, writer_type):
+    """Test backup of output and checkpoint files."""
+
+    out_prefix = outdir.joinpath("tmp").resolve()
+    cpt_prefix = outdir.joinpath("tmp").resolve()
+    config = {"GENERAL": {"output_format": writer_type,
+                          "output_prefix": str(out_prefix)}}
+    conf = configparser.ConfigParser()
+    conf.read_dict(config)
+
+    for i in range(2):
+        # generate some data
+        output_writer  = make_output(conf)
+        checkpt_writer = CheckpointWriter(cpt_prefix)
+        output_writer.write_points_cells(data[0], data[1])
+        checkpt_writer.write(data[0], data[1], conf)
+
+        # create backup
+        create_backup(out_prefix, cpt_prefix)
+
+        # shallow check whether backup worked
+        backups = list(outdir.glob(f"#*.{i}#"))
+        if writer_type == "xdmf":
+            assert len(backups) == 4
+        else:
+            assert len(backups) == 3
+

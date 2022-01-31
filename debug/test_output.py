@@ -30,7 +30,7 @@ conf = configparser.ConfigParser()
 conf.read_string(CONF)
 cpt.write(p,c,conf)
 
-cpt = CheckpointReader("tmp")
+cpt = CheckpointReader("tmp", 0)
 p_in, c_in, conf_in = cpt.read()
 
-create_backup("tmp")
+create_backup("tmp", "tmp")
