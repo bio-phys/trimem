@@ -8,39 +8,8 @@ from .hmc import MeshHMC, MeshFlips, MeshMonteCarlo
 from .mesh import Mesh, read_trimesh
 from .config import update_config_defaults, config_to_params
 from .output import make_output, CheckpointWriter, CheckpointReader
+from .evaluators import EnergyEvaluators
 
-def om_helfrich_energy(mesh, estore, config, output):
-
-    istep  = config["GENERAL"].getint("info")
-    rfrsh  = config["SURFACEREPULSION"].getint("refresh")
-    thin   = config["HMC"].getint("thin")
-
-    def _fun(x):
-        mesh.x = x
-        e = estore.energy(mesh.trimesh)
-        return e
-
-    def _grad(x):
-        mesh.x = x
-        g = estore.gradient(mesh.trimesh)
-        return g
-
-    def _callback(x):
-        i = _callback.i
-        mesh.x = x
-        if i%istep == 0:
-            estore.print_info(mesh.trimesh)
-        if i%thin == 0:
-            output.write_points_cells(mesh.x, mesh.f)
-        if i%rfrsh == 0:
-            estore.update_repulsion(mesh.trimesh)
-        estore.update_reference_properties()
-        _callback.i += 1
-
-    # init callback
-    _callback.i = 0
-
-    return _fun, _grad, _callback
 
 def setup_energy_manager(config):
     """Setup energy manager."""
@@ -108,7 +77,12 @@ def run_mc(mesh, estore, config, restart):
     output = make_output(config)
 
     # function, gradient and callback
-    fun, grad, cb = om_helfrich_energy(mesh, estore, config, output)
+    options = {
+        "info_step":    config["GENERAL"].getint("info"),
+        "output_step":  config["HMC"].getint("thin"),
+        "refresh_step": config["SURFACEREPULSION"].getint("refresh"),
+    }
+    funcs = EnergyEvaluators(mesh, estore, output, options)
 
     # setup hmc to sample vertex positions
     cmc  = config["HMC"]
@@ -121,7 +95,7 @@ def run_mc(mesh, estore, config, restart):
         "cooling_start_step":    cmc.getint("start_cooling"),
         "info_step":             config["GENERAL"].getint("info"),
     }
-    hmc = MeshHMC(mesh, fun, grad, options=options)
+    hmc = MeshHMC(mesh, funcs.fun, funcs.grad, options=options)
 
     # setup edge flips
     options = {
@@ -132,7 +106,7 @@ def run_mc(mesh, estore, config, restart):
     flips = MeshFlips(mesh, estore, options)
 
     # setup combined-step markov chain
-    mmc = MeshMonteCarlo(hmc, flips, callback=cb)
+    mmc = MeshMonteCarlo(hmc, flips, callback=funcs.callback)
    
     # run sampling 
     mmc.run(cmc.getint("num_steps"))
@@ -147,58 +121,43 @@ def run_mc(mesh, estore, config, restart):
 def run_minim(mesh, estore, config, restart):
     """Run minimization."""
 
-    # parameters
-    x0   = mesh.x.copy()
-    N    = config["MINIMIZATION"].getint("maxiter")
-    outi = config["MINIMIZATION"].getint("out_every")
-    info = config["GENERAL"].getint("info")
-
-    # generic minimization requires surface repulsion refresh at every step
-    refresh = config["SURFACEREPULSION"].getint("refresh")
-    if not (refresh == 1 or refresh is None):
-        wstr = "SURFACEREPULSION::refresh is set to {}, ".format(refresh) + \
-               "which is ignored in in minimization."
-        warnings.warn(wstr)
-
     # construct output writer
     output = make_output(config)
 
-    # generate energy, gradient and callback callables to scipy interface
-    def _fun(x):
-        mesh.x = x.reshape(x0.shape)
-        estore.update_repulsion(mesh.trimesh)
-        return estore.energy(mesh.trimesh)
+    # generic minimization requires surface repulsion refresh at every step
+    refresh = config["SURFACEREPULSION"].getint("refresh")
+    if not refresh == 1:
+        wstr = f"SURFACEREPULSION::refresh is set to {refresh}, " + \
+               "which is ignored in in minimization."
+        warnings.warn(wstr)
+        refresh = 1
 
-    def _grad(x):
-        mesh.x = x.reshape(x0.shape)
-        estore.update_repulsion(mesh.trimesh)
-        return estore.gradient(mesh.trimesh).ravel()
-
-    def _cb(x, force_info=False, force_out=False):
-        mesh.x = x.reshape(x0.shape)
-        if force_info or (info > 0 and _cb.i % info == 0):
-            print("\niter:",_cb.i)
-            estore.print_info(mesh.trimesh)
-        if force_out or (outi > 0 and _cb.i % outi == 0):
-            output.write_points_cells(mesh.x, mesh.f)
-        _cb.i += 1
-    _cb.i = 0
-
-    # minimization options
-    mopt = {"maxiter": N, "disp": 0}
+    # function, gradient and callback
+    options = {
+        "info_step":    config["GENERAL"].getint("info"),
+        "output_step":  config["MINIMIZATION"].getint("out_every"),
+        "refresh_step": refresh,
+        "flatten":      True,
+    }
+    funcs = EnergyEvaluators(mesh, estore, output, options)
 
     # run minimization
-    res = minimize(_fun,
-                   x0.ravel(),
-                   jac=_grad,
-                   callback=_cb,
-                   method="L-BFGS-B",
-                   options=mopt)
-    x   = res.x
-    print(res.message)
+    options = {
+        "maxiter": config["MINIMIZATION"].getint("maxiter"),
+        "disp": 0,
+    }
+    res = minimize(
+        funcs.fun,
+        mesh.x,
+        jac=funcs.grad,
+        callback=funcs.callback,
+        method="L-BFGS-B",
+        options=options
+    )
+    mesh.x = res.x.reshape(mesh.x.shape)
 
-    # print info (also updates the mesh)
-    _cb(x, force_info=True, force_out=True)
+    # print info
+    estore.print_info(mesh.trimesh)
 
     # write checkpoint
     write_checkpoint(mesh, config)
