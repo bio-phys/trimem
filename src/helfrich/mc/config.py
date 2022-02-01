@@ -65,6 +65,9 @@ def read_config(fname):
     """Read config from file."""
     cfile = pathlib.Path(fname)
 
+    if not cfile.exists():
+        raise FileNotFoundError(cfile)
+
     config = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
     config.read(fname)
 
