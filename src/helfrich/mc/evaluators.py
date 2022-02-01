@@ -7,6 +7,8 @@ Evaluators for energy, gradient and callback are provided as functions
 of vertex positions 'x'.
 """
 import numpy as np
+import time
+from datetime import datetime, timedelta
 
 
 _eval_default_options = {
@@ -14,6 +16,7 @@ _eval_default_options = {
     "output_step":  1000,
     "refresh_step": 10,
     "flatten":      False,
+    "num_steps":    None,
 }
 
 class EnergyEvaluators:
@@ -49,8 +52,17 @@ class EnergyEvaluators:
             self._ravel = lambda x: x
 
         # init callback counter
-        self.step = 0
+        self._step = 0
 
+    @property
+    def step(self):
+        """Access step counter."""
+        return self._step
+
+    @step.setter
+    def step(self, value):
+        self._step = value
+      
     def _update_mesh(func):
         """Decorates a method with an update of the mesh vertices.
 
@@ -84,3 +96,29 @@ class EnergyEvaluators:
         self.estore.update_reference_properties()
         self.step += 1
 
+
+class TimingEnergyEvaluators(EnergyEvaluators):
+    """EnergyEvaluator with timings for steps."""
+    def __init__(self, mesh, estore, output, options):
+        super().__init__(mesh, estore, output, options)
+        self.timestamps = []
+        self.n          = options["num_steps"] // self.info_step
+        self.start      = datetime.now()
+
+    @property
+    def step(self):
+        return self._step
+
+    @step.setter
+    def step(self, value):
+        if self.info_step and (self.step % self.info_step == 0):
+            self.timestamps.append(time.time())
+            if len(self.timestamps) == 2:
+                tspan  = self.timestamps[1] - self.timestamps[0]
+                speed  = tspan / self.info_step
+                finish = self.start + timedelta(seconds=tspan) * self.n
+                print("\n-- Performance measurements")
+                print(f"----- estimated speed: {speed:.3e} s/step")
+                print(f"----- estimated end:   {finish}")
+                self.timestamps.pop(0)
+        self._step = value

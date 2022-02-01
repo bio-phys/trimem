@@ -9,7 +9,7 @@ from .mesh import Mesh, read_trimesh
 from .config import update_config_defaults, config_to_params
 from .output import make_output, create_backup, \
                     CheckpointWriter, CheckpointReader
-from .evaluators import EnergyEvaluators
+from .evaluators import TimingEnergyEvaluators
 
 
 def setup_energy_manager(config):
@@ -89,8 +89,9 @@ def run_mc(mesh, estore, config, restart):
         "info_step":    config["GENERAL"].getint("info"),
         "output_step":  config["HMC"].getint("thin"),
         "refresh_step": config["SURFACEREPULSION"].getint("refresh"),
+        "num_steps":    config["HMC"].getint("num_steps"),
     }
-    funcs = EnergyEvaluators(mesh, estore, output, options)
+    funcs = TimingEnergyEvaluators(mesh, estore, output, options)
 
     # setup hmc to sample vertex positions
     cmc  = config["HMC"]
@@ -146,8 +147,9 @@ def run_minim(mesh, estore, config, restart):
         "output_step":  config["MINIMIZATION"].getint("out_every"),
         "refresh_step": refresh,
         "flatten":      True,
+        "num_steps":    config["MINIMIZATION"].getint("maxiter"),
     }
-    funcs = EnergyEvaluators(mesh, estore, output, options)
+    funcs = TimingEnergyEvaluators(mesh, estore, output, options)
 
     # run minimization
     options = {
