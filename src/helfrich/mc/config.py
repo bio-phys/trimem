@@ -1,12 +1,16 @@
 import configparser
+import pathlib
+
 from .. import _core as m
 
 CONF = """[GENERAL]
 algorithm = hmc
 info = 1
-input = test.stl
-output_prefix = out/test_
-restart_prefix = out/restart_
+# the io-name/prefix parameters are set automatically from the config file
+# name; uncomment for more precise control
+#input = inp.stl
+#output_prefix = inp
+#restart_prefix = inp
 output_format = vtu
 [BONDS]
 bond_type = Edge
@@ -59,8 +63,19 @@ def write_default_config(fname):
 
 def read_config(fname):
     """Read config from file."""
+    cfile = pathlib.Path(fname)
+
     config = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
     config.read(fname)
+
+    # set config defaults
+    update_config_defaults(
+        config,
+        input=f"{cfile.with_suffix('.stl')}",
+        output_prefix=f"{cfile.with_suffix('')}",
+        restart_prefix=f"{cfile.with_suffix('')}",
+    )
+
     return config
 
 def update_config_defaults(config, **kwargs):

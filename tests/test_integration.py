@@ -10,9 +10,11 @@ import pytest
 CONF = """[GENERAL]
 algorithm = {algorithm}
 info = 1
-input = {stlfile!s}
-output_prefix = {outprefix!s}
-restart_prefix = {restartprefix!s}
+# the io-name/prefix parameters are set automatically from the config file
+# name; uncomment for more precise control
+#input = inp.stl
+#output_prefix = inp
+#restart_prefix = inp
 output_format = vtu
 [BONDS]
 bond_type = Edge
@@ -62,32 +64,11 @@ def iodir(tmp_path_factory):
 
     # prepare io folder
     tmpdir = tmp_path_factory.mktemp("testio")
-    tmpdir.joinpath("out").mkdir()
 
-    # define files and prefixes
-    stlfile       = tmpdir.joinpath("inp.stl")
-    outprefix     = tmpdir.joinpath("out/test_")
-    restartprefix = tmpdir.joinpath("out/restart_")
-    inconf_hmc    = tmpdir.joinpath("conf_hmc.inp")
-    inconf_min    = tmpdir.joinpath("conf_min.inp")
-   
     # generate input geometry
     p, c = meshzoo.icosa_sphere(4)
+    stlfile = tmpdir.joinpath("inp.stl")
     meshio.write_points_cells(str(stlfile.resolve()), p, [("triangle", c)])
-
-    # generate input file for minimzation
-    config = CONF.format(algorithm="minimize",
-                         stlfile=stlfile.resolve(),
-                         outprefix=outprefix.resolve(),
-                         restartprefix=restartprefix.resolve())
-    inconf_min.write_text(config)
-
-    # generate input file for hmc
-    config = CONF.format(algorithm="hmc",
-                         stlfile=stlfile.resolve(),
-                         outprefix=outprefix.resolve(),
-                         restartprefix=restartprefix.resolve())
-    inconf_hmc.write_text(config)
 
     return tmpdir
 
@@ -112,15 +93,12 @@ def test_mcapp_config(iodir):
     # check success of config generation
     assert r.returncode == 0
 
-    # read in generated config
+    # read in generated config as text
     with open(conf_out, "r") as fp:
         config = fp.read()
 
     # reference config
-    ref_config = (CONF.format(algorithm="hmc",
-                              stlfile="test.stl",
-                              outprefix="out/test_",
-                              restartprefix="out/restart_"))
+    ref_config = CONF.format(algorithm="hmc")
 
     # compare configs
     # (string comparison here enables readable output in case of failure)
@@ -129,9 +107,11 @@ def test_mcapp_config(iodir):
 def test_mcapp_min(iodir):
     """Test mc_app."""
 
-    conf = str(iodir.joinpath("conf_min.inp").resolve())
+    config_str = CONF.format(algorithm="minimize")
+    conf = iodir.joinpath("inp.conf")
+    conf.write_text(config_str)
 
-    cmd = ["mc_app", "run", "--conf", conf]
+    cmd = ["mc_app", "run", "--conf", str(conf.resolve())]
 
     r = subprocess.run(cmd,
                        stdout=subprocess.PIPE,
@@ -146,9 +126,11 @@ def test_mcapp_min(iodir):
 def test_mcapp_hmc(iodir):
     """Test mc_app restart from minimization."""
 
-    conf = str(iodir.joinpath("conf_hmc.inp").resolve())
+    config_str = CONF.format(algorithm="hmc")
+    conf = iodir.joinpath("inp.conf")
+    conf.write_text(config_str)
 
-    cmd = ["mc_app", "run", "--conf", conf, "--restart", "0"]
+    cmd = ["mc_app", "run", "--conf", str(conf.resolve()), "--restart", "0"]
 
     r = subprocess.run(cmd,
                        stdout=subprocess.PIPE,
