@@ -45,10 +45,17 @@ def read_checkpoint(config, restartnum):
     cpt = CheckpointReader(prefix, restartnum)
     points, cells, conf = cpt.read()
 
-    # TODO: restart logic (see issue 10, 12)
-    ec = config["ENERGY"]
-    ec["continuation_delta"]  = conf["ENERGY"]["continuation_delta"]
-    ec["continuation_lambda"] = conf["ENERGY"]["continuation_lambda"]
+    # TODO: restart logic (see issue 26)
+    upd = {
+        "ENERGY": {
+            "continuation_delta":  conf["ENERGY"]["continuation_delta"],
+            "continuation_lambda": conf["ENERGY"]["continuation_lambda"],
+        },
+        "DEFAULT": {
+            "init_step": conf["HMC"]["init_step"],
+        }
+    }
+    config.read_dict(upd)
 
     return Mesh(points, cells), config
 
@@ -89,6 +96,7 @@ def run_mc(mesh, estore, config, restart):
         "info_step":    config["GENERAL"].getint("info"),
         "output_step":  config["HMC"].getint("thin"),
         "refresh_step": config["SURFACEREPULSION"].getint("refresh"),
+        "init_step":    config["HMC"].getint("init_step"),
         "num_steps":    config["HMC"].getint("num_steps"),
     }
     funcs = TimingEnergyEvaluators(mesh, estore, output, options)
@@ -102,6 +110,7 @@ def run_mc(mesh, estore, config, restart):
         "initial_temperature":   cmc.getfloat("initial_temperature"),
         "cooling_factor":        cmc.getfloat("cooling_factor"),
         "cooling_start_step":    cmc.getint("start_cooling"),
+        "init_step":             cmc.getint("init_step"),
         "info_step":             config["GENERAL"].getint("info"),
     }
     hmc = MeshHMC(mesh, funcs.fun, funcs.grad, options=options)
@@ -110,6 +119,7 @@ def run_mc(mesh, estore, config, restart):
     options = {
         "flip_type":  cmc["flip_type"],
         "flip_ratio": cmc.getfloat("flip_ratio"),
+        "init_step":  cmc.getint("init_step"),
         "info_step":  config["GENERAL"].getint("info"),
     }
     flips = MeshFlips(mesh, estore, options)
@@ -120,11 +130,22 @@ def run_mc(mesh, estore, config, restart):
     # run sampling 
     mmc.run(cmc.getint("num_steps"))
 
-    # write checkpoint
+    # update mesh
     mesh.x = hmc.x
-    ec = config["ENERGY"]
-    ec["continuation_lambda"] = str(estore.eparams.continuation_params.lam)
-    ec["continuation_delta"]  = str(estore.eparams.continuation_params.delta)
+
+    # update config
+    upd = {
+        "ENERGY": {
+            "continuation_lambda": estore.eparams.continuation_params.lam,
+            "continuation_delta":  estore.eparams.continuation_params.delta,
+        },
+        "HMC": {
+            "init_step": cmc.getint("init_step") + cmc.getint("num_steps"),
+        },
+    }
+    config.read_dict(upd)
+
+    # write checkpoint
     write_checkpoint(mesh, config)
 
 def run_minim(mesh, estore, config, restart):

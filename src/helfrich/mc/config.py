@@ -74,6 +74,7 @@ def read_config(fname):
     # set config defaults
     update_config_defaults(
         config,
+        init_step=0,
         input=f"{cfile.with_suffix('.stl')}",
         output_prefix=f"{cfile.with_suffix('')}",
         restart_prefix=f"{cfile.with_suffix('')}",

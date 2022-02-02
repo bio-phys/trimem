@@ -17,6 +17,7 @@ _eval_default_options = {
     "refresh_step": 10,
     "flatten":      False,
     "num_steps":    None,
+    "init_step":    0,
 }
 
 class EnergyEvaluators:
@@ -52,7 +53,7 @@ class EnergyEvaluators:
             self._ravel = lambda x: x
 
         # init callback counter
-        self._step = 0
+        self._step = options["init_step"]
 
     @property
     def step(self):

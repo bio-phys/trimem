@@ -33,6 +33,7 @@ _hmc_default_options = {
     "cooling_factor":        0.0,
     "cooling_start_step":    0,
     "info_step":             100,
+    "init_step":             0,
 }
 
 class HMC:
@@ -87,7 +88,7 @@ class HMC:
             print(f"  {k: <{width}}: {v}")
 
         # init algorithm
-        self.i   = 0
+        self.i   = options["init_step"]
         self.acc = 0
         self.T   = self.Tinit
 
@@ -189,6 +190,7 @@ _mc_flip_default_options = {
     "flip_type": "parallel",
     "flip_ratio": 0.1,
     "info_step":  100,
+    "init_step":  0,
 }
 
 class MeshFlips:
@@ -225,7 +227,7 @@ class MeshFlips:
         else:
             raise ValueError("Wrong flip-type: {}".format(self.ft))
 
-        self.i   = 0
+        self.i   = options["init_step"]
         self.acc = 0
 
     def _info(self):
