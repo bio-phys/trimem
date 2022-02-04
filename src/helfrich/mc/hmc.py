@@ -133,7 +133,7 @@ class HMC:
 
     def _info(self):
         """Print algorithmic information."""
-        if self.i % self.istep == 0:
+        if self.istep and self.i % self.istep == 0:
             print("\n-- HMC-Step ",self.i)
             print("----- acc-rate:   ", self.acc/self.istep)
             print("----- temperature:", self.T)
@@ -232,7 +232,7 @@ class MeshFlips:
 
     def _info(self):
         """Print algorithmic information."""
-        if self.i % self.istep == 0:
+        if self.istep and self.i % self.istep == 0:
             n_edges = self.mesh.trimesh.n_edges()
             print("\n-- MCFlips-Step ",self.i)
             print("----- flip-accept: ", self.acc/(self.istep * n_edges))
