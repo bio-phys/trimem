@@ -93,15 +93,7 @@ class HMC:
         self.T   = self.Tinit
 
         # initial state
-        self._x = x
-
-    @property
-    def x(self):
-        return self._x
-
-    @x.setter
-    def x(self, value):
-        self.x = value
+        self.x = x
 
     def _hamiltonian(self,x,p):
         """Evaluate Hamiltonian."""
@@ -177,13 +169,10 @@ class MeshHMC(HMC):
         super().__init__(mesh.x, nlog_prob, grad_nlog_prob, callback, options)
         self.mesh = mesh
 
-    @property
-    def x(self):
-        return self.mesh.x
-
-    @x.setter
-    def x(self, value):
-        self.mesh.x = value
+    def step(self):
+        """Make a step and explicitly update the mesh vertices."""
+        super().step()
+        self.mesh.x = self.x
 
 
 _mc_flip_default_options = {
