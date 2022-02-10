@@ -188,6 +188,8 @@ def run_minim(mesh, estore, config, restart):
     mesh.x = res.x.reshape(mesh.x.shape)
 
     # print info
+    print("\n-- Minimization finished at iteration", res.nit)
+    print(res.message)
     estore.print_info(mesh.trimesh)
 
     # write checkpoint
