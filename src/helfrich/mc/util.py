@@ -75,6 +75,7 @@ def run(config, restart=-1):
     else:
         mesh, config = read_checkpoint(config, restart)
         estore, _    = setup_energy_manager(config)
+        estore.update_repulsion(mesh.trimesh)
 
     # run algorithm
     algo    = config["GENERAL"]["algorithm"]
