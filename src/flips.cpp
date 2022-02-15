@@ -94,8 +94,10 @@ int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, real& flip_ratio
     VertexProperties props = estore.properties(mesh);
     real             e0    = estore.energy(props);
 
-    // set-up lock on edges
-    std::vector<OmpGuard> l_edges(nedges);
+    // set-up locks on edges
+    std::vector<omp_lock_t> l_edges(nedges);
+    for (auto& lock: l_edges)
+        omp_init_lock(&lock);
 
     int acc  = 0;
 #pragma omp parallel reduction(+:acc)
@@ -129,24 +131,23 @@ int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, real& flip_ratio
         for (int i=0; i<iflips; i++)
         {
 #pragma omp barrier
-            bool locked = false;
             EdgeHandle eh(-1);
-            if (i<iedges)
+
             {
-                int idx = edges[i];
-                eh = mesh.edge_handle(idx);
-                locked = test_guards(mesh, idx, l_edges);
-            }
+                std::vector<OmpGuard> guards;
+                if (i<iedges)
+                {
+                    int idx = edges[i];
+                    eh = mesh.edge_handle(idx);
+                    guards = test_patch(mesh, idx, l_edges);
+                }
 #pragma omp barrier
-            if (locked)
-            {
-                auto patch = flip_patch(mesh, eh);
-                for (const int& i: patch) l_edges[i].release();
+                if (guards.empty())
+                {
+                    continue;
+                }
             }
-            else
-            {
-                continue;
-            }
+            // here all locks will have been released
 
             // compute differential properties
             auto dprops = edge_vertex_properties(mesh, eh, *(estore.bonds),

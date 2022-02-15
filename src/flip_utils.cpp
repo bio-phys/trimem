@@ -67,52 +67,49 @@ std::unordered_set<int> flip_patch(TriMesh& mesh, const EdgeHandle& eh)
     return patch;
 }
 
-bool test_guards(TriMesh& mesh, const int& idx, std::vector<OmpGuard>& locks)
+/** Test locking of edges
+ *
+ *  Acquire locks on the lock-vector for the patch associated to edge idx.
+ *  In case of success, return a set of OmpGuards 'owning' the locks. The locks
+ *  are realased as soon as the returned set goes out of scope.
+ */
+std::vector<OmpGuard>
+test_patch(TriMesh& mesh, const int& idx, std::vector<omp_lock_t>& locks)
 {
     // check if edge is still available at this point
-    bool locked = locks[idx].test();
+    OmpGuard edge_guard(locks[idx]);
 
-    if (locked)
+    std::vector<OmpGuard> patch_guard;
+    if (edge_guard.test())
     {
-        auto eh          = mesh.edge_handle(idx);
-        auto patch       = flip_patch(mesh, eh);
-        int  count_locks = 0;
+        // get edge-patch
+        auto eh    = mesh.edge_handle(idx);
+        auto patch = flip_patch(mesh, eh);
 
-        // remove edge itself from patch
+        // vector of guards initialized with the edge itself
+        patch_guard.reserve(patch.size());
+        patch_guard.push_back(std::move(edge_guard));
+
+        // try to lock the entire patch but remove the edge
+        // itself from patch first since it is already locked
         patch.erase(idx);
-
-        // try to lock entire patch
         for (const int& i: patch)
         {
-            if (locks[i].test())
+            OmpGuard i_guard(locks[i]);
+            if (i_guard.test())
             {
-                count_locks++;
+                // keep guard alive if lock was successful
+                patch_guard.push_back(std::move(i_guard));
             }
             else
             {
+                // release all locks
+                patch_guard.clear();
                 break;
             }
         }
 
-        // unrool in case of some clashes with other patches
-        if (count_locks != patch.size())
-        {
-            locks[idx].release();
-            for (const int& i: patch)
-            {
-                if (count_locks != 0)
-                {
-                    locks[i].release();
-                    count_locks--;
-                }
-                else
-                {
-                    break;
-                }
-            }
-            return false;
-        }
     }
-    return locked;
+    return patch_guard;
 }
 }

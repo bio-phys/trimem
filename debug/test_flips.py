@@ -32,14 +32,13 @@ def hilbert_sort(points, cells, p=6):
 
 def test_flips():
     """Test flips."""
-    p, c = meshzoo.icosa_sphere(32)
+    p, c = meshzoo.icosa_sphere(16)
 #    p, c = hilbert_sort(p,c)
     mesh = om.TriMesh(p, c)
 
     estore = get_energy_manager(mesh, m.BondType.Edge,
-                                10.0, 1.0e4, 1.0e4, 0.0, 0.0, 1.0,
-                                1.0, 1.0, 1.0)
-    estore.print_info()
+                                10.0, 1.0e4, 1.0e4, 0.0, 0.0, 1.0, 1.0)
+    estore.print_info(mesh)
 
     om.write_mesh("test0.stl", mesh)
     start = time.time()
@@ -52,8 +51,8 @@ def test_flips():
     print("took {}s".format(dt))
     om.write_mesh("test1.stl", mesh)
 
-    dum = estore.energy()
-    estore.print_info()
+    dum = estore.energy(mesh)
+    estore.print_info(mesh)
 
 if __name__ == "__main__":
     test_flips()

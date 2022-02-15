@@ -23,8 +23,10 @@ VertexProperties edge_vertex_properties(TriMesh& mesh,
 //! Compute neighbourhood patch of edges blocked by a flip of eh
 std::unordered_set<int> flip_patch(TriMesh& mesh, const EdgeHandle& eh);
 
-//! "Test" (in the sense of omp_test_lock) locking of edge idx (and it's patch)
-bool test_guards(TriMesh& mesh, const int& idx, std::vector<OmpGuard>& locks);
+//! "Test" (in the sense of omp_test_lock) locking of edge idx and it's patch
+std::vector<OmpGuard> test_patch(TriMesh& mesh,
+                                 const int& idx,
+                                 std::vector<omp_lock_t>& locks);
 
 }
 #endif

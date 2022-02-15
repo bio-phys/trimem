@@ -15,19 +15,23 @@ namespace trimem {
 class OmpGuard {
 public:
     // construct
-    OmpGuard();
+    OmpGuard(omp_lock_t& lock);
     ~OmpGuard();
 
     // don't allow copy
     OmpGuard(const OmpGuard&) = delete;
     OmpGuard operator=(const OmpGuard&) = delete;
 
+    // move is supported
+    OmpGuard(OmpGuard&& o);
+
     // use the guard
     bool test();
     void release();
  
 private:
-    omp_nest_lock_t lock_;
+    omp_lock_t* lock_;
+    bool owner_;
 };
 } 
 #endif // OMP_GUARD_H

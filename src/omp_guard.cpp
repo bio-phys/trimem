@@ -1,44 +1,47 @@
 /** \file omp_guard.cpp
  */
+#include <utility>
+#include <iostream>
+
 #include "omp_guard.h"
 
 namespace trimem {
  
 // construct
-OmpGuard::OmpGuard()
+OmpGuard::OmpGuard(omp_lock_t& lock) : lock_(&lock), owner_(false)
 {
-    omp_init_nest_lock(&lock_);
+    test();
 }
 
 // destruct
 OmpGuard::~OmpGuard()
 {
-    omp_destroy_nest_lock(&lock_);
+    release();
 }
 
-// unset
+// move (take ownership away from o in case)
+OmpGuard::OmpGuard(OmpGuard&& o) :
+    lock_(o.lock_),
+    owner_(std::exchange(o.owner_, false)) {}
+
+// unset the lock
 void OmpGuard::release()
 {
-    // check if owned and release in case
-    int state = omp_test_nest_lock(&lock_);
-    if (state > 0)
+    if (owner_)
     {
-        for (int i=state; i>0; i--) omp_unset_nest_lock(&lock_);
+        owner_ = false;
+        omp_unset_lock(lock_);
     }
 }
 
-// test: try to lock but go on in any case
+// test the lock
 bool OmpGuard::test()
 {
-    int state = omp_test_nest_lock(&lock_);
-    if (state == 1) return true;
-    if (state > 1)
+    if (!owner_)
     {
-        // no need to keep nested locks
-        omp_unset_nest_lock(&lock_);
-        return false;
+        owner_ = omp_test_lock(lock_);
     }
-    return false;
+    return owner_;
 }
  
 }
