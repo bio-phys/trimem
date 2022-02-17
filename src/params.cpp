@@ -17,8 +17,6 @@ void expose_parameters(py::module& m)
         .def(py::init())
         .def_readwrite("lc0", &BondParams::lc0)
         .def_readwrite("lc1", &BondParams::lc1)
-//        .def_readwrite("lmax", &BondParams::lmax)
-//        .def_readwrite("lmin", &BondParams::lmin)
         .def_readwrite("a0", &BondParams::a0)
         .def_readwrite("r", &BondParams::r)
         .def_readwrite("type", &BondParams::type);
@@ -35,21 +33,7 @@ void expose_parameters(py::module& m)
     py::class_<ContinuationParams>(m, "ContinuationParams")
         .def(py::init())
         .def_readwrite("delta", &ContinuationParams::delta)
-        .def_readwrite("lam", &ContinuationParams::lambda)
-        .def(py::pickle(
-            [](const ContinuationParams &p) { // __getstate__
-                return py::make_tuple(
-                    p.delta,
-                    p.lambda);
-            },
-            [](py::tuple t) { // __setstate__
-                if (t.size() != 2)
-                    throw std::runtime_error("Invalid state!");
-                ContinuationParams p = {
-                    t[0].cast<real>(),
-                    t[1].cast<real>() };
-                return p;
-            }));
+        .def_readwrite("lam", &ContinuationParams::lambda);
 
     py::class_<EnergyParams>(m, "EnergyParams")
         .def(py::init())
