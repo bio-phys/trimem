@@ -63,24 +63,8 @@ def data(request):
 def params(data):
     """Energy parameters."""
 
-    mesh = data.mesh
-
-    l = np.mean([mesh.calc_edge_length(he) for he in mesh.halfedges()])
-    params = m.BondParams()
-    params.type = m.BondType.Edge
-    params.r = 2
-    params.lc0 = 1.15*l
-    params.lc1 = 0.85*l
-    params.a0   = m.area(mesh)/mesh.n_faces()
-
     eparams = m.EnergyParams()
-    eparams.area_frac      = 1.0
-    eparams.volume_frac    = 1.0
-    eparams.curvature_frac = 1.0
-    eparams.bond_params    = params
-
-    estore = m.EnergyManager(mesh, eparams)
-
+    estore = m.EnergyManager(data.mesh, eparams)
     data.estore = estore
 
     yield data
@@ -89,17 +73,14 @@ def params(data):
 #                                                                       test --
 # -----------------------------------------------------------------------------
 def test_properties(params):
-    """Test values of global properties."""
+    """Test values of global energy properties."""
 
     p = params.estore.properties(params.mesh)
-    e = params.estore.energy(p)
-
-    ref = params.ref
 
     def cmp(a,b):
         return np.abs(a-b)/b
 
-    assert cmp(p.area, ref["area"]) < eps
-    assert cmp(p.volume, ref["volume"]) < eps
-    assert cmp(p.curvature, ref["curvature"]) < eps
-    assert cmp(p.bending, ref["bending"]) < eps
+    assert cmp(p.area, params.ref["area"]) < eps
+    assert cmp(p.volume, params.ref["volume"]) < eps
+    assert cmp(p.curvature, params.ref["curvature"]) < eps
+    assert cmp(p.bending, params.ref["bending"]) < eps

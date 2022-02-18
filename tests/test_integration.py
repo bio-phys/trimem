@@ -82,10 +82,12 @@ def test_mcapp_config(iodir):
 
     cmd = ["mc_app", "config", "--conf", conf_out]
 
-    r = subprocess.run(cmd,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       check=False)
+    r = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False
+    )
 
     if not r.stderr is None:
         print(r.stderr.decode())
@@ -113,10 +115,12 @@ def test_mcapp_min(iodir):
 
     cmd = ["mc_app", "run", "--conf", str(conf.resolve())]
 
-    r = subprocess.run(cmd,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       check=False)
+    r = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False
+    )
 
     if not r.stderr is None:
         print(r.stderr.decode())
@@ -132,10 +136,12 @@ def test_mcapp_hmc(iodir):
 
     cmd = ["mc_app", "run", "--conf", str(conf.resolve()), "--restart", "0"]
 
-    r = subprocess.run(cmd,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE,
-                       check=False)
+    r = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False
+    )
 
     if not r.stderr is None:
         print(r.stderr.decode())
