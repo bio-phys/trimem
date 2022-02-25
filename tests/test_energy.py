@@ -1,5 +1,4 @@
 import helfrich as m
-import helfrich.openmesh as om
 import numpy as np
 import meshzoo
 from collections import namedtuple
@@ -19,14 +18,14 @@ eps = 1.0e-2  # relative acceptance error
 def sphere(r, n):
     """Get sphere mesh with analytical reference values."""
     points, cells = meshzoo.icosa_sphere(n)
-    mesh = om.TriMesh(points*r, cells)
+    mesh = m.TriMesh(points*r, cells)
     # mesh, area, vol, curv, bending
     return mesh, 4*np.pi*r**2, 4/3*np.pi*r**3, 4*np.pi*r, 8*np.pi
 
 def tube(r, n):
     """Get tube mesh with analytical reference values."""
     points, cells = meshzoo.tube(length=1, radius=r, n=n)
-    mesh = om.TriMesh(points, cells)
+    mesh = m.TriMesh(points, cells)
     # mesh, area, vol, curv, bending
     return mesh, 2*np.pi*r, 2/3*np.pi*r**2, np.pi, np.pi/r
 

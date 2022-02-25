@@ -1,5 +1,4 @@
 import helfrich as m
-import helfrich.openmesh as om
 import meshzoo
 import numpy as np
 
@@ -11,7 +10,7 @@ import pytest
 def get_mesh():
     """Get a mesh."""
     points, cells = meshzoo.icosa_sphere(8)
-    return om.TriMesh(points, cells)
+    return m.TriMesh(points, cells)
 
 def get_energy_manager(mesh, bond_type):
     """Setup energy manager."""
@@ -50,8 +49,8 @@ def bond_type(request):
 def test_gradient(bond_type):
     """Test gradient."""
 
-    mesh     = get_mesh()
-    estore   = get_energy_manager(mesh, bond_type)
+    mesh   = get_mesh()
+    estore = get_energy_manager(mesh, bond_type)
 
     # finite difference gradient
     ref_grad = np.empty((mesh.n_vertices(),3))

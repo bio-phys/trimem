@@ -9,6 +9,7 @@
 #include "pybind11/stl.h"
 
 #include "defs.h"
+#include "mesh.h"
 #include "mesh_util.h"
 #include "energy.h"
 #include "flips.h"
@@ -80,6 +81,9 @@ void gradient(TriMesh& mesh,
 
 PYBIND11_MODULE(_core, m) {
     m.doc() = "Trimem python bindings";
+
+    // expose mesh
+    expose_mesh(m);
 
     // expose mesh properties
     expose_properties(m);

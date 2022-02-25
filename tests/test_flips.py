@@ -1,5 +1,4 @@
 import helfrich as m
-import helfrich.openmesh as om
 import numpy as np
 import meshzoo
 
@@ -13,15 +12,15 @@ def params():
     """Energy parameters."""
 
     p, c= meshzoo.uv_sphere(num_points_per_circle=20, num_circles=10)
-    mesh = om.TriMesh(p,c)
+    mesh = m.TriMesh(p,c)
 
-    l = np.mean([mesh.calc_edge_length(he) for he in mesh.halfedges()])
+    a, l = m.avg_tri_props(mesh)
     params = m.BondParams()
     params.type = m.BondType.Edge
     params.r = 2
     params.lc0 = 1.15*l
     params.lc1 = 0.85*l
-    params.a0   = m.area(mesh)/mesh.n_faces()
+    params.a0   = a
 
     eparams = m.EnergyParams()
     eparams.kappa_b        = 1.0

@@ -4,7 +4,8 @@
 #ifndef DEFS_H
 #define DEFS_H
 
-#include "MeshTypes.hh"
+#include "mesh.h"
+
 #include "OpenMesh/Core/Mesh/Handles.hh"
 
 namespace trimem {

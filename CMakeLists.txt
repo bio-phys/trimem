@@ -1,31 +1,29 @@
 cmake_minimum_required(VERSION 3.18)
 project(test)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 find_package(OpenMP)
+find_package(pybind11 REQUIRED)
 
-# use EXCLUDE_FROM_ALL to avoid the install targets defined upstream OpenMesh,
-# instead add dependency of test on opemesh-python explicitly below
-add_subdirectory(openmesh-python EXCLUDE_FROM_ALL)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+add_subdirectory(OpenMesh EXCLUDE_FROM_ALL)
 
 pybind11_add_module(_core MODULE src/bindings.cpp
-                          src/params.cpp
-                          src/mesh_properties.cpp
-                          src/mesh_util.cpp
-                          src/energy.cpp
-                          src/flips.cpp
-                          src/flip_utils.cpp
-                          src/omp_guard.cpp
-                          src/nlists/nlist.cpp)
-target_include_directories(_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
-                                         openmesh-python/src
-                                         openmesh-python/OpenMesh/src)
+                                 src/mesh.cpp
+                                 src/params.cpp
+                                 src/mesh_properties.cpp
+                                 src/mesh_util.cpp
+                                 src/energy.cpp
+                                 src/flips.cpp
+                                 src/flip_utils.cpp
+                                 src/omp_guard.cpp
+                                 src/nlists/nlist.cpp)
+target_include_directories(_core PRIVATE src OpenMesh/src)
 
 target_link_libraries(_core PUBLIC OpenMeshToolsStatic
                                    OpenMeshCoreStatic
                                    OpenMP::OpenMP_CXX)
 
-add_dependencies(_core openmesh)
 
-install(TARGETS _core openmesh DESTINATION .)
+install(TARGETS _core DESTINATION .)

@@ -5,8 +5,9 @@ triangles.
 """
 
 import numpy as np
-from .. import openmesh as om
 import copy
+
+from .. import _core as m
 
 class Mesh:
     """Lightweight wrapper around OpenMesh::TriMesh."""
@@ -14,9 +15,9 @@ class Mesh:
     def __init__(self, points=None, cells=None):
         """Initialize mesh given vertices and triangles."""
         if (not points is None) and (not cells is None):
-            self.trimesh = om.TriMesh(points, cells)
+            self.trimesh = m.TriMesh(points, cells)
         else:
-            self.trimesh = om.TriMesh()
+            self.trimesh = m.TriMesh()
 
     # vertex get and set access
     @property
@@ -42,5 +43,5 @@ class Mesh:
 def read_trimesh(filename):
     """Read a mesh from file."""
     mesh = Mesh()
-    mesh.trimesh = om.read_trimesh(filename)
+    mesh.trimesh = m.read_mesh(filename)
     return mesh

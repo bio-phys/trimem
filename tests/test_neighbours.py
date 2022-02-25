@@ -3,7 +3,6 @@ import meshzoo
 import pytest
 
 import helfrich as m
-import helfrich.openmesh as om
 
 from scipy.sparse import coo_matrix
 from scipy.spatial import KDTree
@@ -22,7 +21,7 @@ def data(request):
         variant="zigzag"
     )
     x = np.append(points, np.zeros((len(points),1)), axis=1)
-    mesh = om.TriMesh(x, cells)
+    mesh = m.TriMesh(x, cells)
 
     class Data:
         pass

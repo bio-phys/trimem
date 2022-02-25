@@ -1,5 +1,4 @@
 import helfrich as m
-import helfrich.openmesh as om
 import autograd.numpy as np
 from autograd import grad
 
@@ -73,7 +72,7 @@ def data(request):
     results["angle"]    = dihedral_angle(points)
     results["d_angle"]  = d_dihedral_angle(points)
 
-    mesh = om.TriMesh(points, cells)
+    mesh = m.TriMesh(points, cells)
 
     class Data:
         pass
