@@ -16,6 +16,8 @@ namespace trimem {
 //! Neighbour list interface
 struct NeighbourList
 {
+  virtual ~NeighbourList() = default;
+
   virtual std::tuple<std::vector<real>, std::vector<int>, std::vector<int> >
   distance_matrix(const TriMesh& mesh, const real& dmax) const = 0;
 
@@ -27,6 +29,8 @@ struct NeighbourList
 template<int exclusion = 0>
 struct NeighbourListT : NeighbourList
 {
+  virtual ~NeighbourListT() = default;
+
   virtual std::tuple<std::vector<real>, std::vector<int>, std::vector<int> >
   distance_matrix(const TriMesh& mesh, const real& dmax) const = 0;
 
