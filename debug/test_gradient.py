@@ -1,5 +1,4 @@
 import helfrich as m
-import helfrich.openmesh as om
 import meshzoo
 import numpy as np
 import time
@@ -11,19 +10,19 @@ import matplotlib.pyplot as plt
 def test_energy():
     """Test energy and gradient."""
     points, cells = meshzoo.icosa_sphere(8)
-    mesh = om.TriMesh(points, cells)
+    mesh = m.TriMesh(points, cells)
     print("Num vertices:",len(points))
 
     estore = get_energy_manager(mesh, m.BondType.Edge,
                                 0.1, 1.0e2, 1.0e2, 1.0e2, 1.0e3, 0.1, # weights
                                 0.8, .8, 0.8)                 # fractions
 
-    estore.print_info()
+    estore.print_info(mesh)
 
     print("Time to solution:")
 
     start = time.time()
-    e = estore.energy()
+    e = estore.energy(mesh)
     dt = time.time() - start
     print(" energy           :", dt)
     print("-")
@@ -39,7 +38,7 @@ def test_energy():
 
     # method 2 (exact)
     start = time.time()
-    gradient2 = estore.gradient()
+    gradient2 = estore.gradient(mesh)
     dt2 = time.time() - start
     print(" gradient (exact) :", dt2)
     print("-")

@@ -1,11 +1,11 @@
-import helfrich as m
-import helfrich.openmesh as om
-import meshzoo
-import numpy as np
 import time
 
+import meshzoo
+import meshio
+import numpy as np
 from hilbertcurve.hilbertcurve import HilbertCurve
 
+import helfrich as m
 from util import get_energy_manager
 
 def hilbert_sort(points, cells, p=6):
@@ -34,13 +34,15 @@ def test_flips():
     """Test flips."""
     p, c = meshzoo.icosa_sphere(16)
 #    p, c = hilbert_sort(p,c)
-    mesh = om.TriMesh(p, c)
+    mesh = m.TriMesh(p, c)
 
     estore = get_energy_manager(mesh, m.BondType.Edge,
                                 10.0, 1.0e4, 1.0e4, 0.0, 0.0, 1.0, 1.0)
     estore.print_info(mesh)
 
-    om.write_mesh("test0.stl", mesh)
+    meshio.write_points_cells("test0.stl",
+                              mesh.points(),
+                              [('triangle', mesh.fv_indices())])
     start = time.time()
     for i in range(10):
         #flips = m.flip(mesh, estore, 0.1)
@@ -49,7 +51,9 @@ def test_flips():
     dt = time.time() - start
     print("flipped {} of {} edges".format(flips, mesh.n_edges()))
     print("took {}s".format(dt))
-    om.write_mesh("test1.stl", mesh)
+    meshio.write_points_cells("test1.stl",
+                              mesh.points(),
+                              [('triangle', mesh.fv_indices())])
 
     dum = estore.energy(mesh)
     estore.print_info(mesh)

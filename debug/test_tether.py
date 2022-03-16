@@ -1,5 +1,4 @@
 import helfrich as m
-import helfrich.openmesh as om
 import meshzoo
 import numpy as np
 
@@ -9,9 +8,9 @@ def plot_tether():
     """Plot tether potential."""
 
     points, cells = meshzoo.icosa_sphere(8)
-    mesh = om.TriMesh(points, cells)
+    mesh = m.TriMesh(points, cells)
 
-    a = np.mean([mesh.calc_edge_length(he) for he in mesh.halfedges()])
+    a,_ = m.avg_tri_props(mesh)
     b = 1.0
     lc0 = 1.15*a
     lc1 = 0.85*a
@@ -44,9 +43,9 @@ def plot_mod_tether():
     """Plot tether potential."""
 
     points, cells = meshzoo.icosa_sphere(8)
-    mesh = om.TriMesh(points, cells)
+    mesh = m.TriMesh(points, cells)
 
-    a = np.mean([mesh.calc_edge_length(he) for he in mesh.halfedges()])
+    a,_ = m.avg_tri_props(mesh)
     b = 100.0
     r = 2
     lc0 = 1.15*a

@@ -6,9 +6,7 @@ import numpy as np
 
 def get_energy_manager(mesh, bond_type, kb, ka, kv, kc, kt, kr, af=1, vf=1, cf=1):
     """Setup energy manager."""
-    l = np.mean([mesh.calc_edge_length(he) for he in mesh.halfedges()])
-    a = m.area(mesh)/mesh.n_faces();
-    print(l)
+    a,l = m.avg_tri_props(mesh)
 
     bparams = m.BondParams()
     bparams.type = bond_type

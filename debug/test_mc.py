@@ -1,6 +1,6 @@
 import helfrich as m
-import helfrich.openmesh as om
 import meshzoo
+import meshio
 import numpy as np
 import time
 
@@ -98,12 +98,12 @@ def test_integration():
     """Test md."""
 
     points, cells = meshzoo.icosa_sphere(8)
-    mesh = om.TriMesh(points, cells)
+    mesh = m.TriMesh(points, cells)
 
     estore = get_energy_manager(mesh, m.BondType.Edge,
                                 1.0, 1.0e4, 1.0e4, 0.0, 10,
                                 1.0, 0.8, 1.0)
-    estore.print_info()
+    estore.print_info(mesh)
 
     sigma = 1 #-> m
     gamma = 1.0
@@ -112,7 +112,7 @@ def test_integration():
     v = np.random.normal(size=x.shape)*np.sqrt(sigma)
 
     def force(x,v):
-        g = estore.gradient()
+        g = estore.gradient(mesh)
         return -g-gamma*v
 
     xn, vn = vv(x, v, force, sigma, 0.001, 20000)
@@ -121,21 +121,23 @@ def test_integration():
     for i,xi in enumerate(xn):
         if i%200 == 0:
             np.copyto(x,xi)
-            om.write_mesh("out/test_"+str(n)+".stl", mesh)
+            meshio.write_points_cells("out/test_"+str(n)+".stl",
+                                      mesh.points(),
+                                      [('triangle', mesh.fv_indices())])
             n += 1
 
-    estore.print_info()
+    estore.print_info(mesh)
 
 def test_hmc():
     """Test hamilton monte carlo."""
 
     points, cells = meshzoo.icosa_sphere(8)
-    mesh = om.TriMesh(points, cells)
+    mesh = m.TriMesh(points, cells)
 
     estore = get_energy_manager(mesh, m.BondType.Edge,
                                 1.0, 1.0e4, 1.0e4, 0.0, 10,
                                 1.0, 0.8, 1.0)
-    estore.print_info()
+    estore.print_info(mesh)
 
     sigma = 1 #-> m
 
@@ -145,14 +147,14 @@ def test_hmc():
         points = mesh.points()
         np.copyto(points, x)
         vr = v.ravel()
-        e = estore.energy()/T + 0.5*vr.dot(vr)/sigma/T
+        e = estore.energy(mesh)/T + 0.5*vr.dot(vr)/sigma/T
         np.copyto(points,x0)
         return e
 
     def force(x,v,T):
         points = mesh.points()
         np.copyto(points,x)
-        g = estore.gradient()
+        g = estore.gradient(mesh)
         np.copyto(points,x0)
         return -g/T
 
@@ -162,8 +164,8 @@ def test_hmc():
         print("  ----- acc-rate:   ", acc)
         p = mesh.points()
         np.copyto(p,x)
-        estore.energy()
-        estore.print_info()
+        estore.energy(mesh)
+        estore.print_info(mesh)
 
     def flip():
         m.flip_edges(mesh)
@@ -173,32 +175,34 @@ def test_hmc():
 
     for i,xi in enumerate(xn):
         if i%100 == 0:
-          x = mesh.points()
-          np.copyto(x,xi)
-          om.write_mesh("out/test_"+str(i)+".stl", mesh)
+            x = mesh.points()
+            np.copyto(x,xi)
+            meshio.write_points_cells("out/test_"+str(i)+".stl",
+                                      mesh.points(),
+                                      [('triangle', mesh.fv_indices())])
 
 def test_minimization():
     """try direct minimization."""
 
     points, cells = meshzoo.icosa_sphere(8)
-    mesh = om.TriMesh(points, cells)
+    mesh = m.TriMesh(points, cells)
 
     estore = get_energy_manager(mesh, m.BondType.Edge,
                                 1.0, 1.0e4, 1.0e4, 0.0, 10,
                                 1.0, 0.8, 1.0)
-    estore.print_info()
+    estore.print_info(mesh)
 
     def fun(x):
         points = mesh.points()
         points += x.reshape(points.shape)
-        e = estore.energy()
+        e = estore.energy(mesh)
         points -= x.reshape(points.shape)
         return e
 
     def jac(x):
         points = mesh.points()
         points += x.reshape(points.shape)
-        g = estore.gradient()
+        g = estore.gradient(mesh)
         points -= x.reshape(points.shape)
         return g.ravel()
 
@@ -206,12 +210,16 @@ def test_minimization():
     res = minimize(fun, x0, jac=jac, options={"maxiter": 5000, "disp": 1})
     print(res.nit, res.message)
 
-    om.write_mesh("out/test0.stl", mesh)
+    meshio.write_points_cells("out/test0.stl",
+                              mesh.points(),
+                              [('triangle', mesh.fv_indices())])
     points = mesh.points()
     points += res.x.reshape(points.shape)
-    om.write_mesh("out/test1.stl", mesh)
+    meshio.write_points_cells("out/test1.stl",
+                              mesh.points(),
+                              [('triangle', mesh.fv_indices())])
 
-    estore.print_info()
+    estore.print_info(mesh)
 
 if __name__ == "__main__":
     #test_vv()

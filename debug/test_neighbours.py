@@ -1,5 +1,4 @@
 import helfrich as m
-import helfrich.openmesh as om
 import meshzoo
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -24,7 +23,7 @@ def get_mesh(n, constant_density=False):
         variant="zigzag",  # or "up", "down", "center"
     )
     x = np.append(points, np.zeros((len(points),1)), axis=1)
-    return om.TriMesh(x, cells)
+    return m.TriMesh(x, cells)
 
 def get_nlist(mesh, ltype, rlist, excl):
     """Get a neighbour list."""
@@ -109,14 +108,17 @@ def check_scaling(ltype="cell-list", dimp2=8):
     lin = [cli*x for x in N]
 
     plt.plot(N, dts_trimem, "o-", label="trimem")
-    plt.plot(N, dts_kdtree, "o-", label="kdtree")
+    plt.plot(N, dts_kdtree, "o-", label="scipy (kdtree)")
     plt.plot(N, lin, "--", label=r'O(N)', alpha=0.5, color="gray")
     plt.yscale("log")
     plt.xscale("log")
-    plt.title("Scaling of r-ball search")
-    plt.xlabel("number of vertices")
-    plt.ylabel("time to solution")
-    plt.legend()
+    plt.title("Scaling of r-ball search with {}".format(ltype), fontsize=14)
+    plt.xlabel("number of vertices", fontsize=12)
+    plt.ylabel("time to solution", fontsize=12)
+    plt.tick_params(labelsize=12)
+    plt.legend(fontsize=12)
+    plt.tight_layout()
+    plt.savefig("nlist_{}.pdf".format(ltype))
     plt.show()
 
 if __name__ == "__main__":
