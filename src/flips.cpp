@@ -149,6 +149,9 @@ int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, real& flip_ratio
             }
             // here all locks will have been released
 
+            if (not mesh.is_flip_ok(eh))
+                continue;
+
             // compute differential properties
             auto dprops = edge_vertex_properties(mesh, eh, *(estore.bonds),
                                                  *(estore.repulse));
