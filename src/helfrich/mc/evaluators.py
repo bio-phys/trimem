@@ -14,10 +14,12 @@ from datetime import datetime, timedelta
 _eval_default_options = {
     "info_step":    100,
     "output_step":  1000,
+    "cpt_step":     0,
     "refresh_step": 10,
     "flatten":      False,
     "num_steps":    None,
     "init_step":    0,
+    "write_cpt":    lambda m,e,s: None,
 }
 
 class EnergyEvaluators:
@@ -44,7 +46,11 @@ class EnergyEvaluators:
         # control info, output and refresh frequencies
         self.info_step    = max(options["info_step"], 0)
         self.out_step     = max(options["output_step"], 0)
+        self.cpt_step     = max(options["cpt_step"], 0)
         self.refresh_step = max(options["refresh_step"], 0)
+
+        # register checkpoint handle
+        self.write_cpt = options["write_cpt"]
 
         # output-shape
         if options["flatten"]:
@@ -92,6 +98,8 @@ class EnergyEvaluators:
             self.estore.print_info(self.mesh.trimesh)
         if self.out_step and (self.step % self.out_step == 0):
             self.output.write_points_cells(self.mesh.x, self.mesh.f)
+        if self.cpt_step and (self.step % self.cpt_step == 0):
+            self.write_cpt(self.mesh, self.estore, self.step)
         if self.refresh_step and (self.step % self.refresh_step == 0):
             self.estore.update_repulsion(self.mesh.trimesh)
         self.estore.update_reference_properties()

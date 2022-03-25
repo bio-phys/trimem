@@ -54,6 +54,7 @@ input = input.stl
 output_prefix = out/test_
 restart_prefix = out/restart_
 output_format = vtu
+checkpoint_every = 0
 [BONDS]
 bond_type = Edge
 r = 2

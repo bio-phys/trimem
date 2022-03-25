@@ -1,4 +1,6 @@
 import warnings
+import functools
+import copy
 
 import numpy as np
 from scipy.optimize import minimize
@@ -27,15 +29,38 @@ def setup_energy_manager(config):
 
     return estore, mesh
 
-def write_checkpoint(mesh, config, **kwargs):
-    """Write checkpoint file."""
+def write_checkpoint_handle(config, fix_step=None):
+    """Return function to write checkpoint file."""
 
-    prefix = config["GENERAL"]["restart_prefix"]
+    conf = copy.deepcopy(config)
 
-    cpt = CheckpointWriter(prefix)
-    cpt.write(mesh.x, mesh.f, config, **kwargs)
+    def _write_checkpoint(mesh, estore, step):
+        """Write checkpoint with signature (mesh, estore, step)."""
 
-    print("Writing checkpoint:", cpt.fname)
+        # don't always set hmc-init-step, e.g. when doing minimzation
+        if not fix_step is None:
+            step = fix_step
+
+        # update config
+        upd = {
+            "ENERGY": {
+                "continuation_lambda": estore.eparams.continuation_params.lam,
+                "continuation_delta":  estore.eparams.continuation_params.delta,
+            },
+            "HMC": {
+                "init_step": config["HMC"].getint("init_step") + step,
+            },
+        }
+        conf.read_dict(upd)
+
+        prefix = config["GENERAL"]["restart_prefix"]
+
+        cpt = CheckpointWriter(prefix)
+        cpt.write(mesh.x, mesh.f, conf)
+
+        print("Writing checkpoint:", cpt.fname)
+
+    return _write_checkpoint
 
 def read_checkpoint(config, restartnum):
     """Read data from checkpoint file."""
@@ -92,13 +117,18 @@ def run_mc(mesh, estore, config, restart):
     # construct output writer
     output = make_output(config)
 
+    # initialize checkpoint writer
+    cpt_writer = write_checkpoint_handle(config)
+
     # function, gradient and callback
     options = {
         "info_step":    config["GENERAL"].getint("info"),
         "output_step":  config["HMC"].getint("thin"),
+        "cpt_step":     config["GENERAL"].getint("checkpoint_every"),
         "refresh_step": config["SURFACEREPULSION"].getint("refresh"),
         "init_step":    config["HMC"].getint("init_step"),
         "num_steps":    config["HMC"].getint("num_steps"),
+        "write_cpt":    cpt_writer,
     }
     funcs = TimingEnergyEvaluators(mesh, estore, output, options)
 
@@ -134,20 +164,8 @@ def run_mc(mesh, estore, config, restart):
     # update mesh
     mesh.x = hmc.x
 
-    # update config
-    upd = {
-        "ENERGY": {
-            "continuation_lambda": estore.eparams.continuation_params.lam,
-            "continuation_delta":  estore.eparams.continuation_params.delta,
-        },
-        "HMC": {
-            "init_step": cmc.getint("init_step") + cmc.getint("num_steps"),
-        },
-    }
-    config.read_dict(upd)
-
-    # write checkpoint
-    write_checkpoint(mesh, config)
+    # write final checkpoint
+    cpt_writer(mesh, estore, cmc.getint("num_steps"))
 
 def run_minim(mesh, estore, config, restart):
     """Run minimization."""
@@ -163,13 +181,18 @@ def run_minim(mesh, estore, config, restart):
         warnings.warn(wstr)
         refresh = 1
 
+    # init checkpoint writer (no support/need for 'init_step' in minim)
+    cpt_writer = write_checkpoint_handle(config, fix_step=0)
+
     # function, gradient and callback
     options = {
         "info_step":    config["GENERAL"].getint("info"),
         "output_step":  config["MINIMIZATION"].getint("out_every"),
+        "cpt_step":     config["GENERAL"].getint("checkpoint_every"),
         "refresh_step": refresh,
         "flatten":      True,
         "num_steps":    config["MINIMIZATION"].getint("maxiter"),
+        "write_cpt":    cpt_writer,
     }
     funcs = TimingEnergyEvaluators(mesh, estore, output, options)
 
@@ -193,5 +216,5 @@ def run_minim(mesh, estore, config, restart):
     print(res.message)
     estore.print_info(mesh.trimesh)
 
-    # write checkpoint
-    write_checkpoint(mesh, config)
+    # write final checkpoint
+    cpt_writer(mesh,estore,0)

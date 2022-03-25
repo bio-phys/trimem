@@ -16,6 +16,7 @@ info = 1
 #output_prefix = inp
 #restart_prefix = inp
 output_format = vtu
+checkpoint_every = 0
 [BONDS]
 bond_type = Edge
 r = 2

@@ -12,6 +12,7 @@ info = 1
 #output_prefix = inp
 #restart_prefix = inp
 output_format = vtu
+checkpoint_every = 0
 [BONDS]
 bond_type = Edge
 r = 2
@@ -78,6 +79,7 @@ def read_config(fname):
         input=f"{cfile.with_suffix('.stl')}",
         output_prefix=f"{cfile.with_suffix('')}",
         restart_prefix=f"{cfile.with_suffix('')}",
+        checkpoint_every=0,
     )
 
     return config
