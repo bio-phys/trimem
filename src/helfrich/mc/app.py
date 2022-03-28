@@ -30,7 +30,12 @@ def cli():
     # run subparser
     parse_run = subparsers.add_parser("run", help="run hmc")
     parse_run.add_argument("--conf", help="config-file name", required=True)
-    parse_run.add_argument("--restart", help="restart index", default=-1, type=int)
+    parse_run.add_argument("--restart",
+                           help="restart index",
+                           nargs="?",
+                           default=None,
+                           const=-1,
+                           type=int)
     parse_run.set_defaults(func=run)
 
     # execute command

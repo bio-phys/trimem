@@ -82,20 +82,22 @@ def read_checkpoint(config, restartnum):
     }
     config.read_dict(upd)
 
+    print("Read checkpoint:", cpt.fname)
+
     return Mesh(points, cells), config
 
-def run(config, restart=-1):
+def run(config, restart=None):
     """Run algorithm."""
 
     # do backup for non-restarts
-    if restart == -1:
+    if restart is None:
         create_backup(
             config["GENERAL"]["output_prefix"],
             config["GENERAL"]["restart_prefix"]
         )
 
     # setup mesh and energy
-    if restart == -1:
+    if restart is None:
         estore, mesh = setup_energy_manager(config)
     else:
         mesh, config = read_checkpoint(config, restart)
@@ -105,13 +107,13 @@ def run(config, restart=-1):
     # run algorithm
     algo    = config["GENERAL"]["algorithm"]
     if algo == "hmc":
-      run_mc(mesh, estore, config, restart)
+      run_mc(mesh, estore, config)
     elif algo == "minimize":
-      run_minim(mesh, estore, config, restart)
+      run_minim(mesh, estore, config)
     else:
       raise ValueError("Invalid algorithm")
 
-def run_mc(mesh, estore, config, restart):
+def run_mc(mesh, estore, config):
     """Run monte carlo sampling."""
 
     # construct output writer
@@ -167,7 +169,7 @@ def run_mc(mesh, estore, config, restart):
     # write final checkpoint
     cpt_writer(mesh, estore, cmc.getint("num_steps"))
 
-def run_minim(mesh, estore, config, restart):
+def run_minim(mesh, estore, config):
     """Run minimization."""
 
     # construct output writer

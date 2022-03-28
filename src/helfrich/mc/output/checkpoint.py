@@ -14,7 +14,7 @@ import numpy as np
 from xml.etree import ElementTree as ET
 import h5py
 
-from ._common import _create_part
+from ._common import _create_part, _get_parts
 
 _restart_data = [
     "iteration"
@@ -90,7 +90,10 @@ class CheckpointReader:
 
     def __init__(self, fname, fnum):
         """Init."""
-        self.fname   = pathlib.Path(fname).with_suffix(f".p{fnum}.cpt")
+        if fnum == -1:
+            fnum = _get_parts(pathlib.Path(fname).with_suffix(".cpt"))
+            fnum = fnum - 1
+        self.fname = pathlib.Path(fname).with_suffix(f".p{fnum}.cpt")
 
         self.tree = ET.parse(self.fname)
         self.root = self.tree.getroot()
