@@ -1,5 +1,6 @@
 import configparser
 import pathlib
+import io
 
 from .. import _core as m
 
@@ -83,6 +84,20 @@ def read_config(fname):
     )
 
     return config
+
+def print_config(config):
+    """Print config to stdout."""
+
+    # print config to string
+    with io.StringIO() as sout:
+        config.write(sout)
+        conf = sout.getvalue().replace("\n\n", "\n")
+
+    info  = "\n------------------\n"
+    info += "Run configuration:\n"
+    info += conf
+
+    print(info)
 
 def update_config_defaults(config, **kwargs):
     """Update default section with kwargs."""

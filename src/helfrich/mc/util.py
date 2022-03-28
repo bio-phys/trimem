@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 from .. import _core as m
 from .hmc import MeshHMC, MeshFlips, MeshMonteCarlo
 from .mesh import Mesh, read_trimesh
-from .config import update_config_defaults, config_to_params
+from .config import update_config_defaults, config_to_params, print_config
 from .output import make_output, create_backup, \
                     CheckpointWriter, CheckpointReader
 from .evaluators import TimingEnergyEvaluators
@@ -103,6 +103,9 @@ def run(config, restart=None):
         mesh, config = read_checkpoint(config, restart)
         estore, _    = setup_energy_manager(config)
         estore.update_repulsion(mesh.trimesh)
+
+    # print effective run configuration
+    print_config(config)
 
     # run algorithm
     algo    = config["GENERAL"]["algorithm"]
