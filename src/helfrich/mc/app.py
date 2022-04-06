@@ -1,3 +1,4 @@
+import io
 import argparse
 
 #from .. import _core as m
@@ -12,7 +13,12 @@ def run(args):
 
 def config(args):
     """Command action to write default config."""
-    write_default_config(args.conf)
+    if args.conf:
+        write_default_config(args.conf, args.strip)
+    else:
+        out = io.StringIO()
+        write_default_config(out, args.strip)
+        print(out.getvalue())
 
 def cli():
     """command line interface."""
@@ -24,11 +30,17 @@ def cli():
 
     # config subparser
     parse_config = subparsers.add_parser("config", help="write default config")
-    parse_config.add_argument("--conf", help="config-file name", required=True)
+    parse_config.add_argument("--strip",
+                              help="strip comments",
+                              action="store_true")
+    parse_config.add_argument("--conf",
+                              help="config-file name (empty or str)",
+                              default="",
+                              type=str)
     parse_config.set_defaults(func=config)
 
     # run subparser
-    parse_run = subparsers.add_parser("run", help="run hmc")
+    parse_run = subparsers.add_parser("run", help="run simulation")
     parse_run.add_argument("--conf", help="config-file name", required=True)
     parse_run.add_argument("--restart",
                            help="restart index",

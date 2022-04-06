@@ -1,56 +1,158 @@
 import configparser
 import pathlib
 import io
+import os
 
 from .. import _core as m
 
 CONF = """[GENERAL]
+# algorithm to run: 'hmc', 'minimize'
 algorithm = hmc
-info = 1
-# the io-name/prefix parameters are set automatically from the config file
-# name; uncomment for more precise control
-#input = inp.stl
-#output_prefix = inp
-#restart_prefix = inp
-output_format = vtu
-checkpoint_every = 0
-[BONDS]
-bond_type = Edge
-r = 2
-[SURFACEREPULSION]
-n_search = cell-list
-rlist = 0.1
-exclusion_level = 2
-refresh = 1
-lc1 = 0.0
-r = 2
-[ENERGY]
-kappa_b = 1.0
-kappa_a = 1.0
-kappa_v = 1.0
-kappa_c = 1.0
-kappa_t = 1.0
-kappa_r = 1.0
-area_fraction = 1.0
-volume_fraction = 1.0
-curvature_fraction = 1.0
-continuation_delta = 0.0
-continuation_lambda = 1.0
-[HMC]
-num_steps = 10
-step_size = 1.0
-traj_steps = 10
-momentum_variance = 1.0
-thin = 10
-flip_ratio = 0.1
-flip_type = serial
-initial_temperature = 1.0
-cooling_factor = 1.0e-4
-start_cooling = 0
-[MINIMIZATION]
-maxiter = 10
-out_every = 0
 
+# verbosity flag
+# print state information every i'th step
+info = 1
+
+# initial geometry (default: '<config-file-prefix>.stl')
+;input = inp.stl
+
+# output file prefix (default: config-file-prefix)
+;output_prefix = inp
+
+# checkpoint file prefix (default: config-file-prefix)
+;restart_prefix = inp
+
+# checkpoint frequency (default: 0; only final checkpoint)
+;checkpoint_every = 0
+
+# output format (choose from: vtu, xyz, hdmf)
+output_format = vtu
+
+[BONDS]
+# type of tether potential (choose from: Edge, Area)
+bond_type = Edge
+
+# control steepness of penalty potential (must be an integer >= 1)
+r = 2
+
+# onset distance of attractive force for 'Edge'-type
+# (default: 1.25 * mean edge length computed from initial geometry)
+;lc0 =
+
+# onset distance of repelling force for 'Edge'-type
+# (default: 0.75 * mean edge length computed from initial geometry)
+;lc1 =
+
+# average triangle area for 'Area'-type
+# (default: mean triangle area computed from initial geometry)
+;a0 =
+
+[SURFACEREPULSION]
+# neighbour list algorithm (choose from: cell-list, verlet-list)
+n_search = cell-list
+
+# neighbour list cutoff
+rlist = 0.1
+
+# vertex self- and direct neighbourhood exclusion
+# (choose from: 0,1,2)
+# 0: exclude self
+# 1: exclude directly connected vertex neighbourhood
+# 2: exclude 2-link connected vertex neighbourhood
+# exclusion levels are inclusive, i.e., 0<1<2.
+exclusion_level = 2
+
+# refresh neighbour lists every i'th step
+# for 'algorithm = minimize' this is set to 1 internally
+refresh = 1
+
+# onset distance of repulsion force
+lc1 = 0.0
+
+# steepness of repulsion force (must be an integer >= 1)
+r = 2
+
+[ENERGY]
+# Helfrich functional weight
+kappa_b = 1.0
+
+# surface area penalty weight
+kappa_a = 1.0
+
+# volume penalty weight
+kappa_v = 1.0
+
+# surface area difference penalty weight
+kappa_c = 1.0
+
+# tether penalty weight
+kappa_t = 1.0
+
+# repulsion penalty weight
+kappa_r = 1.0
+
+# target surface area fraction wrt. the initial geometry
+area_fraction = 1.0
+
+# target volume fraction wrt. the initial geometry
+volume_fraction = 1.0
+
+# target curvature fraction wrt. the initial geometry
+curvature_fraction = 1.0
+
+# time step for the parameter continuation (choose from: [0,1])
+continuation_delta = 0.0
+
+# start time for the parameter continuation (choose from: [0,1])
+# should be consistent with initial geometry and the chosen
+# area-/volume-/curvature-fraction
+continuation_lambda = 1.0
+
+[HMC]
+# number of steps in the markov chain
+num_steps = 10
+
+# inital step number (default: 0)
+# controls start of simulated annealing in combination with 'start_cooling'
+# uncomment and set to desired value in case; useful for restarting from
+# already cooled states
+;init_step = 0
+
+# step size for time integration within the HMC-step
+step_size = 1.0
+
+# number of steps within the time integration of a HMC-step
+traj_steps = 10
+
+# mass matrix magnitude for the HMC integration
+momentum_variance = 1.0
+
+# keep every i'th step of the markov chain
+thin = 10
+
+# precentage of flips to attempt during a flip sweep (choose from: [0,1])
+flip_ratio = 0.1
+
+# flip-sweep implementation (choose from: none, serial, parallel)
+flip_type = serial
+
+# temperature (cooled down to zero with simulated annealing)
+initial_temperature = 1.0
+
+# exponential cooling factor for simulated annealing (choose >= 0)
+# larger values correspond to faster cooling
+cooling_factor = 1.0e-4
+
+# start cooling at step i
+# start simulated annealing for 'start_cooling > (init_step + i)'
+start_cooling = 0
+
+[MINIMIZATION]
+# maximum number of iterations in the minimization
+maxiter = 10
+
+# keep every i'th iteration in the output
+out_every = 0
 """
 
 _bond_enums = {
@@ -58,10 +160,21 @@ _bond_enums = {
     "Area": m.BondType.Area
 }
 
-def write_default_config(fname):
-    """Write default config to file."""
-    with open(fname, "w") as fp:
-        fp.write(CONF)
+def write_default_config(fname, strip=True):
+    """Write default config to fname."""
+
+    if strip:
+        config = os.linesep.join([l for l in CONF.splitlines()
+                                  if l and not l.startswith("#")])
+        config += os.linesep # end with newline
+    else:
+        config = CONF
+
+    if hasattr(fname, "write"):
+        fname.write(config)
+    else:
+        fp = pathlib.Path(fname)
+        fp.write_text(config)
 
 def read_config(fname):
     """Read config from file."""

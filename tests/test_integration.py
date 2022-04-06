@@ -10,16 +10,17 @@ import pytest
 CONF = """[GENERAL]
 algorithm = {algorithm}
 info = 1
-# the io-name/prefix parameters are set automatically from the config file
-# name; uncomment for more precise control
-#input = inp.stl
-#output_prefix = inp
-#restart_prefix = inp
+;input = inp.stl
+;output_prefix = inp
+;restart_prefix = inp
+;checkpoint_every = 0
 output_format = vtu
-checkpoint_every = 0
 [BONDS]
 bond_type = Edge
 r = 2
+;lc0 =
+;lc1 =
+;a0 =
 [SURFACEREPULSION]
 n_search = cell-list
 rlist = 0.1
@@ -41,6 +42,7 @@ continuation_delta = 0.0
 continuation_lambda = 1.0
 [HMC]
 num_steps = 10
+;init_step = 0
 step_size = 1.0
 traj_steps = 10
 momentum_variance = 1.0
@@ -53,7 +55,6 @@ start_cooling = 0
 [MINIMIZATION]
 maxiter = 10
 out_every = 0
-
 """
 
 # -----------------------------------------------------------------------------
@@ -81,7 +82,7 @@ def test_mcapp_config(iodir):
 
     conf_out = str(iodir.joinpath("conf_default.inp").resolve())
 
-    cmd = ["mc_app", "config", "--conf", conf_out]
+    cmd = ["mc_app", "config", "--strip", "--conf", conf_out]
 
     r = subprocess.run(
         cmd,
