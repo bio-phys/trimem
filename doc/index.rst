@@ -35,7 +35,7 @@ Trimem builds upon the generic mesh data structure
 is included as a submodule that is pulled in upon ``git clone`` via the
 ``--recurse-submodules`` flag, see :ref:`installation`.
 
-For the efficient exploitation of shared-memory parallelism, trimem makes
+For the efficient utilization of shared-memory parallelism, trimem makes
 use of the `OpenMP <https://www.openmp.org/>`_ application programming model
 (``>= v4.5``) and modern ``C++``. It thus requires relatively up-to-date
 compilers (supporting at least ``C++17``).
