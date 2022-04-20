@@ -11,9 +11,8 @@ tests:
     - export CXX=g++
     - export CC=gcc
     - git submodule update --init --recursive
-    - pip install -v .
+    - pip install -v .[tests]
     - pip install --upgrade numpy scipy
-    - pip install meshio meshzoo autograd
     - export PATH=$PATH:/root/.local/bin
     - pytest -v tests/
 
@@ -23,9 +22,7 @@ pages-test:
     - module load gcc/9 anaconda/3/2021.11
     - export CXX=g++
     - export CC=gcc
-    - pip install .
-    - pip install meshio
-    - pip install sphinx sphinx-copybutton sphinxcontrib-programoutput
+    - pip install .[docs]
     - export PATH=$PATH:/root/.local/bin
     - sphinx-build -W -b html doc/ doc-test/
   artifacts:
@@ -40,9 +37,7 @@ pages:
     - module load gcc/9 anaconda/3/2021.11
     - export CXX=g++
     - export CC=gcc
-    - pip install .
-    - pip install meshio
-    - pip install sphinx sphinx-copybutton sphinxcontrib-programoutput
+    - pip install .[docs]
     - export PATH=$PATH:/root/.local/bin
     - sphinx-build -b html doc/ public/
   artifacts:
