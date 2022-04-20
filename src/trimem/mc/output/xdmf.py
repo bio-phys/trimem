@@ -1,8 +1,8 @@
 """A simple xdmf writer.
 
-This is a simple xdmf writer that writes a series of triangle meshes as
+A simple xdmf writer that writes a series of triangle meshes as
 grid collection. It is not a generic xdmf writer but specific to the
-usecase in trimem, in particular to the writing of temporal series of meshes
+use case in trimem, in particular to the writing of temporal series of meshes
 as xdmf's collections of grids. Data is stored in hdf5 format.
 """
 
@@ -14,7 +14,11 @@ from xml.etree import ElementTree as ET
 import h5py
 
 class XdmfWriter:
-    """Xdmf writer to write series of meshes."""
+    """Xdmf writer to write series of meshes.
+
+    Args:
+        fname (str, path-like): output file prefix.
+    """
 
     def __init__(self, fname):
         """Init."""
@@ -47,12 +51,19 @@ class XdmfWriter:
                                    compression_opts=4)
 
         self.data_counter += 1
- 
-        # give file name (relative to xdmf container file!) 
+
+        # give file name (relative to xdmf container file!)
         return self.fnameh5.name + ":/" + name
 
     def write_points_cells(self, points, cells):
-        """Write points and cells by appending a grid to the collection."""
+        """Write points and cells by appending a grid to the collection.
+
+        Args:
+            points (ndarray[float]): (N,3) array of vertex positions with N
+                being the number of vertices.
+            cells (ndarray[int]): (M,3) array of face definitions with M
+                being the number of faces.
+        """
 
         step = "Step {}".format(self.step_counter)
 

@@ -1,7 +1,7 @@
 """A simple vtu writer.
 
-This writes a mesh as a series of enumerated vtu files that can conveniently
-be visualzed as time-series by, e.g., paraview.
+Writes a mesh as a series of enumerated vtu files that can conveniently
+be visualized as time-series by, e.g., paraview.
 """
 
 import pathlib
@@ -12,7 +12,11 @@ import meshio
 
 
 class VtuWriter:
-    """Vtu writer to write series of meshes."""
+    """Vtu writer to write series of meshes.
+
+    Args:
+        fname (str, path-like): output file prefix.
+    """
 
     def __init__(self, fname):
         """Init."""
@@ -23,7 +27,14 @@ class VtuWriter:
         self.step = 0
 
     def write_points_cells(self, points, cells):
-        """Write points and cells to vtu series file."""
+        """Write points and cells to vtu series file.
+
+        Args:
+            points (ndarray[float]): (N,3) array of vertex positions with N
+                being the number of vertices.
+            cells (ndarray[int]): (M,3) array of face definitions with M
+                being the number of faces.
+        """
 
         fname = _remsuffix(self.fname.name, "".join(self.fname.suffixes))
         fname = self.fname.with_name(f"{fname}.{self.step}{self.part}.vtu")

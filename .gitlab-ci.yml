@@ -1,6 +1,11 @@
 image: gitlab-registry.mpcdf.mpg.de/mpcdf/module-image
 
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
 tests:
+  stage: test
   script:
     - module load git gcc/9 anaconda/3/2020.02
     - export CXX=g++
@@ -11,3 +16,38 @@ tests:
     - pip install meshio meshzoo autograd
     - export PATH=$PATH:/root/.local/bin
     - pytest -v tests/
+
+pages-test:
+  stage: test
+  script:
+    - module load gcc/9 anaconda/3/2021.11
+    - export CXX=g++
+    - export CC=gcc
+    - pip install .
+    - pip install meshio
+    - pip install sphinx sphinx-copybutton sphinxcontrib-programoutput
+    - export PATH=$PATH:/root/.local/bin
+    - sphinx-build -W -b html doc/ doc-test/
+  artifacts:
+    paths:
+      - doc-test
+  rules:
+    - if: '$CI_COMMIT_BRANCH != "main"'
+
+pages:
+  stage: deploy
+  script:
+    - module load gcc/9 anaconda/3/2021.11
+    - export CXX=g++
+    - export CC=gcc
+    - pip install .
+    - pip install meshio
+    - pip install sphinx sphinx-copybutton sphinxcontrib-programoutput
+    - export PATH=$PATH:/root/.local/bin
+    - sphinx-build -b html doc/ public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+

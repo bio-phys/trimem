@@ -1,6 +1,6 @@
 """xyz coordinate writer.
 
-This writes vertex coordinates only, i.e. the mesh is lost. It also writes
+Writes vertex coordinates only, i.e. the mesh is lost. It also writes
 data as plain text.
 """
 
@@ -10,7 +10,11 @@ import numpy as np
 from ._common import _create_part
 
 class XyzWriter:
-    """Write series of point locations in xyz-format."""
+    """Write series of point locations in xyz-format.
+
+    Args:
+        fname (str, path-like): output file prefix.
+    """
 
     def __init__(self, fname):
         """Init."""
@@ -20,7 +24,13 @@ class XyzWriter:
         self.step_counter = 0
 
     def write_points_cells(self, points, cells):
-        """Write points and ignore cells."""
+        """Write points and ignore cells.
+
+        Args:
+            points (ndarray[float]): (N,3) array of vertex positions with N
+                being the number of vertices.
+            cells: ignored
+        """
 
         rwflag = "w+" if self.step_counter == 0 else "a+"
         with self.fname.open(mode=rwflag) as fp:

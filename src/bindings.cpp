@@ -80,7 +80,13 @@ void gradient(TriMesh& mesh,
 }
 
 PYBIND11_MODULE(core, m) {
-    m.doc() = "Trimem python bindings";
+    m.doc() = R"pbdoc(
+        C++ library with python bindings for trimem.
+
+        This module encapsulates the heavy lifting involved in the
+        energy/gradient evaluations associated with trimem in a C++
+        library offering bindings to be called from python.
+    )pbdoc";
 
     // expose mesh
     expose_mesh(m);
@@ -103,12 +109,76 @@ PYBIND11_MODULE(core, m) {
     // expose neighbour lists
     expose_nlists(m);
 
-    // energy stuff
-    m.def("gradient", &gradient, "Finite difference gradient of energy");
+    // (debug) energy stuff
+    m.def(
+        "gradient",
+        &gradient,
+        py::arg("mesh"),
+        py::arg("estore"),
+        py::arg("gradient"),
+        py::arg("epsilon"),
+        R"pbdoc(
+        Finite difference gradient of energy.
 
-    m.def("area", &area, "TriMesh area");
-    m.def("edges_length", &edges_length, "TriMesh edge length");
-    m.def("avg_tri_props", &mean_tri_props, "Avg. triangle area/edge length");
+        This is merely for testing/debugging. Use the gradient function
+        exposed by the :class:`EnergyManager` class.
+
+        Args:
+            mesh (TriMesh): mesh instance.
+            estore (EnergyManager): energy evaluation.
+            gradient (numpy.ndarray): (N,3) array filled with the gradient.
+            epsilon (float): finite difference perturbation magnitude.
+
+        )pbdoc"
+    );
+
+    m.def(
+        "area",
+        &area,
+        py::arg("mesh"),
+        R"pbdoc(
+        Compute surface area.
+
+        Args:
+            mesh (TriMesh): input mesh to be evaluated
+
+        Returns:
+            The value of the surface area of ``mesh``.
+        )pbdoc"
+   );
+
+    m.def(
+        "edges_length",
+        &edges_length,
+        py::arg("mesh"),
+        R"pbdoc(
+        Compute cumulative edge length.
+
+        Args:
+            mesh (TriMesh): input mesh to be evaluated
+
+        Returns:
+            The cumulated value of the length of all edges in ``mesh``.
+        )pbdoc"
+    );
+
+    m.def(
+        "avg_tri_props",
+        &mean_tri_props,
+        py::arg("mesh"),
+        R"pbdoc(
+        Average triangle area and edge length
+
+        Args:
+            mesh (TriMesh): mesh to process.
+
+        Returns:
+            A tuple (`a`, `l`) with `a` being the ``mesh``'s average face
+            area and `l` being the mesh's average edge length. (Used for
+            automatic detection of the characteristic lengths involved in
+            the tether and repulsion penalties.)
+        )pbdoc"
+    );
 }
 
 }

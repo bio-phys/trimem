@@ -1,3 +1,9 @@
+"""Trimem run configuration.
+
+Utilities to set up, read and write configuration files providing
+control on the trimem functionality.
+"""
+
 import configparser
 import pathlib
 import io
@@ -161,7 +167,14 @@ _bond_enums = {
 }
 
 def write_default_config(fname, strip=True):
-    """Write default config to fname."""
+    """Write default config to fname.
+
+    Args:
+        fname (str, path-like): file name to write to.
+
+    Keyword Args:
+        strip (bool): Strip comments from output (default: True).
+    """
 
     if strip:
         config = os.linesep.join([l for l in CONF.splitlines()
@@ -177,7 +190,11 @@ def write_default_config(fname, strip=True):
         fp.write_text(config)
 
 def read_config(fname):
-    """Read config from file."""
+    """Read config from file.
+
+    Args:
+        fname (str, path-like): file name to read from.
+    """
     cfile = pathlib.Path(fname)
 
     if not cfile.exists():
@@ -199,7 +216,11 @@ def read_config(fname):
     return config
 
 def print_config(config):
-    """Print config to stdout."""
+    """Print config to stdout.
+
+    Args:
+        config (ConfigParser): configuration to print.
+    """
 
     # print config to string
     with io.StringIO() as sout:
@@ -213,11 +234,27 @@ def print_config(config):
     print(info)
 
 def update_config_defaults(config, **kwargs):
-    """Update default section with kwargs."""
+    """Update default section with kwargs.
+
+    Args:
+        config (ConfigParser): config to be updated.
+
+    Keyword Args:
+        kwargs (dict): dictionary to be written to the `DEFAULT` section.
+    """
     config.read_dict({"DEFAULT": kwargs})
 
 def config_to_params(config):
-    """Translate config to energy params."""
+    """Translate config to energy params.
+
+    Args:
+        config (ConfigParser): config to be translated
+
+    Returns:
+        EnergyParams:
+            Instance of :class:`helfrich._core.EnergyParams` parametrized by
+            `config`.
+    """
 
     # translate bond params
     bc      = config["BONDS"]

@@ -1,7 +1,7 @@
 """Checkpoint writer/reader.
 
-Writes/reads the mesh and potentially additional data that is necessary to
-run restarts.
+Writes and reads the mesh and configuration data that is necessary to
+restart a simulation.
 """
 
 import pathlib
@@ -21,10 +21,14 @@ _restart_data = [
 ]
 
 class CheckpointWriter:
-    """Write checkpoint data to restart mc_app."""
+    """Writer for an automatically enumerated checkpoint file.
+
+        Args:
+            fname (str, path-like): filename prefix.
+    """
 
     def __init__(self, fname):
-        """Init."""
+        """Initialization."""
         self.fname   = pathlib.Path(fname).with_suffix(".cpt")
         self.fnameh5 = self.fname.with_suffix(".cpt.h5")
 
@@ -54,7 +58,18 @@ class CheckpointWriter:
         h5file.close()
 
     def write(self, points, cells, config, **kwargs):
-        """Write points, cells and other data to checkpoint file."""
+        """Write points, cells and config to checkpoint file.
+
+        Args:
+            points (numpy.ndarray[float]): (N,3) array of vertex positions with
+                N being the number of vertices.
+            cells (numpy.ndarray[int]): (M,3) array of face definitions with M
+                being the number of faces.
+            config (ConfigParser): trimem configuration
+
+        Keyword Args:
+            kwargs: currently unused
+        """
 
         # write points information
         xpoints = ET.SubElement(self.cpt,
@@ -86,10 +101,15 @@ class CheckpointWriter:
 
 
 class CheckpointReader:
-    """Read checkpoint data."""
+    """Reader for a checkpoint file with number `fnum` and prefix `fname`.
+
+    Args:
+        fname (str, path-like): filename prefix.
+        fnum (int): checkpoint file number.
+    """
 
     def __init__(self, fname, fnum):
-        """Init."""
+        """Initialization."""
         if fnum == -1:
             fnum = _get_parts(pathlib.Path(fname).with_suffix(".cpt"))
             fnum = fnum - 1
@@ -99,7 +119,13 @@ class CheckpointReader:
         self.root = self.tree.getroot()
 
     def read(self):
-        """Write points, cells and other data to checkpoint file."""
+        """Reads points, cells and configuration file.
+
+        Returns:
+            tuple(ndarray[float], ndarray[int], ConfigParser):
+                A 3-tuple of the (N,3) and (M,3) arrays of points and cells and
+                the trimem configuration. N: number of vertices; M: number of faces.
+        """
 
         # read points information
         xpoints = self.root[0]

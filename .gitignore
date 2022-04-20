@@ -1,6 +1,7 @@
 build
 _skbuild
 dist
+public
 *.egg-info
 .eggs
 *.so

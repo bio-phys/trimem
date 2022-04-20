@@ -1,9 +1,9 @@
-"""Sampling functionality.
+"""Monte Carlo Sampling.
 
-This module provides a plain Hamiltonian Monte Carlo implementation with
-optional cooling. Additionally a multi-proposal Monte Carlo algorithm is
-available that is capable to integrate trimem-specific edge-flip functionality
-as flip proposal into the Monte Carlo framework.
+A vanilla Hamiltonian Monte Carlo implementation with optional cooling.
+Additionally, a multi-proposal Monte Carlo algorithm is available that is
+capable to integrate trimem-specific edge-flip functionality as flip
+proposals into the Monte Carlo framework.
 """
 
 import numpy as np
@@ -39,35 +39,53 @@ _hmc_default_options = {
 class HMC:
     """Simple Hamiltonian Monte Carlo (with optional cooling).
 
-    This class implements only the marching. Recording of the generated
-    chain must be provided by the user within the callable 'callback' given
-    as optional argument to the contructor. It must implement the signature
-    'callback(x)', x being an element of the sample space.
+    This class implements the `marching` only. Recording of the generated
+    chain/trajectory must be provided by the user within the callable
+    `callback` given as optional argument to the constructor. This callback
+    must implement the signature `callback(x)` with `x` being an element of
+    the sample space.
+
+    Args:
+        x (ndarray[float]): initial state
+        nlog_prob (callable): negative log of probability density function
+        grad_nlog_prob (callable): gradient of negative log of pdf
+
+    Keyword Args:
+        callback (callable): step callback with signature callback(x)
+            (defaults to no-op.)
+        options (dict-like): algorithm parametrization (optional):
+
+            * ``mass`` (default: 1.0): scaling factor for unit-diagonal mass
+              matrix used in the time integration
+            * ``time_step`` (default: 1.0e-4): time step for time integration
+            * ``num_integration_steps`` (default: 100): number of time
+              integration steps
+            * ``initial_temperature`` (default: 1.0): initial temperature for
+              simulated annealing
+            * ``minimal_temperature`` (default: 1.0e-6): minimal temperature
+              for annealing
+            * ``cooling_factor`` (default: 0.0): factor for exponential cooling
+            * ``cooling_start_step`` (default: 0): start simulated annealing
+              at this step
+            * ``info_step`` (default: 100): print info every n'th step
+            * ``init_step`` (default: 0): start value for step counter
+
     """
 
     def __init__(
         self,
-        x, 
+        x,
         nlog_prob,
         grad_nlog_prob,
-        callback=lambda x: None,
+        callback=None,
         options={},
     ):
-        """Initialization.
-
-        Parameters:
-        ----------
-        x:              initial state
-        nlog_prob:      negative log of probability density function
-        grad_nlog_prob: gradient of negative log of pdf
-        callback:       step callback with signature: callback(x)
-        options:        see _hmc_default_options
-        """
+        """Initialization."""
 
         # function, gradient and callback evaluation
         self.nlog_prob      = nlog_prob
         self.grad_nlog_prob = grad_nlog_prob
-        self.cb             = callback
+        self.cb             = lambda x: None if callback is None else callback
 
         # init options
         options    = {**_hmc_default_options, **options}
@@ -155,14 +173,28 @@ class HMC:
 
 
 class MeshHMC(HMC):
-    """HMC but with mesh object as state."""
+    """HMC with mesh as state.
+
+    A lightweight extension of :class:`HMC` that can be initialized with
+    a mesh as the `state` in the sampling space.
+
+    Args:
+        x (Mesh): initial state
+        nlog_prob (callable): negative log of probability density function
+        grad_nlog_prob (callable): gradient of negative log of pdf
+
+    Keyword Args:
+        callback (callable): step callback with signature callback(x)
+            (defaults to no-op.)
+        options (dict-like): algorithm parametrization. (see :class:`HMC`)
+    """
 
     def __init__(
         self,
         mesh, 
         nlog_prob,
         grad_nlog_prob,
-        callback=lambda x: None,
+        callback=None,
         options={},
     ):
         """Init."""
@@ -187,6 +219,20 @@ class MeshFlips:
 
     This class wraps the flip functionality available from the core
     C++-module such that it fits into a multi-proposal Monte Carlo framework.
+
+    Args:
+        mesh (Mesh): initial state.
+        estore (EnergyManager): `backend` for performing flipping on edges.
+
+    Keyword Args:
+        options (dict-like): flip parametrization (optional):
+
+            * ``flip_type`` (default: 'parallel'): 'serial' or 'parallel' flip
+              evaluation
+            * ``flip_ration`` (default: 0.1): proportion of edges in the mesh
+              for which a flip is attempted
+            * ``info_step`` (default: 100): print info every n'th step
+            * ``init_step`` (default: 0): initial value for the step counter
     """
     def __init__(self, mesh, estore, options={}):
         """Init."""
@@ -236,13 +282,26 @@ class MeshFlips:
 
 
 class MeshMonteCarlo:
-    """MonteCarlo with two-step moves."""
+    """MonteCarlo with two-step moves.
 
-    def __init__(self, hmc, flips, callback=lambda x: None):
+    Bundles :class:`HMC` and :class:`MeshFlips` into a bi-step Monte Carlo
+    algorithm where each step comprises a step of the :class:`HMC` and
+    subsequently a step of :class:`MeshFlips`.
+
+    Args:
+        hmc (HMC): HMC algorithm
+        flips (MeshFlips): Monte Carlo flip algorithm
+
+    Keyword Args:
+        callback (callable): step callback with signature callback(x)
+            (defaults to no-op.)
+    """
+
+    def __init__(self, hmc, flips, callback=None):
         """Initialize."""
         self.hmc   = hmc
         self.flips = flips
-        self.cb    = callback
+        self.cb    = lambda x: None if callback is None else callback
 
     def step(self):
         """Make one step each with each algorithm."""

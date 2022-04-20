@@ -1,4 +1,5 @@
-"""Output utilities."""
+"""Output utilities.
+"""
 import warnings
 import pathlib
 
@@ -21,7 +22,12 @@ _backup_suffixes = {
 }
 
 def create_backup(outprefix, cptprefix):
-    """Create enumerated backups of file-set with prefixed names."""
+    """Create enumerated backups of a set of files with prefixed names.
+
+    Takes a whole set of files starting with `outprefix` and/or `cptprefix`
+    and puts it into an enumerated backup that automatically detects its
+    number from existing backups of the same set of files.
+    """
 
     outfname = pathlib.Path(outprefix)
     cptfname = pathlib.Path(cptprefix)
@@ -54,7 +60,18 @@ def create_backup(outprefix, cptprefix):
         print(f"Created backup #{bnum+1} of:", backups)
 
 def make_output(config):
-    """Return output writer object."""
+    """Construct output writer object.
+
+    Args:
+        config (ConfigParser): trimem config defining the output type in
+            config['GENERAL']['output_format']. Must be one of `vtu`, `xyz` or
+            `xdmf`.
+
+    Returns:
+        Writer-like:
+            An instance of an output writer class having a method
+            `write_points_cells` with signature `(points, cells)`.
+    """
 
     fmt    = config["GENERAL"]["output_format"]
     prefix = config["GENERAL"]["output_prefix"]

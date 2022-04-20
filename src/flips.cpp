@@ -189,8 +189,57 @@ int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, real& flip_ratio
 
 void expose_flips(py::module& m)
 {
-    m.def("flip", &flip_serial);
-    m.def("pflip", &flip_parallel_batches);
+    m.def(
+        "flip",
+        &flip_serial,
+        py::arg("mesh"),
+        py::arg("estore"),
+        py::arg("flip_ratio"),
+        R"pbdoc(
+        Serial flip sweep.
+
+        Performs a sweep over a fraction ``flip_ratio`` of edges in ``mesh``
+        trying to flip each edge sequentially and evaluating the energies
+        associated to the flip against the Metropolis criterion.
+
+        Args:
+            mesh (TriMesh): input mesh to be used
+            estore (EnergyManager): instance of :class:`EnergyManager` used in
+                combination with the ``mesh`` to evaluate energy differences
+                necessary for flip acceptance/rejection.
+            flip_ratio (float): ratio of edges to test (must be in [0,1]).
+        )pbdoc"
+    );
+
+    m.def(
+        "pflip",
+        &flip_parallel_batches,
+        py::arg("mesh"),
+        py::arg("estore"),
+        py::arg("flip_ratio"),
+        R"pbdoc(
+        Batch parallel flip sweep.
+
+        Performs a sweep over a fraction ``flip_ratio`` of edges in ``mesh``
+        in a batch parallel fashion albeit maintaining chain ergodicity.
+        To this end, a batch of edges is selected at random by each thread
+        from a thread-local pool of edges. If an edge is free to be flipped
+        independently, i.e., no overlap of its patch with the patch of other
+        edges (realized by a locking mechanism), it is flipped and its
+        differential contribution to the Hamiltonian is evaluated in parallel
+        for the whole batch. Ergodicity is maintained by subsequently evaluating
+        the Metropolis criterion for each edge in the batch sequentially. This
+        is repeated for a number of ``flip_ratio / batch_size * mesh.n_edges``
+        times.
+
+        Args:
+            mesh (TriMesh): input mesh to be used
+            estore (EnergyManager): instance of :class:`EnergyManager` used in
+                combination with the ``mesh`` to evaluate energy differences
+                necessary for flip acceptance/rejection.
+            flip_ratio (float): ratio of edges to test (must be in [0,1]).
+        )pbdoc"
+    );
 }
 
 }

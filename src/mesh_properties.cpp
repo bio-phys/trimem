@@ -175,14 +175,52 @@ void vertex_properties_grad(const TriMesh& mesh,
 
 void expose_properties(py::module& m)
 {
-    py::class_<VertexProperties>(m, "VertexProperties")
+    py::class_<VertexProperties>(
+        m,
+        "VertexProperties",
+        R"pbdoc(Container for vertex-averaged properties.
+
+        The vertex averaged quantities `area`, `volume`, `curvature` and
+        `bending energy` are at the core of the evaluations involved in the
+        Helfrich functional that is represented by :class:`EnergyManager`.
+        class:`VertexProperties` encapsulates access to these quantities. It
+        further allows for the automatic reduction on vectors of
+        :class:`VertexProperties` by implementing the operators
+        ``+=`` and ``-=``.
+
+        Its current usage in trimem implies an AoS approach that might be
+        replaced by an SoA approach if required by performance considerations.
+        In this case the idea is to still keep the container 'interface' as
+        is and manage the data layout behind the scenes.
+        )pbdoc"
+        )
         .def(py::init())
-        .def_readwrite("area", &VertexProperties::area)
-        .def_readwrite("volume", &VertexProperties::volume)
-        .def_readwrite("curvature", &VertexProperties::curvature)
-        .def_readwrite("bending", &VertexProperties::bending)
-        .def_readwrite("tethering", &VertexProperties::tethering)
-        .def_readwrite("repulsion", &VertexProperties::repulsion)
+        .def_readwrite(
+            "area",
+            &VertexProperties::area,
+            "Face area"
+        )
+        .def_readwrite(
+            "volume",
+            &VertexProperties::volume,
+            "Face volume")
+        .def_readwrite(
+            "curvature",
+            &VertexProperties::curvature,
+            "Edge curvature")
+        .def_readwrite(
+            "bending",
+            &VertexProperties::bending,
+            "Bending energy")
+        .def_readwrite(
+            "tethering",
+            &VertexProperties::tethering,
+            "Tether regularization")
+        .def_readwrite(
+            "repulsion",
+            &VertexProperties::repulsion,
+            "Repulsion penalty")
+        //TODO: remove pickling support since unused
         .def(py::pickle(
            [](const VertexProperties &p) { // __getstate__
                return py::make_tuple(

@@ -120,30 +120,122 @@ py::array_t<typename TriMesh::Point::value_type> points(TriMesh& mesh)
 void expose_mesh(py::module& m){
 
     // not really necessary but used in testing
-    py::class_<OpenMesh::HalfedgeHandle>(m, "HalfedgeHandle")
+    py::class_<OpenMesh::HalfedgeHandle>(
+        m,
+        "HalfedgeHandle",
+        R"pbdoc(
+        ``OpenMesh::HalfedgeHandle``.
+
+        Handle/Reference to halfedges used by several functions within trimem.
+        )pbdoc"
+        )
         .def(py::init());
 
-    py::class_<TriMesh>(m, "TriMesh")
-        .def(py::init())
-		    .def(py::init([](
-            py::array_t<typename TriMesh::Point::value_type> points,
-            py::array_t<int>                                  faces
-            )
-            {
-                TriMesh mesh;
-                return from_points_cells(points, faces);
-			      }
-        ), py::arg("points"), py::arg("faces"))
-        .def("fv_indices", &fv_indices)
-        .def("points", &points)
-        .def("n_vertices", [](TriMesh& mesh) {return mesh.n_vertices();})
-        .def("n_edges", [](TriMesh& mesh) {return mesh.n_edges();})
-        .def("halfedge_handle", [](TriMesh& mesh, int i)
+    py::class_<TriMesh>(
+        m,
+        "TriMesh",
+        R"pbdoc(
+        Triangulation.
+
+        Specialization of ``OpenMesh::TriMesh_ArrayKernelT<MeshTraits>``.
+        )pbdoc"
+        )
+
+        .def(
+            py::init(),
+            R"pbdoc(
+            Initialize empty mesh.
+
+            Returns:
+                TriMesh with zero vertices and no faces.
+            )pbdoc"
+        )
+
+		    .def(
+            py::init([](
+                py::array_t<typename TriMesh::Point::value_type> points,
+                py::array_t<int>                                  faces
+                )
+                {
+                    TriMesh mesh;
+                    return from_points_cells(points, faces);
+			          }
+            ),
+            py::arg("points"),
+            py::arg("faces"),
+            R"pbdoc(
+            Initialize from arrays of vertices and faces.
+
+            Args:
+                points ((N,3) float-array): array of vertices in 3 dimensions.
+                faces ((N,3) int-array): array of face indices.
+
+            Returns:
+                TriMesh with vertices and faces defined by the input.
+            )pbdoc"
+        )
+
+        .def(
+            "fv_indices",
+            &fv_indices,
+            R"pbdoc(
+            Get face-vertex indices.
+
+            Returns:
+                An (N,3) array of type int with N being the number of faces
+                that contains the vertex indices defining each face.
+            )pbdoc"
+         )
+
+        .def(
+            "points",
+            &points,
+            R"pbdoc(
+            Get vertex positions.
+
+            Returns:
+                An (N,3) array of type float with N being the number of
+                vertices.
+            )pbdoc"
+        )
+
+        .def(
+            "n_vertices",
+            [](TriMesh& mesh) {return mesh.n_vertices();},
+            "Number of vertices in the mesh."
+        )
+
+        .def(
+            "n_edges",
+            [](TriMesh& mesh) {return mesh.n_edges();},
+            "Number of edges in the mesh."
+        )
+
+        .def(
+            "halfedge_handle",
+            [](TriMesh& mesh, int i)
             {
                 return mesh.halfedge_handle(i);
-            }
+            },
+            py::arg("edge"),
+            "Returns handle to first halfedge of ``edge`` i."
         );
 
-    m.def("read_mesh", &read_mesh);
+    m.def(
+        "read_mesh",
+        &read_mesh,
+        py::arg("fname"),
+        R"pbdoc(
+        Read mesh from fname
+
+        Uses ``OpenMesh::IO::read_mesh``.
+
+        Args:
+            fname (str): file name to read mesh from
+
+        Returns:
+            An instance of TriMesh read from fname.
+        )pbdoc"
+        );
 }
 }

@@ -1,3 +1,9 @@
+"""Trimem run module.
+
+High level building blocks to run simulations. These blocks are utilized
+from the `mc_app` cli but can also be used standalone as a python module.
+"""
+
 import warnings
 import functools
 import copy
@@ -15,7 +21,17 @@ from .evaluators import TimingEnergyEvaluators
 
 
 def setup_energy_manager(config):
-    """Setup energy manager."""
+    """Setup energy manager.
+
+    Create EnergyManager and Mesh from config file.
+
+    Args:
+        config (dict-like): run-config file.
+
+    Returns:
+        A tuple (estore, mesh) where estore is of type :class:`EnergyManager`
+        and mesh is of type :class:`Mesh`.
+    """
 
     mesh = read_trimesh(config["GENERAL"]["input"])
 
@@ -30,7 +46,20 @@ def setup_energy_manager(config):
     return estore, mesh
 
 def write_checkpoint_handle(config, fix_step=None):
-    """Return function to write checkpoint file."""
+    """Create checkpoint write handle.
+
+    Args:
+        config (dict-like): run-config file.
+
+    Keyword Args:
+        fix_step (None or int): fix step input in handle signature.
+
+    Returns:
+        A function handle with signature (mesh, estore, step) that allows to
+        write the mesh and the state of the EnergyManager to a checkpoint
+        file. 'step' can be fixed to a particular value by the `fix_step`
+        argument.
+    """
 
     conf = copy.deepcopy(config)
 
@@ -63,7 +92,22 @@ def write_checkpoint_handle(config, fix_step=None):
     return _write_checkpoint
 
 def read_checkpoint(config, restartnum):
-    """Read data from checkpoint file."""
+    """Read checkpoint file.
+
+    Acquire checkpoint prefix from config and read the checkpoint with
+    number 'restartnum'.
+
+    Note: Continuation params are taken from the checkpoint.
+    Note: 'init_step' is set from the HMC section if given.
+
+    Args:
+        config (dict-like): run-config file.
+        restartnum (int): checkpoint file number to read.
+
+    Returns:
+        A tuple (mesh, config) with mesh being of type :class:`Mesh` and
+        config being of type `ConfigParser`.
+    """
 
     prefix = config["GENERAL"]["restart_prefix"]
 
@@ -87,7 +131,14 @@ def read_checkpoint(config, restartnum):
     return Mesh(points, cells), config
 
 def run(config, restart=None):
-    """Run algorithm."""
+    """Run algorithm.
+
+    Runs an algorithm defined by the run-config. Performs a restart in case.
+
+    Args:
+        config (dict-like): run-config file.
+        restart (None or int): checkpoint file number to restart from.
+    """
 
     # do backup for non-restarts
     if restart is None:
@@ -117,7 +168,16 @@ def run(config, restart=None):
       raise ValueError("Invalid algorithm")
 
 def run_mc(mesh, estore, config):
-    """Run monte carlo sampling."""
+    """Run Monte Carlo sampling.
+
+    Perform Monte Carlo sampling of the Helfrich bending energy as defined
+    by the `config`.
+
+    Args:
+        mesh (mesh.Mesh): initial geometry.
+        estore (EnergyManager): EnergyManager.
+        config (dict-like): run-config file.
+    """
 
     # construct output writer
     output = make_output(config)
@@ -173,7 +233,16 @@ def run_mc(mesh, estore, config):
     cpt_writer(mesh, estore, cmc.getint("num_steps"))
 
 def run_minim(mesh, estore, config):
-    """Run minimization."""
+    """Run (precursor) minimization.
+
+    Performs a minimization of the Helfrich bending energy as defined
+    by the `config`.
+
+    Args:
+        mesh (mesh.Mesh): initial geometry.
+        estore (EnergyManager): EnergyManager.
+        config (dict-like): run-config file.
+    """
 
     # construct output writer
     output = make_output(config)
