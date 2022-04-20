@@ -1,4 +1,4 @@
-import helfrich as m
+import helfrich.core as m
 import meshzoo
 import numpy as np
 

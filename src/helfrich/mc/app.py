@@ -1,7 +1,6 @@
 import io
 import argparse
 
-#from .. import _core as m
 from .config import write_default_config, read_config
 from .util import run as irun
 

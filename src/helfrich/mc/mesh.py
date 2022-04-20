@@ -7,7 +7,7 @@ triangles.
 import numpy as np
 import copy
 
-from .. import _core as m
+from .. import core as m
 
 class Mesh:
     """Lightweight wrapper around OpenMesh::TriMesh."""

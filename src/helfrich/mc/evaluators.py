@@ -1,7 +1,7 @@
 """Easy access evaluator for the EnergyManager.
 
 This module wraps access to the functionality of the EnergyManager class
-provided by _core C++ module.
+provided by core C++ module.
 
 Evaluators for energy, gradient and callback are provided as functions
 of vertex positions 'x'.

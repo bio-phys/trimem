@@ -3,7 +3,7 @@ import pathlib
 import io
 import os
 
-from .. import _core as m
+from .. import core as m
 
 CONF = """[GENERAL]
 # algorithm to run: 'hmc', 'minimize'

@@ -79,7 +79,7 @@ void gradient(TriMesh& mesh,
     }
 }
 
-PYBIND11_MODULE(_core, m) {
+PYBIND11_MODULE(core, m) {
     m.doc() = "Trimem python bindings";
 
     // expose mesh

@@ -1,4 +1,4 @@
-import helfrich as m
+import helfrich.core as m
 import numpy as np
 import meshzoo
 from collections import namedtuple

@@ -5,7 +5,7 @@ import copy
 import numpy as np
 from scipy.optimize import minimize
 
-from .. import _core as m
+from .. import core as m
 from .hmc import MeshHMC, MeshFlips, MeshMonteCarlo
 from .mesh import Mesh, read_trimesh
 from .config import update_config_defaults, config_to_params, print_config

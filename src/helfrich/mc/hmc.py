@@ -8,7 +8,7 @@ as flip proposal into the Monte Carlo framework.
 
 import numpy as np
 
-from .. import _core as m
+from .. import core as m
 
 def _vv_integration(x0, p0, force, m, dt, N):
     """Velocity verlet integration (using momentum instead of velocity)."""
@@ -185,7 +185,7 @@ _mc_flip_default_options = {
 class MeshFlips:
     """Flipping edges as a step in a Markov Chain.
 
-    This class wraps the flip functionality available from the _core
+    This class wraps the flip functionality available from the core
     C++-module such that it fits into a multi-proposal Monte Carlo framework.
     """
     def __init__(self, mesh, estore, options={}):
