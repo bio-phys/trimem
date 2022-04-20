@@ -2,7 +2,7 @@ import numpy as np
 import meshzoo
 import pytest
 
-import helfrich.core as m
+import trimem.core as m
 
 from scipy.sparse import coo_matrix
 from scipy.spatial import KDTree

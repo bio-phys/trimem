@@ -7,9 +7,9 @@ from xml.etree import ElementTree as ET
 
 import meshio
 
-from helfrich.mc.output import make_output, create_backup
-from helfrich.mc.output.checkpoint import CheckpointWriter, CheckpointReader
-from helfrich.mc.config import CONF
+from trimem.mc.output import make_output, create_backup
+from trimem.mc.output.checkpoint import CheckpointWriter, CheckpointReader
+from trimem.mc.config import CONF
 
 # -----------------------------------------------------------------------------
 #                                                                     pytest --

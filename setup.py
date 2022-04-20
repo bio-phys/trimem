@@ -5,17 +5,17 @@ from skbuild import setup
 
 
 setup(
-    name="helfrich",
+    name="trimem",
     version="0.0.1",
-    description='Evaluation of the helfrich bending energy using OpenMesh',
+    description='Evaluation of the Helfrich bending energy using OpenMesh',
     author='Sebastian Kehl',
     license="MIT",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     entry_points="""
         [console_scripts]
-        mc_app=helfrich.mc.app:cli
+        mc_app=trimem.mc.app:cli
     """,
-    cmake_install_dir="src/helfrich",
+    cmake_install_dir="src/trimem",
     include_package_data=True,
 )

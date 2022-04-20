@@ -1,10 +1,10 @@
-"""Test the sampling routines from helfrich.mc"""
+"""Test the sampling routines from trimem.mc"""
 import numpy as np
 import meshzoo
 import pytest
 
-from helfrich.mc.mesh import Mesh
-from helfrich.mc.hmc import HMC, MeshHMC, MeshFlips, MeshMonteCarlo
+from trimem.mc.mesh import Mesh
+from trimem.mc.hmc import HMC, MeshHMC, MeshFlips, MeshMonteCarlo
 
 # ------------------------------------------------------------------------------
 #                                                               reference data -
