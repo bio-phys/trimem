@@ -203,45 +203,27 @@ void expose_properties(py::module& m)
         .def_readwrite(
             "volume",
             &VertexProperties::volume,
-            "Face volume")
+            "Face volume"
+        )
         .def_readwrite(
             "curvature",
             &VertexProperties::curvature,
-            "Edge curvature")
+            "Edge curvature"
+        )
         .def_readwrite(
             "bending",
             &VertexProperties::bending,
-            "Bending energy")
+            "Bending energy"
+        )
         .def_readwrite(
             "tethering",
             &VertexProperties::tethering,
-            "Tether regularization")
+            "Tether regularization"
+        )
         .def_readwrite(
             "repulsion",
             &VertexProperties::repulsion,
-            "Repulsion penalty")
-        //TODO: remove pickling support since unused
-        .def(py::pickle(
-           [](const VertexProperties &p) { // __getstate__
-               return py::make_tuple(
-                   p.area,
-                   p.volume,
-                   p.curvature,
-                   p.bending,
-                   p.tethering,
-                   p.repulsion);
-           },
-           [](py::tuple t) { // __setstate__
-               if (t.size() != 6)
-                   throw std::runtime_error("Invalid state!");
-               VertexProperties p = {
-                   t[0].cast<real>(),
-                   t[1].cast<real>(),
-                   t[2].cast<real>(),
-                   t[3].cast<real>(),
-                   t[4].cast<real>(),
-                   t[5].cast<real>() };
-               return p;
-           }));
+            "Repulsion penalty"
+        );
 }
 }
