@@ -3,6 +3,22 @@
 Command line interface
 ======================
 
+Trimem offers a command line application that is available after installation
+as ``mc_app``. This application implements an interface to the following
+simulation logic:
+
+.. image:: images/flow.svg
+   :align: center
+
+It offers the possibility to run either a minimization of the Helfrich
+functional or a statistical exploration by means of Markov Chain Monte
+Carlo sampling. Checkpointing allows for a versatile recombination of these
+two steps. Please have a look at the :ref:`Quick-Start` tutorial for
+an applied introduction.
+
+cli reference
+-------------
+
 The command line interface ``mc_app`` can be queried with the ``--help`` flag
 to provide a verbose help message:
 
@@ -18,6 +34,3 @@ A simulation parametrized by an input configuration file can then be run with
 the ``run`` subcommand:
 
 .. program-output:: mc_app run --help
-
-Please have a look at the :ref:`Quick-Start` tutorial for an applied
-introduction.

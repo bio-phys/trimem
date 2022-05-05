@@ -4,7 +4,7 @@
 membranes according to the Helfrich theory [^Helfrich1973].
 
 [^Helfrich1973]: Helfrich, W. (1973) Elastic properties of lipid bilayers:
-  Theory and possible experiments. Zeitschrift fur Naturforschung C,
+  Theory and possible experiments. Zeitschrift für Naturforschung C,
   28(11), 693-703
 
 ## Installation
@@ -61,7 +61,7 @@ The documentation can be generated with `sphinx` by
 
 ```bash
 pip install trimem/[docs]
-cd docs; make html
+cd doc; make html
 ```
 
 ## Usage

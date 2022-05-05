@@ -60,9 +60,9 @@ Usage
 -----
 
 **Trimem** provides a convenient user interface via a :ref:`cli` that is
-available after :ref:`installation` under the respective ``bin`` directory
-available to ``pip``. For a quick-start and more detailed documentation,
-please have a look at the :ref:`usage`.
+available after :ref:`installation` as ``mc_app`` under the respective binary
+installation directory available to ``pip``. For a quick-start and more
+detailed documentation, please have a look at the :ref:`usage`.
 
 Alternatively, trimem can also be used as a
 :ref:`python library <python-module>`. High level functionality is exposed in
