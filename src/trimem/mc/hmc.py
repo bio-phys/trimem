@@ -301,7 +301,7 @@ class MeshMonteCarlo:
         """Initialize."""
         self.hmc   = hmc
         self.flips = flips
-        self.cb    = lambda x: None if callback is None else callback
+        self.cb    = (lambda x: None) if callback is None else callback
 
     def step(self):
         """Make one step each with each algorithm."""
