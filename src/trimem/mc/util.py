@@ -18,6 +18,7 @@ from .config import update_config_defaults, config_to_params, print_config
 from .output import make_output, create_backup, \
                     CheckpointWriter, CheckpointReader
 from .evaluators import TimingEnergyEvaluators
+from .. import __version__
 
 
 def setup_energy_manager(config):
@@ -139,6 +140,9 @@ def run(config, restart=None):
         config (dict-like): run-config file.
         restart (None or int): checkpoint file number to restart from.
     """
+
+    # print start info
+    print("Running with trimem version {}".format(__version__))
 
     # do backup for non-restarts
     if restart is None:

@@ -1,6 +1,7 @@
 [build-system]
 requires = [
     "setuptools>=42",
+    "setuptools_scm>=6.2",
     "wheel",
     "pybind11[global]>=2.9.1",
     "cmake>=3.18",
@@ -8,3 +9,6 @@ requires = [
 ]
 
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "src/trimem/_version.py"

@@ -2,6 +2,7 @@ build
 _skbuild
 dist
 public
+src/trimem/_version.py
 *.egg-info
 .eggs
 *.so

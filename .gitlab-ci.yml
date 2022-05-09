@@ -19,7 +19,7 @@ tests:
 pages-test:
   stage: test
   script:
-    - module load gcc/9 anaconda/3/2021.11
+    - module load gcc/9 anaconda/3/2021.11 git
     - export CXX=g++
     - export CC=gcc
     - pip install .[docs]
@@ -34,7 +34,7 @@ pages-test:
 pages:
   stage: deploy
   script:
-    - module load gcc/9 anaconda/3/2021.11
+    - module load gcc/9 anaconda/3/2021.11 git
     - export CXX=g++
     - export CC=gcc
     - pip install .[docs]
