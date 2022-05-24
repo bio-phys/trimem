@@ -67,7 +67,7 @@ cd doc; make html
 ## Usage
 
 For an introduction to the usage of trimem please refer to the
-[documentation](https://mpibp-hummer.pages.mpcdf.de/trimem/).
+[documentation](https://trimem.readthedocs.io/).
 
 ## Citation
 
