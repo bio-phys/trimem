@@ -7,8 +7,11 @@ build:
     python: "3.9"
 
 sphinx:
-   configuration: docs/conf.py
+  configuration: docs/conf.py
 
 python:
-   install:
-   - requirements: docs/requirements.txt
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
