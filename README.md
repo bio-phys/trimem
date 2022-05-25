@@ -12,7 +12,7 @@ membranes according to the Helfrich theory [^Helfrich1973].
 Trimem can be installed using pip:
 
 ```bash
- git clone --recurse-submodules https://gitlab.mpcdf.mpg.de/MPIBP-Hummer/trimem.git
+ git clone --recurse-submodules https://github.com/bio-phys/trimem.git
  pip install trimem/
 ```
 

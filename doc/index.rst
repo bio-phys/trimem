@@ -18,7 +18,7 @@ Trimem can be installed via
 
 .. code-block:: Bash
 
-   git clone --recurse-submodules https://gitlab.mpcdf.mpg.de/MPIBP-Hummer/trimem.git
+   git clone --recurse-submodules https://github.com/bio-phys/trimem.git
    pip install trimem/
 
 We suggest the installation using the ``--user`` flag to ``pip``. Alternatively,
