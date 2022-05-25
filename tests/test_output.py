@@ -55,11 +55,11 @@ def test_writer(writer, data):
     if writer.fname.suffix == ".xyz":
         outfile = writer.fname
         # check content of step 1
-        re_data = np.loadtxt(outfile, usecols=[1,2,3], skiprows=1, max_rows=4)
+        re_data = np.loadtxt(outfile, usecols=[1,2,3], skiprows=2, max_rows=4)
         assert np.linalg.norm(points - re_data) < 1.0e-5
 
         # check content of step 2
-        re_data = np.loadtxt(outfile, usecols=[1,2,3], skiprows=7, max_rows=4)
+        re_data = np.loadtxt(outfile, usecols=[1,2,3], skiprows=8, max_rows=4)
         assert np.linalg.norm(points - re_data) < 1.0e-5
 
     elif writer.fname.suffix == ".vtu":
