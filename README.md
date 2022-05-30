@@ -75,7 +75,8 @@ If you use trimem for your scientific work, please consider the citation of
 Siggel, M. et al[^Siggel2022].
 
 [^Siggel2022]: Siggel, M. et al. (2022) TriMem: A Parallelized Hybrid Monte
-  Carlo Software for Efficient Membrane Simulations
+  Carlo Software for Efficient Simulations of Lipid Membranes. bioRxiv 2022.05.25.493239;
+  doi: https://doi.org/10.1101/2022.05.25.493239
 
 ## References
 
