@@ -9,8 +9,6 @@
 #include "params.h"
 #include "mesh_properties.h"
 
-#include "pybind11/pybind11.h"
-
 namespace trimem {
 
 struct BondPotential;
@@ -56,8 +54,6 @@ public:
     // neighbour list
     std::unique_ptr<NeighbourList> nlist;
 };
-
-void expose_energy(py::module& m);
 
 }
 #endif

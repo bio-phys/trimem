@@ -4,6 +4,8 @@
 #ifndef FLIP_UTILS_H
 #define FLIP_UTILS_H
 
+#include <unordered_set>
+
 #include "defs.h"
 #include "mesh_properties.h"
 

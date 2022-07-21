@@ -13,8 +13,6 @@
 #include "mesh_tether.h"
 #include "mesh_repulsion.h"
 
-#include "pybind11/pybind11.h"
-
 namespace trimem {
 
 //! energy contributions

@@ -8,9 +8,6 @@
 
 #include "OpenMesh/Core/Geometry/VectorT.hh"
 
-#include "pybind11/pybind11.h"
-#include "pybind11/numpy.h"
-
 namespace trimem {
 
 inline TriMesh::Normal edge_vector(const TriMesh& mesh,
@@ -127,8 +124,6 @@ inline std::vector<Point> dihedral_angle_grad(const TriMesh& mesh,
 
     return gradient;
 }
-
-void expose_mesh_utils(py::module& m);
 
 }
 #endif

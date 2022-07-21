@@ -1,9 +1,8 @@
 /** \file mesh.h
  * \brief Mesh definition.
  *
- * This just defines the TriMesh as does openmesh-python but with only
- * a minimal exposure to python. If mesh manipulation is sought after in
- * python openmesh-python can be used explicitly.
+ * This just defines the TriMesh as does openmesh-python. See mesh_py.cpp for
+ * the exposure to python.
  */
 #ifndef MESH_H
 #define MESH_H
@@ -12,10 +11,6 @@
 
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
-
-#include "pybind11/pybind11.h"
-
-namespace py = pybind11;
 
 namespace trimem {
 
@@ -40,7 +35,5 @@ typedef OpenMesh::TriMesh_ArrayKernelT<MeshTraits> TriMesh;
 // read mesh from file
 TriMesh read_mesh(const std::string fname);
 
-// minimal exposure
-void expose_mesh(py::module& m);
 }
 #endif

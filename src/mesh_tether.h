@@ -8,8 +8,6 @@
 #include "params.h"
 #include "mesh_util.h"
 
-#include "pybind11/pybind11.h"
-
 namespace trimem {
 
 struct BondPotential

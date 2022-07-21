@@ -9,8 +9,6 @@
 #include "defs.h"
 #include "params.h"
 
-#include "pybind11/pybind11.h"
-
 namespace trimem {
 
 //! Neighbour list interface
@@ -40,8 +38,6 @@ struct NeighbourListT : NeighbourList
 
 std::unique_ptr<NeighbourList> make_nlist(const TriMesh& mesh,
                                           const EnergyParams& params);
-
-void expose_nlists(py::module& m);
 
 }
 #endif

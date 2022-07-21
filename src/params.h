@@ -6,8 +6,6 @@
 
 #include "defs.h"
 
-#include "pybind11/pybind11.h"
-
 namespace trimem {
 
 enum class BondType : int
@@ -71,8 +69,6 @@ struct EnergyParams
   //! parameters for the repulsion penalty
   SurfaceRepulsionParams repulse_params;
 };
-
-void expose_parameters(py::module& m);
 
 }
 #endif

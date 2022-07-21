@@ -5,11 +5,15 @@
 #define FLIPS_H
 
 #include "defs.h"
-#include "pybind11/pybind11.h"
+
+#include "mesh.h"
 
 namespace trimem {
 
-void expose_flips(py::module& m);
+struct EnergyManager;
 
+int flip_serial(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio);
+
+int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio);
 }
 #endif

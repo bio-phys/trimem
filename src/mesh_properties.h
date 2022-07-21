@@ -6,8 +6,6 @@
 
 #include "defs.h"
 
-#include "pybind11/pybind11.h"
-
 namespace trimem {
 
 struct BondPotential;
@@ -59,8 +57,6 @@ void vertex_properties_grad(const TriMesh& mesh,
                             const SurfaceRepulsion& constraint,
                             const VertexHandle& ve,
                             std::vector<VertexPropertiesGradient>& d_props);
-
-void expose_properties(py::module& m);
 
 }
 #endif
