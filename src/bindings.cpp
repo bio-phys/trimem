@@ -152,6 +152,26 @@ void expose_mesh(py::module& m)
             },
             py::arg("edge"),
             "Returns handle to first halfedge of ``edge`` i."
+        )
+
+        .def(
+            "opposite_halfedge_handle",
+            [](TriMesh& mesh, const OpenMesh::HalfedgeHandle& he)
+            {
+                return mesh.opposite_halfedge_handle(he);
+            },
+            py::arg("edge"),
+            "Returns handle to the opposite of ``halfedge`` he."
+        )
+
+        .def(
+            "next_halfedge_handle",
+            [](TriMesh& mesh, const OpenMesh::HalfedgeHandle& he)
+            {
+                return mesh.next_halfedge_handle(he);
+            },
+            py::arg("edge"),
+            "Returns handle to ``halfedge`` next to ``halfedge`` he."
         );
 
     m.def(
