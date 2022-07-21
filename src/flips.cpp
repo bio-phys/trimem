@@ -21,7 +21,7 @@ namespace trimem {
 typedef std::chrono::high_resolution_clock myclock;
 static std::mt19937 generator_(myclock::now().time_since_epoch().count());
 
-int flip_serial(TriMesh& mesh, EnergyManager& estore, real& flip_ratio)
+int flip_serial(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio)
 {
     if (flip_ratio > 1.0)
         std::runtime_error("flip_ratio must be <= 1.0");
@@ -82,7 +82,7 @@ int flip_serial(TriMesh& mesh, EnergyManager& estore, real& flip_ratio)
     return acc;
 }
 
-int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, real& flip_ratio)
+int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio)
 {
     if (flip_ratio > 1.0)
         throw std::range_error("flip_ratio must be <= 1.0");
