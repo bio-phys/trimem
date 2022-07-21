@@ -1,5 +1,8 @@
 image: gitlab-registry.mpcdf.mpg.de/mpcdf/module-image
 
+variables:
+  GIT_SUBMODULE_STRATEGY: normal
+
 workflow:
   rules:
     - if: '$CI_COMMIT_BRANCH'
@@ -10,7 +13,6 @@ tests:
     - module load git gcc/9 anaconda/3/2020.02
     - export CXX=g++
     - export CC=gcc
-    - git submodule update --init --recursive
     - pip install -v .[tests]
     - pip install --upgrade numpy scipy
     - export PATH=$PATH:/root/.local/bin
