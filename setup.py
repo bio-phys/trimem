@@ -12,4 +12,5 @@ setup(
     },
     cmake_install_dir="src/trimem",
     include_package_data=True,
+    scripts=["src/debug/testd"],
 )

@@ -33,3 +33,6 @@ target_link_libraries(core PRIVATE trimem)
 install(TARGETS core trimem DESTINATION .)
 set_target_properties(core PROPERTIES INSTALL_RPATH
                                       "$ORIGIN/${CMAKE_INSTALL_LIBDIR}")
+
+# c++ debug app
+add_subdirectory(src/debug)
