@@ -136,17 +136,19 @@ Point trimem_gradient(const EnergyParams& params,
     return grad;
 }
 
-//! energy
-struct TrimemProperties
+//! evaluate VertexProperties
+struct EvaluateProperties
 {
-    TrimemProperties(const EnergyParams& params,
-                     const TriMesh& mesh,
-                     const BondPotential& bonds,
-                     const SurfaceRepulsion& repulse) :
+    EvaluateProperties(const EnergyParams& params,
+                       const TriMesh& mesh,
+                       const BondPotential& bonds,
+                       const SurfaceRepulsion& repulse,
+                       std::vector<VertexProperties>& props) :
         params_(params),
         mesh_(mesh),
         bonds_(bonds),
-        repulse_(repulse) {}
+        repulse_(repulse),
+        props_(props) {}
 
     //parameters
     const EnergyParams& params_;
@@ -154,24 +156,38 @@ struct TrimemProperties
     const BondPotential& bonds_;
     const SurfaceRepulsion& repulse_;
 
-    void operator() (const int i, VertexProperties& contrib)
+    // result
+    std::vector<VertexProperties>& props_;
+
+    void operator() (const int i)
     {
         auto vh = mesh_.vertex_handle(i);
-        contrib += vertex_properties(mesh_, bonds_, repulse_, vh);
-    }
-
-    void operator() (const VertexHandle& vh, VertexProperties& contrib)
-    {
-        contrib += vertex_properties(mesh_, bonds_, repulse_, vh);
+        props_[i] = vertex_properties(mesh_, bonds_, repulse_, vh);
     }
 };
 
-struct TrimemPropsGradient
+//! reduce vector of VertexProperties
+struct ReduceProperties
 {
-    TrimemPropsGradient(const TriMesh& mesh,
-                        const BondPotential& bonds,
-                        const SurfaceRepulsion& repulse,
-                        std::vector<VertexPropertiesGradient>& gradients) :
+    ReduceProperties(const std::vector<VertexProperties>& props) :
+        props_(props) {}
+
+    //parameters
+    const std::vector<VertexProperties>& props_;
+
+    void operator() (const int i, VertexProperties& contrib)
+    {
+        contrib += props_[i];
+    }
+};
+
+struct EvaluatePropertiesGradient
+{
+    EvaluatePropertiesGradient(const TriMesh& mesh,
+                               const BondPotential& bonds,
+                               const SurfaceRepulsion& repulse,
+                               std::vector<VertexPropertiesGradient>& gradients)
+        :
         mesh_(mesh),
         bonds_(bonds),
         repulse_(repulse),
@@ -192,13 +208,13 @@ struct TrimemPropsGradient
     }
 };
 
-struct TrimemGradient
+struct EvaluateGradient
 {
-    TrimemGradient(const EnergyParams& params,
-                   const VertexProperties& props,
-                   const VertexProperties& ref_props,
-                   const std::vector<VertexPropertiesGradient>& gprops,
-                   std::vector<Point>& gradient) :
+    EvaluateGradient(const EnergyParams& params,
+                     const VertexProperties& props,
+                     const VertexProperties& ref_props,
+                     const std::vector<VertexPropertiesGradient>& gprops,
+                     std::vector<Point>& gradient) :
         params_(params),
         props_(props),
         ref_props_(ref_props),

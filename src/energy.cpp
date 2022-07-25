@@ -62,10 +62,16 @@ void EnergyManager::update_repulsion(const TriMesh& mesh)
 
 VertexProperties EnergyManager::properties(const TriMesh& mesh)
 {
-    TrimemProperties kernel(params, mesh, *bonds, *repulse);
+    const size_t n = mesh.n_vertices();
 
     VertexProperties props{ 0, 0, 0, 0, 0, 0};
-    parallel_reduction(mesh.n_vertices(), kernel, props);
+    std::vector<VertexProperties> vprops(n, props);
+
+    EvaluateProperties eval_kernel(params, mesh, *bonds, *repulse, vprops);
+    parallel_for(n, eval_kernel);
+
+    ReduceProperties reduce_kernel(vprops);
+    parallel_reduction(n, reduce_kernel, props);
 
     return props;
 }
@@ -86,22 +92,31 @@ real EnergyManager::energy(const VertexProperties& props)
 
 std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
 {
-    size_t n = mesh.n_vertices();
+    const size_t n = mesh.n_vertices();
 
-    // update global properties
-    auto props     = properties(mesh);
+    // update properties
+    VertexProperties props{ 0, 0, 0, 0, 0, 0};
+    std::vector<VertexProperties> vprops(n, props);
+
+    EvaluateProperties eval_kernel(params, mesh, *bonds, *repulse, vprops);
+    parallel_for(n, eval_kernel);
+
+    ReduceProperties reduce_kernel(vprops);
+    parallel_reduction(n, reduce_kernel, props);
+
+    // reference properties
     auto ref_props = interpolate_reference_properties();
 
     // properties gradients
     VertexPropertiesGradient zeros
       { Point(0), Point(0), Point(0), Point(0), Point(0), Point(0) };
     std::vector<VertexPropertiesGradient> gprops(n, zeros);
-    TrimemPropsGradient pg_kernel(mesh, *bonds, *repulse, gprops);
+    EvaluatePropertiesGradient pg_kernel(mesh, *bonds, *repulse, gprops);
     parallel_for(n, pg_kernel);
 
     // evaluate gradient
     std::vector<Point> gradient(n, Point(0));
-    TrimemGradient g_kernel(params, props, ref_props, gprops, gradient);
+    EvaluateGradient g_kernel(params, props, ref_props, gprops, gradient);
     parallel_for(n, g_kernel);
 
     return gradient;
