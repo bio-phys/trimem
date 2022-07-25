@@ -83,8 +83,8 @@ void vertex_properties_grad(const TriMesh& mesh,
             // edge curvature
             real edge_length = trimem::edge_length(mesh, he);
             real edge_angle  = trimem::dihedral_angle(mesh, he);
-            auto d_length = trimem::edge_length_grad(mesh, he);
-            auto d_angle  = trimem::dihedral_angle_grad(mesh, he);
+            auto d_length = trimem::edge_length_grad<3>(mesh, he);
+            auto d_angle  = trimem::dihedral_angle_grad<15>(mesh, he);
             for (size_t i=0; i<d_length.size(); i++)
             {
                 auto val = 0.25 * edge_angle * d_length[i];
@@ -114,7 +114,7 @@ void vertex_properties_grad(const TriMesh& mesh,
             }
 
             // face area
-            auto d_face_area = trimem::face_area_grad(mesh, he);
+            auto d_face_area = trimem::face_area_grad<7>(mesh, he);
             for (size_t i=0; i<d_face_area.size(); i++)
             {
                 auto val = d_face_area[i] / 3;
@@ -130,7 +130,7 @@ void vertex_properties_grad(const TriMesh& mesh,
             }
 
             // face volume
-            auto d_face_volume = trimem::face_volume_grad(mesh, he);
+            auto d_face_volume = trimem::face_volume_grad<7>(mesh, he);
             for (size_t i=0; i<d_face_volume.size(); i++)
             {
                 auto val = d_face_volume[i] / 3;

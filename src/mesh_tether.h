@@ -56,7 +56,7 @@ struct FlatBottomEdgePenalty : BondPotential
                          const HalfedgeHandle& he) const override
     {
         real l  = edge_length(mesh, he);
-        auto lg = edge_length_grad(mesh, he);
+        auto lg = edge_length_grad<3>(mesh, he);
         real fac = 0.0;
         if (l > lc0_)
         {
@@ -100,7 +100,7 @@ struct HarmonicTriAreaPenalty : BondPotential
                          const HalfedgeHandle& he) const override
     {
         real a  = face_area(mesh, he);
-        auto ag = face_area_grad(mesh, he);
+        auto ag = face_area_grad<7>(mesh, he);
 
         real d = 2.0 * ( a / a0_ - 1.0 ) / a0_;
 

@@ -268,7 +268,7 @@ void expose_mesh_utils(py::module& m)
     m.def(
         "edge_length_grad",
         [](TriMesh& mesh, HalfedgeHandle& he) {
-            auto res = edge_length_grad(mesh, he);
+            auto res = edge_length_grad<3>(mesh, he);
             return tonumpy(res[0], res.size());
         },
         py::arg("mesh"),
@@ -305,7 +305,7 @@ void expose_mesh_utils(py::module& m)
     m.def(
         "face_area_grad",
         [](TriMesh& mesh, HalfedgeHandle& he) {
-            auto res = face_area_grad(mesh, he);
+            auto res = face_area_grad<7>(mesh, he);
             return tonumpy(res[0], res.size());
         },
         py::arg("mesh"),
@@ -345,7 +345,7 @@ void expose_mesh_utils(py::module& m)
     m.def(
         "face_volume_grad",
         [](TriMesh& mesh, HalfedgeHandle& he) {
-            auto res = face_volume_grad(mesh, he);
+            auto res = face_volume_grad<7>(mesh, he);
             return tonumpy(res[0], res.size());
         },
         py::arg("mesh"),
@@ -386,7 +386,7 @@ void expose_mesh_utils(py::module& m)
     m.def(
         "dihedral_angle_grad",
         [](TriMesh& mesh, HalfedgeHandle& he) {
-            auto res = dihedral_angle_grad(mesh, he);
+            auto res = dihedral_angle_grad<15>(mesh, he);
             return tonumpy(res[0], res.size());
         },
         py::arg("mesh"),
