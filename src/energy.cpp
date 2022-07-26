@@ -111,7 +111,8 @@ std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
     VertexPropertiesGradient zeros
       { Point(0), Point(0), Point(0), Point(0), Point(0), Point(0) };
     std::vector<VertexPropertiesGradient> gprops(n, zeros);
-    EvaluatePropertiesGradient pg_kernel(mesh, *bonds, *repulse, gprops);
+    EvaluatePropertiesGradient pg_kernel(
+        mesh, *bonds, *repulse, vprops, gprops);
     parallel_for(n, pg_kernel);
 
     // evaluate gradient

@@ -186,17 +186,20 @@ struct EvaluatePropertiesGradient
     EvaluatePropertiesGradient(const TriMesh& mesh,
                                const BondPotential& bonds,
                                const SurfaceRepulsion& repulse,
+                               const std::vector<VertexProperties>& props,
                                std::vector<VertexPropertiesGradient>& gradients)
         :
         mesh_(mesh),
         bonds_(bonds),
         repulse_(repulse),
+        props_(props),
         gradients_(gradients) {}
 
     //parameters
     const TriMesh& mesh_;
     const BondPotential& bonds_;
     const SurfaceRepulsion& repulse_;
+    const std::vector<VertexProperties>& props_;
 
     // result
     std::vector<VertexPropertiesGradient>& gradients_;
@@ -204,7 +207,7 @@ struct EvaluatePropertiesGradient
     void operator() (const int i)
     {
         auto vh = mesh_.vertex_handle(i);
-        vertex_properties_grad(mesh_, bonds_, repulse_, vh, gradients_);
+        vertex_properties_grad(mesh_, bonds_, repulse_, vh, props_, gradients_);
     }
 };
 

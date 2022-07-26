@@ -52,123 +52,97 @@ void vertex_properties_grad(const TriMesh& mesh,
                             const BondPotential& bonds,
                             const SurfaceRepulsion& repulse,
                             const VertexHandle& ve,
+                            const std::vector<VertexProperties>& props,
                             std::vector<VertexPropertiesGradient>& d_props)
 {
-    // pre-compute vertex-curvature to vertex-area ratio (needed for bending)
-    real curvature = 0;
-    real area      = 0;
-    for (auto he : mesh.voh_range(ve))
-    {
-        real l  = edge_length(mesh, he);
-        real da = dihedral_angle(mesh, he);
+    // This routine, instead of evaluating the gradient of each vertex-averaged
+    // property wrt the coordinates of all the vertices involved (which would
+    // require atomic operations or some gradient buffers; the former having
+    // shown to produce a significant slow down, the latter being inefficient for
+    // large number of threads), gathers gradients from all vertex-averaged
+    // properties ve is involved in, i.e., summing only into the gradient at index
+    // ve.idx() (being not used by other threads!).
 
-        curvature += 0.5 * l * da;
-        area      += face_area(mesh, he);
-    }
-    real c_to_a = curvature / area * 1.5;
+    // pre-compute vertex-curvature to vertex-area ratio (needed for bending)
+    // for the patch of vertex ve (at pos 0 of this array) and later also at
+    // pos 1 and 2 for other vertex-patches.
+    std::array<real, 3> c_to_a;
+    auto idx = ve.idx();
+    c_to_a[0] = props[idx].curvature / props[idx].area;
 
     for (auto he : mesh.voh_range(ve))
     {
         if ( not he.is_boundary() )
         {
-            //relevant vertex indices of the facet-pair associated to 'he'
-            std::vector<int> idx
-              { ve.idx(),
-                mesh.to_vertex_handle(he).idx(),
-                mesh.to_vertex_handle(mesh.next_halfedge_handle(he)).idx(),
-                mesh.to_vertex_handle(mesh.next_halfedge_handle(
-                  mesh.opposite_halfedge_handle(he))).idx()
-              };
+            auto n_he = mesh.next_halfedge_handle(he);
+            auto jdx  = mesh.to_vertex_handle(he).idx();
+            auto kdx  = mesh.to_vertex_handle(n_he).idx();
 
-            // edge curvature
+            // vertex-curvature ratio of other patches
+            c_to_a[1] = props[jdx].curvature / props[jdx].area;
+            c_to_a[2] = props[kdx].curvature / props[kdx].area;
+
+            // edge curvature of outgoing he
+            // the gradient of the edge-length as well as the dihedral-angle
+            // is symmetric wrt to edge-swap, i.e. when seen from vertex jdx
             real edge_length = trimem::edge_length(mesh, he);
             real edge_angle  = trimem::dihedral_angle(mesh, he);
-            auto d_length = trimem::edge_length_grad<3>(mesh, he);
-            auto d_angle  = trimem::dihedral_angle_grad<15>(mesh, he);
-            for (size_t i=0; i<d_length.size(); i++)
+            auto d_length    = trimem::edge_length_grad<1>(mesh, he);
+            auto d_angle     = trimem::dihedral_angle_grad<1>(mesh, he);
+            for (int i=0; i<2; i++)
             {
-                auto val = 0.25 * edge_angle * d_length[i];
-                for (int j=0; j<3; j++)
-                {
-#pragma omp atomic
-                    d_props[idx[i]].curvature[j] += val[j];
-
-                    // contribution to bending
-#pragma omp atomic
-                    d_props[idx[i]].bending[j] += 4.0 * val[j] * c_to_a;
-                }
+                auto val = 0.25 * (edge_angle * d_length[0] +
+                                   edge_length * d_angle[0]);
+                d_props[idx].curvature += val;
+                d_props[idx].bending   += 4.0 * c_to_a[i] * val;
             }
 
-            for (size_t i=0; i<d_angle.size(); i++)
+            // face area of outgoing he
+            // contribution from self as well as from outgoing he of jdx,
+            // the latter being equivalent just needs different c_to_a
+            auto d_face_area = trimem::face_area_grad<1>(mesh, he);
+            for (int i=0; i<3; i++)
             {
-                auto val = 0.25 * edge_length * d_angle[i];
-                for (int j=0; j<3; j++)
-                {
-#pragma omp atomic
-                    d_props[idx[i]].curvature[j] += val[j];
-
-                    // contribution to bending
-#pragma omp atomic
-                    d_props[idx[i]].bending[j] += 4.0 * val[j] * c_to_a;
-                }
+                auto val = d_face_area[0] / 3;
+                d_props[idx].area    += val;
+                d_props[idx].bending -= 2.0  * c_to_a[i] * c_to_a[i] * val;
             }
 
-            // face area
-            auto d_face_area = trimem::face_area_grad<7>(mesh, he);
-            for (size_t i=0; i<d_face_area.size(); i++)
+            // face volume of outging he
+            // same logic as for the area
+            auto d_face_volume = trimem::face_volume_grad<1>(mesh, he);
+            for (size_t i=0; i<3; i++)
             {
-                auto val = d_face_area[i] / 3;
-                for (int j=0; j<3; j++)
-                {
-#pragma omp atomic
-                    d_props[idx[i]].area[j] += val[j];
-
-                    // contribution to bending
-#pragma omp atomic
-                    d_props[idx[i]].bending[j] -= 2.0 * val[j] * c_to_a * c_to_a;
-                }
+                auto val = d_face_volume[0] / 3;
+                d_props[idx].volume += val;
             }
 
-            // face volume
-            auto d_face_volume = trimem::face_volume_grad<7>(mesh, he);
-            for (size_t i=0; i<d_face_volume.size(); i++)
+            // edge curvature of next halfedge
+            edge_length = trimem::edge_length(mesh, n_he);
+            edge_angle  = trimem::dihedral_angle(mesh, n_he);
+            d_angle     = trimem::dihedral_angle_grad<4>(mesh, n_he);
+            for (int i=1; i<3; i++)
             {
-                auto val = d_face_volume[i] / 3;
-                for (int j=0; j<3; j++)
-                {
-#pragma omp atomic
-                    d_props[idx[i]].volume[j] += val[j];
-                }
+                auto val = 0.25 * edge_length * d_angle[0];
+                d_props[idx].curvature += val;
+                d_props[idx].bending   += 4.0 * c_to_a[i] * val;
             }
 
             // tether bonds
-            auto d_bond = bonds.vertex_property_grad(mesh, he);
-            for (size_t i=0; i<d_bond.size(); i++)
-            {
-                auto val = d_bond[i] / bonds.valence();
-                for (int j=0; j<3; j++)
-                {
-#pragma omp atomic
-                    d_props[idx[i]].tethering[j] += val[j];
-                }
-            }
+            auto d_bond = bonds.vertex_property_grad(mesh, he)[0];
+            d_props[idx].tethering += d_bond;
+
         } // not boundary
     } // outgoing halfedges
 
     // repulsion penalty
     std::vector<Point> d_repulse;
-    std::vector<int> idx;
-    std::tie(d_repulse, idx) = repulse.vertex_property_grad(mesh, ve.idx());
+    std::vector<int> jdx;
+    std::tie(d_repulse, jdx) = repulse.vertex_property_grad(mesh, idx);
     for (size_t i=0; i<d_repulse.size(); i++)
     {
         auto val = d_repulse[i];
-        for (int j=0; j<3; j++)
-        {
-#pragma omp atomic
-            d_props[idx[i]].repulsion[j] -= val[j];
-#pragma omp atomic
-            d_props[ve.idx()].repulsion[j] += val[j];
-        }
+        d_props[idx].repulsion += 2 * d_repulse[i];
     }
 
 }
