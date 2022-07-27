@@ -1,5 +1,4 @@
 import numpy as np
-import meshzoo
 import pytest
 
 import trimem.core as m
@@ -7,6 +6,7 @@ import trimem.core as m
 from scipy.sparse import coo_matrix
 from scipy.spatial import KDTree
 
+from util import rect
 
 # -----------------------------------------------------------------------------
 #                                                                     pytest --
@@ -15,13 +15,8 @@ from scipy.spatial import KDTree
 def data(request):
     """Test mesh."""
 
-    points, cells = meshzoo.rectangle_tri(
-        np.linspace(0.0, 1.0, 20),
-        np.linspace(0.0, 1.0, 20),
-        variant="zigzag"
-    )
-    x = np.append(points, np.zeros((len(points),1)), axis=1)
-    mesh = m.TriMesh(x, cells)
+    points, cells = rect(20,20)
+    mesh = m.TriMesh(points, cells)
 
     class Data:
         pass
@@ -32,7 +27,7 @@ def data(request):
 
     return d
 
-@pytest.fixture(params=[(0,44),(1,36),(2,20)])
+@pytest.fixture(params=[(0,44),(1,38),(2,26)])
 def excl(request):
     """Exclusion level with result for num neighbours of node 151.
 

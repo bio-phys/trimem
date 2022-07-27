@@ -27,14 +27,13 @@ following. For details on the available functionality, please refer to the
 Python example
 --------------
 
-As a preprocessing step, we start by generating a mesh using meshzoo_:
+As a preprocessing step, we start by generating a mesh using trimesh_:
 
-.. _meshzoo: https://pypi.org/project/meshzoo/
+.. _trimesh: https://trimsh.org/
 
->>> import meshzoo
->>> import meshio
->>> points, cells = meshzoo.icosa_sphere(8);
->>> meshio.write_points_cells('input.stl', points, [('triangle', cells)])
+>>> import trimesh
+>>> mesh = trimesh.creation.icosphere(3)
+>>> mesh.export('input.stl')
 
 Such a mesh can then subsequently be used as an input to trimem:
 

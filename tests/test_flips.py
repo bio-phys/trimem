@@ -1,6 +1,7 @@
-import trimem.core as m
 import numpy as np
-import meshzoo
+import trimem.core as m
+
+from util import icosphere
 
 import pytest
 
@@ -11,7 +12,7 @@ import pytest
 def params():
     """Energy parameters."""
 
-    p, c= meshzoo.uv_sphere(num_points_per_circle=20, num_circles=10)
+    p, c = icosphere(3)
     mesh = m.TriMesh(p,c)
 
     a, l = m.avg_tri_props(mesh)
@@ -56,4 +57,4 @@ def test_flips(params):
 
     acc = m.flip(mesh, estore, 0.5)
 
-    assert acc > 10
+    assert acc > 100

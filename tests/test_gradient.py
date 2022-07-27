@@ -1,6 +1,7 @@
 import trimem.core as m
-import meshzoo
 import numpy as np
+
+from util import icosphere
 
 import pytest
 
@@ -9,7 +10,7 @@ import pytest
 # -----------------------------------------------------------------------------
 def get_mesh():
     """Get a mesh."""
-    points, cells = meshzoo.icosa_sphere(8)
+    points, cells = icosphere(3)
     return m.TriMesh(points, cells)
 
 def get_energy_manager(mesh, bond_type):

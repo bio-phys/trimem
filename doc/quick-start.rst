@@ -12,17 +12,16 @@ Mesh generation
 ---------------
 
 For the reading of mesh geometries, trimem uses the IO facilities provided by
-OpenMesh_ and thus supports IO-formats as provided by OpenMesh_. For high
-quality meshes of simple geometries we make use of the meshzoo_ python library
-in this tutorial using the `stl`-format.
+OpenMesh_ and thus supports IO-formats as provided by OpenMesh_. For a high
+quality mesh of a simple sphere geometry we make use of the trimesh_ Python
+library in this tutorial using the `stl`-format.
 
 .. _OpenMesh: https://www.graphics.rwth-aachen.de/software/openmesh/
-.. _meshzoo: https://pypi.org/project/meshzoo/
+.. _trimesh: https://trimsh.org/
 
->>> import meshzoo
->>> import meshio
->>> points, cells = meshzoo.icosa_sphere(8);
->>> meshio.write_points_cells('input.stl', points, [('triangle', cells)])
+>>> import trimesh
+>>> mesh = trimesh.creation.icosphere(3)
+>>> mesh.export('input.stl')
 
 Configuration
 -------------

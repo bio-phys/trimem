@@ -1,9 +1,7 @@
 import io
 import subprocess
 import configparser
-
-import meshzoo
-import meshio
+import trimesh
 
 import pytest
 
@@ -68,9 +66,9 @@ def iodir(tmp_path_factory):
     tmpdir = tmp_path_factory.mktemp("testio")
 
     # generate input geometry
-    p, c = meshzoo.icosa_sphere(4)
+    m = trimesh.creation.icosphere(3)
     stlfile = tmpdir.joinpath("inp.stl")
-    meshio.write_points_cells(str(stlfile.resolve()), p, [("triangle", c)])
+    m.export(stlfile.resolve())
 
     return tmpdir
 

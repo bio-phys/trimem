@@ -1,10 +1,12 @@
 """Test the sampling routines from trimem.mc"""
 import numpy as np
-import meshzoo
 import pytest
 
 from trimem.mc.mesh import Mesh
 from trimem.mc.hmc import HMC, MeshHMC, MeshFlips, MeshMonteCarlo
+
+from util import icosahedron
+
 
 # ------------------------------------------------------------------------------
 #                                                               reference data -
@@ -31,7 +33,7 @@ def test_hmc():
     """Test plain HMC."""
     np.random.seed(42)
 
-    p, c = meshzoo.icosa_sphere(1)
+    p, c = icosahedron()
     mesh = Mesh(p,c)
 
     # simplified energy and gradient evaluators
@@ -64,7 +66,7 @@ def test_mesh_hmc():
 
     np.random.seed(42)
 
-    p, c = meshzoo.icosa_sphere(1)
+    p, c = icosahedron()
     mesh = Mesh(p,c)
 
     # simplified energy and gradient evaluators, but with mesh access

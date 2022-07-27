@@ -1,7 +1,10 @@
+from collections import namedtuple
+
 import trimem.core as m
 import numpy as np
-import meshzoo
-from collections import namedtuple
+
+from util import icosphere
+from util import tube as tube_mesh
 
 import pytest
 
@@ -17,14 +20,14 @@ eps = 1.0e-2  # relative acceptance error
 # -----------------------------------------------------------------------------
 def sphere(r, n):
     """Get sphere mesh with analytical reference values."""
-    points, cells = meshzoo.icosa_sphere(n)
+    points, cells = icosphere(int(np.log2(n)))
     mesh = m.TriMesh(points*r, cells)
     # mesh, area, vol, curv, bending
     return mesh, 4*np.pi*r**2, 4/3*np.pi*r**3, 4*np.pi*r, 8*np.pi
 
 def tube(r, n):
     """Get tube mesh with analytical reference values."""
-    points, cells = meshzoo.tube(length=1, radius=r, n=n)
+    points, cells = tube_mesh(length=1, radius=r, segments=n)
     mesh = m.TriMesh(points, cells)
     # mesh, area, vol, curv, bending
     return mesh, 2*np.pi*r, 2/3*np.pi*r**2, np.pi, np.pi/r

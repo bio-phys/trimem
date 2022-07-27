@@ -4,7 +4,6 @@ import h5py
 import configparser
 
 from xml.etree import ElementTree as ET
-
 import meshio
 
 from trimem.mc.output import make_output, create_backup
@@ -36,7 +35,7 @@ def writer(outdir, writer_type):
     config = {"GENERAL": {"output_format": writer_type,
                           "output_prefix": str(prefix)}}
     return make_output(config)
-    
+
 # -----------------------------------------------------------------------------
 #                                                                       test --
 # -----------------------------------------------------------------------------
@@ -49,7 +48,7 @@ def test_writer(writer, data):
     writer.write_points_cells(points, cells)
     writer.write_points_cells(points, cells)
 
-    # check write 
+    # check write
     assert writer.fname.exists()
 
     if writer.fname.suffix == ".xyz":
