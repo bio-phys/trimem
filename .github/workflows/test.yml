@@ -34,8 +34,8 @@ jobs:
                      m = trimesh.creation.icosphere(3);\
                      m.export('inp.stl')"
           testd inp.stl 0.15
-          mc_app config --strip --conf inp.cfg
-          cat inp.cfg
+          apt-get install valgrind
+          valgrind --tool=none mc_app config --strip --conf inp.cfg
       - name: run test
         run: |
           pytest -v tests
