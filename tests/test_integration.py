@@ -41,7 +41,7 @@ continuation_lambda = 1.0
 [HMC]
 num_steps = 10
 ;init_step = 0
-step_size = 1.0
+step_size = {step_size}
 traj_steps = 10
 momentum_variance = 1.0
 thin = 10
@@ -100,7 +100,7 @@ def test_mcapp_config(iodir):
         config = fp.read()
 
     # reference config
-    ref_config = CONF.format(algorithm="hmc")
+    ref_config = CONF.format(algorithm="hmc", step_size="1.0")
 
     # compare configs
     # (string comparison here enables readable output in case of failure)
@@ -109,7 +109,7 @@ def test_mcapp_config(iodir):
 def test_mcapp_min(iodir):
     """Test mc_app."""
 
-    config_str = CONF.format(algorithm="minimize")
+    config_str = CONF.format(algorithm="minimize", step_size="1.0")
     conf = iodir.joinpath("inp.conf")
     conf.write_text(config_str)
 
@@ -130,7 +130,7 @@ def test_mcapp_min(iodir):
 def test_mcapp_hmc(iodir):
     """Test mc_app restart from minimization."""
 
-    config_str = CONF.format(algorithm="hmc")
+    config_str = CONF.format(algorithm="hmc", step_size="1.0e-5")
     conf = iodir.joinpath("inp.conf")
     conf.write_text(config_str)
 
