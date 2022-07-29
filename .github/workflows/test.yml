@@ -37,7 +37,8 @@ jobs:
                      m.export('inp.stl')"
           testd inp.stl 0.15
           sudo apt-get install valgrind
-          valgrind --tool=none mc_app config --strip --conf inp.cfg
+          #valgrind --tool=none mc_app config --strip --conf inp.cfg
+          valgrind --tool=none python -c "import trimem.core"
       - name: run test
         run: |
           pytest -v tests
