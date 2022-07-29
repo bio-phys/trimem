@@ -66,7 +66,7 @@ int main(int argc, char* argv[])
 
     auto N = g.size();
     std::cout << "Energy: " << e << "\n";
-    std::cout << "Gradient: \n" << g[0] << "\n ...\n" << g[N] << "\n";
+    std::cout << "Gradient: \n[[" << g[0] << "]\n ...\n[" << g[N-1] << "]]\n";
     std::cout << "Flipped " << n << " triangles\n";
 
     return 0;
