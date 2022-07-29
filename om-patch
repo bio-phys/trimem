@@ -1,0 +1,13 @@
+diff --git a/src/OpenMesh/Core/IO/reader/PLYReader.hh b/src/OpenMesh/Core/IO/reader/PLYReader.hh
+index 44ba7a06..ef46152f 100644
+--- a/src/OpenMesh/Core/IO/reader/PLYReader.hh
++++ b/src/OpenMesh/Core/IO/reader/PLYReader.hh
+@@ -97,6 +97,8 @@ public:
+ 
+   _PLYReader_();
+ 
++  virtual ~_PLYReader_() {};
++
+   std::string get_description() const override { return "PLY polygon file format"; }
+   std::string get_extensions()  const override { return "ply"; }
+   std::string get_magic()       const override { return "PLY"; }
