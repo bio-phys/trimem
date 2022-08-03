@@ -43,7 +43,7 @@ automatically installed:
 Documentation and tests further require:
 
 * autograd
-* meshzoo
+* trimesh
 * sphinx
 * sphinx-copybutton
 * sphinxcontrib-programoutput
