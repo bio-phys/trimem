@@ -14,6 +14,8 @@ namespace trimem {
 //! Interface to SurfaceRepulsion
 struct SurfaceRepulsion
 {
+    virtual ~SurfaceRepulsion() = default;
+
     //! Compute penalty contributions to VertexProperties
     virtual real vertex_property(const TriMesh &mesh, const int &pid) const = 0;
 

@@ -12,6 +12,8 @@ namespace trimem {
 
 struct BondPotential
 {
+    virtual ~BondPotential() = default;
+
     virtual real vertex_property(const TriMesh& mesh,
                                  const HalfedgeHandle& he) const = 0;
 
