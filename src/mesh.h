@@ -7,8 +7,6 @@
 #ifndef MESH_H
 #define MESH_H
 
-#define OM_STATIC_BUILD
-
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 

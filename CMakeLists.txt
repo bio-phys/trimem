@@ -21,8 +21,7 @@ add_library(trimem SHARED src/mesh.cpp
                              src/nlists/nlist.cpp
                              src/util.cpp)
 target_include_directories(trimem PUBLIC src OpenMesh/src)
-target_link_libraries(trimem PUBLIC OpenMeshToolsStatic
-                                    OpenMeshCoreStatic
+target_link_libraries(trimem PUBLIC OpenMeshCore
                                     OpenMP::OpenMP_CXX)
 
 # python module
@@ -30,8 +29,8 @@ pybind11_add_module(core MODULE src/bindings.cpp
                                 src/mesh_py.cpp)
 target_link_libraries(core PRIVATE trimem)
 
-install(TARGETS core trimem DESTINATION .)
-set_target_properties(core PROPERTIES INSTALL_RPATH
+install(TARGETS core trimem OpenMeshCore DESTINATION .)
+set_target_properties(core trimem PROPERTIES INSTALL_RPATH
                                       "$ORIGIN/${CMAKE_INSTALL_LIBDIR}")
 
 # c++ debug app
