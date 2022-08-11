@@ -24,25 +24,24 @@ int flip_serial(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio)
     if (flip_ratio > 1.0)
         std::runtime_error("flip_ratio must be <= 1.0");
 
-    int nflips = (int) (mesh.n_edges() * flip_ratio);
-
-    // generate random vector of edge indices
-    std::vector<size_t> idx;
-    idx.reserve(mesh.n_edges());
-    for (size_t i=0; i<mesh.n_edges(); i++) idx.push_back(i);
-    std::shuffle(idx.begin(), idx.end(), generator_);
+    int nedges = mesh.n_edges();
+    int nflips = (int) (nedges * flip_ratio);
 
     // get initial vertex properties
     VertexProperties props = estore.properties(mesh);
     real             e0    = estore.energy(props);
 
     // acceptance probability distribution
-    std::uniform_real_distribution<real> accept(0.0,1.0);
+    std::uniform_real_distribution<real> accept(0.0, 1.0);
+
+    // proposal distribution
+    std::uniform_int_distribution<int> propose(0, nedges-1);
 
     int acc = 0;
     for (int i=0; i<nflips; i++)
     {
-        auto eh = mesh.edge_handle(idx[i]);
+        int  idx = propose(generator_);
+        auto eh  = mesh.edge_handle(idx);
         if (mesh.is_flip_ok(eh) and !mesh.is_boundary(eh))
         {
             // remove old properties
@@ -105,25 +104,8 @@ int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, const real& flip
 
         int itime   = myclock::now().time_since_epoch().count();
         std::mt19937 prng((ithread + 1) * itime);
-        std::uniform_real_distribution<real> accept(0.0,1.0);
-
-        //  get this thread's edges
-        int iedges = (int) std::ceil(nedges / nthread);
-        int ilow   = ithread * iedges;
-        int iupp   = (ithread + 1) * iedges;
-        iupp   = iupp < nedges ? iupp : nedges;
-        iedges = iupp > ilow ? iupp - ilow : 0;
-        std::vector<int> edges;
-        edges.reserve(iedges);
-        for (int i=ilow; i<iupp; i++)
-        {
-            edges.push_back(i);
-        }
-
-        // shuffle locally
-        std::shuffle(edges.begin(), edges.end(), prng);
-
-        // result vector
+        std::uniform_real_distribution<real> accept(0.0, 1.0);
+        std::uniform_int_distribution<int> propose(0, nedges-1);
         int iflips = (int) std::ceil(nflips / nthread);
 
         for (int i=0; i<iflips; i++)
@@ -133,12 +115,9 @@ int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, const real& flip
 
             {
                 std::vector<OmpGuard> guards;
-                if (i<iedges)
-                {
-                    int idx = edges[i];
-                    eh = mesh.edge_handle(idx);
-                    guards = test_patch(mesh, idx, l_edges);
-                }
+                int idx = propose(prng);
+                eh = mesh.edge_handle(idx);
+                guards = test_patch(mesh, idx, l_edges);
 #pragma omp barrier
                 if (guards.empty())
                 {
