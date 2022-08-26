@@ -7,6 +7,7 @@ proposals into the Monte Carlo framework.
 """
 
 import numpy as np
+from collections import Counter
 
 from .. import core as m
 
@@ -24,6 +25,15 @@ def _vv_integration(x0, p0, force, m, dt, N):
 
     return x, p
 
+def get_step_counters():
+    """Counter to manage the accounting of steps for moves and flips.
+
+    Returns:
+        collections.Counter:
+            Counter with keys for vertex-moves and edge-flips.
+    """
+    return Counter(move=0, flip=0)
+
 _hmc_default_options = {
     "mass":                  1.0,
     "time_step":             1.0e-4,
@@ -33,7 +43,6 @@ _hmc_default_options = {
     "cooling_factor":        0.0,
     "cooling_start_step":    0,
     "info_step":             100,
-    "init_step":             0,
 }
 
 class HMC:
@@ -78,6 +87,7 @@ class HMC:
         nlog_prob,
         grad_nlog_prob,
         callback=None,
+        counter=get_step_counters(),
         options={},
     ):
         """Initialization."""
@@ -85,7 +95,7 @@ class HMC:
         # function, gradient and callback evaluation
         self.nlog_prob      = nlog_prob
         self.grad_nlog_prob = grad_nlog_prob
-        self.cb             = lambda x: None if callback is None else callback
+        self.cb             = lambda x,s: None if callback is None else callback
 
         # init options
         options    = {**_hmc_default_options, **options}
@@ -105,8 +115,11 @@ class HMC:
         for k, v in options.items():
             print(f"  {k: <{width}}: {v}")
 
+        # ref to step counters
+        self.counter = counter
+
         # init algorithm
-        self.i   = options["init_step"]
+        self.i   = 0
         self.acc = 0
         self.T   = self.Tinit
 
@@ -141,35 +154,40 @@ class HMC:
             self.x    = xn
             self.acc += 1
 
-    def _info(self):
+        # update internal step counter
+        self.i += 1
+
+    def info(self):
         """Print algorithmic information."""
-        if self.istep and self.i % self.istep == 0:
-            print("\n-- HMC-Step ",self.i)
-            print("----- acc-rate:   ", self.acc/self.istep)
+        i_total = sum(self.counter.values())
+        if self.istep and i_total % self.istep == 0:
+            ar = self.acc/self.i if not self.i == 0 else 0.0
+            print("\n-- HMC-Step ", self.counter["move"])
+            print("----- acc-rate:   ", ar)
             print("----- temperature:", self.T)
             self.acc = 0
+            self.i   = 0
 
     def step(self):
         """Make one step."""
 
         # update temperature
-        Tn = np.exp(-self.fT * (self.i - self.cN)) * self.Tinit
+        i = sum(self.counter.values()) #py3.10: self.counter.total()
+        Tn = np.exp(-self.fT * (i - self.cN)) * self.Tinit
         self.T = max(min(Tn, self.Tinit), self.Tmin)
 
         # make a step
         self._step()
 
-        # info
-        self._info()
-
-        # update internal step counter
-        self.i += 1
+        # update step count
+        self.counter["move"] += 1
 
     def run(self, N):
         """Run HMC for N steps."""
         for i in range(N):
             self.step()
-            self.cb(self.x)
+            self.info()
+            self.cb(self.x, self.counter)
 
 
 class MeshHMC(HMC):
@@ -195,10 +213,18 @@ class MeshHMC(HMC):
         nlog_prob,
         grad_nlog_prob,
         callback=None,
+        counter=get_step_counters(),
         options={},
     ):
         """Init."""
-        super().__init__(mesh.x, nlog_prob, grad_nlog_prob, callback, options)
+        super().__init__(
+            mesh.x,
+            nlog_prob,
+            grad_nlog_prob,
+            callback,
+            counter,
+            options
+        )
         self.mesh = mesh
 
     def step(self):
@@ -211,7 +237,6 @@ _mc_flip_default_options = {
     "flip_type": "parallel",
     "flip_ratio": 0.1,
     "info_step":  100,
-    "init_step":  0,
 }
 
 class MeshFlips:
@@ -234,7 +259,13 @@ class MeshFlips:
             * ``info_step`` (default: 100): print info every n'th step
             * ``init_step`` (default: 0): initial value for the step counter
     """
-    def __init__(self, mesh, estore, options={}):
+    def __init__(
+        self,
+        mesh,
+        estore,
+        counter=get_step_counters(),
+        options={}
+    ):
         """Init."""
 
         self.mesh   = mesh
@@ -262,54 +293,80 @@ class MeshFlips:
         else:
             raise ValueError("Wrong flip-type: {}".format(self.ft))
 
-        self.i   = options["init_step"]
+        self.i   = 0
         self.acc = 0
+        self.counter = counter
 
-    def _info(self):
+    def info(self):
         """Print algorithmic information."""
-        if self.istep and self.i % self.istep == 0:
+        i_total = sum(self.counter.values())
+        if self.istep and i_total % self.istep == 0:
             n_edges = self.mesh.trimesh.n_edges()
-            print("\n-- MCFlips-Step ",self.i)
-            print("----- flip-accept: ", self.acc/(self.istep * n_edges))
+            ar      = self.acc / (self.i * n_edges) if not self.i == 0 else 0.0
+            print("\n-- MCFlips-Step ", self.counter["flip"])
+            print("----- flip-accept: ", ar)
             print("----- flip-rate:   ", self.fr)
             self.acc = 0
+            self.i   = 0
 
     def step(self):
         """Make one step."""
         self.acc += self._flips()
-        self._info()
         self.i += 1
+        self.counter["flip"] += 1
+
+    def run(self, N):
+        """Make N flip-sweeps."""
+        for i in range(N):
+            self.step()
+            self.info()
 
 
 class MeshMonteCarlo:
     """MonteCarlo with two-step moves.
 
     Bundles :class:`HMC` and :class:`MeshFlips` into a bi-step Monte Carlo
-    algorithm where each step comprises a step of the :class:`HMC` and
-    subsequently a step of :class:`MeshFlips`.
+    algorithm where each step comprises a step of the :class:`HMC` or
+    a step of :class:`MeshFlips` with equal probability.
 
     Args:
         hmc (HMC): HMC algorithm
         flips (MeshFlips): Monte Carlo flip algorithm
 
     Keyword Args:
-        callback (callable): step callback with signature callback(x)
+        callback (callable): step callback with signature callback(x,s) with
+            x begin the state and s being compatible with collections.Counter
             (defaults to no-op.)
     """
 
-    def __init__(self, hmc, flips, callback=None):
+    def __init__(
+        self,
+        hmc,
+        flips,
+        counter=get_step_counters(),
+        callback=None
+    ):
         """Initialize."""
         self.hmc   = hmc
         self.flips = flips
-        self.cb    = (lambda x: None) if callback is None else callback
+        self.cb    = (lambda x, s: None) if callback is None else callback
+
+        # make counters consistent (! works only for mutables)
+        self.counter       = counter
+        self.hmc.counter   = counter
+        self.flips.counter = counter
 
     def step(self):
         """Make one step each with each algorithm."""
-        self.hmc.step()
-        self.flips.step()
+        if np.random.choice(2) == 0:
+            self.hmc.step()
+        else:
+            self.flips.step()
 
     def run(self, N):
         """Run for N steps."""
         for i in range(N):
             self.step()
-            self.cb(self.flips.mesh.x)
+            self.hmc.info()
+            self.flips.info()
+            self.cb(self.flips.mesh.x, self.counter)

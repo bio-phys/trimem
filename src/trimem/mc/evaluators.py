@@ -18,7 +18,6 @@ _eval_default_options = {
     "refresh_step": 10,
     "flatten":      False,
     "num_steps":    None,
-    "init_step":    0,
     "write_cpt":    lambda m,e,s: None,
 }
 
@@ -96,18 +95,6 @@ class EnergyEvaluators:
         else:
             self._ravel = lambda x: x
 
-        # init callback counter
-        self._step = options["init_step"]
-
-    @property
-    def step(self):
-        """Step counter."""
-        return self._step
-
-    @step.setter
-    def step(self, value):
-        self._step = value
-
     def _update_mesh(func):
         """Decorates a method with an update of the mesh vertices.
 
@@ -117,7 +104,8 @@ class EnergyEvaluators:
         def wrap(self, x, *args, **kwargs):
             self.mesh.x = x.reshape(self.mesh.x.shape)
             return func(self, x, *args, **kwargs)
-        wrap.__doc__ = func.__doc__
+        wrap.__doc__  = func.__doc__
+        wrap.__name__ = func.__name__
         return wrap
 
     @_update_mesh
@@ -162,11 +150,11 @@ class EnergyEvaluators:
         return self._ravel(self.estore.gradient(self.mesh.trimesh))
 
     @_update_mesh
-    def callback(self, x):
+    def callback(self, x, steps):
         """Callback.
 
-        Updates :attr:`step` and allows for the injection of custom
-        trimem functionality into generic sampling and minimization algorithms:
+        Allows for the injection of custom trimem functionality into generic
+        sampling and minimization algorithms:
 
             * stdout verbosity
             * writing of output trajectories
@@ -176,22 +164,23 @@ class EnergyEvaluators:
         Args:
             x (ndarray[float]): (N,3) array of vertex positions with N being
                 the number of vertices in self.mesh.
+            steps (collections.Counter): step counter dictionary
             args: ignored
 
         Keyword Args:
             kwargs: ignored
         """
-        if self.info_step and (self.step % self.info_step == 0):
-            print("\n-- Energy-Evaluation-Step ",self.step)
+        i = sum(steps.values()) #py3.10: steps.total()
+        if self.info_step and (i % self.info_step == 0):
+            print("\n-- Energy-Evaluation-Step ", i)
             self.estore.print_info(self.mesh.trimesh)
-        if self.out_step and (self.step % self.out_step == 0):
+        if self.out_step and (i % self.out_step == 0):
             self.output.write_points_cells(self.mesh.x, self.mesh.f)
-        if self.cpt_step and (self.step % self.cpt_step == 0):
-            self.write_cpt(self.mesh, self.estore, self.step)
-        if self.refresh_step and (self.step % self.refresh_step == 0):
+        if self.cpt_step and (i % self.cpt_step == 0):
+            self.write_cpt(self.mesh, self.estore, steps)
+        if self.refresh_step and (i % self.refresh_step == 0):
             self.estore.update_repulsion(self.mesh.trimesh)
         self.estore.update_reference_properties()
-        self.step += 1
 
 
 class TimingEnergyEvaluators(EnergyEvaluators):
@@ -206,13 +195,14 @@ class TimingEnergyEvaluators(EnergyEvaluators):
         self.n          = options["num_steps"] // self.info_step
         self.start      = datetime.now()
 
-    @property
-    def step(self):
-        return self._step
+    def callback(self, x, steps):
+        """Callback with timings.
 
-    @step.setter
-    def step(self, value):
-        if self.info_step and (self.step % self.info_step == 0):
+        Wraps :meth:`EnergyEvaluators.callback` with timing functionality.
+        """
+        super().callback(x, steps)
+        i = sum(steps.values()) #py3.10: steps.total()
+        if self.info_step and (i % self.info_step == 0):
             self.timestamps.append(time.time())
             if len(self.timestamps) == 2:
                 tspan  = self.timestamps[1] - self.timestamps[0]
@@ -222,4 +212,3 @@ class TimingEnergyEvaluators(EnergyEvaluators):
                 print(f"----- estimated speed: {speed:.3e} s/step")
                 print(f"----- estimated end:   {finish}")
                 self.timestamps.pop(0)
-        self._step = value

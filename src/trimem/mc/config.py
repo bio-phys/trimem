@@ -115,14 +115,18 @@ continuation_delta = 0.0
 continuation_lambda = 1.0
 
 [HMC]
-# number of steps in the markov chain
+# number of steps to run in the markov chain
 num_steps = 10
 
-# inital step number (default: 0)
-# controls start of simulated annealing in combination with 'start_cooling'
-# uncomment and set to desired value in case; useful for restarting from
-# already cooled states
-;init_step = 0
+# inital step number counters (default: {})
+# if not empty it must be a stringification of a dict with keys in
+# ["move", "flip"] and values giving the step count for the step-type indicated 
+# by the key, e.g., a value of {"move": 10, "flip": 5} would restart with a
+# total step count of 15. An empty dict resets all counters.
+# this can be used to control the start of simulated annealing in combination
+# with 'start_cooling' uncomment and set to desired value in case; useful for
+# restarting from already cooled states
+;init_step = {}
 
 # step size for time integration within the HMC-step
 step_size = 1.0
@@ -206,7 +210,7 @@ def read_config(fname):
     # set config defaults
     update_config_defaults(
         config,
-        init_step=0,
+        init_step="{}",
         input=f"{cfile.with_suffix('.stl')}",
         output_prefix=f"{cfile.with_suffix('')}",
         restart_prefix=f"{cfile.with_suffix('')}",

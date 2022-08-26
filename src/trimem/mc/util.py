@@ -7,12 +7,13 @@ from the `mc_app` cli but can also be used standalone as a python module.
 import warnings
 import functools
 import copy
+import json
 
 import numpy as np
 from scipy.optimize import minimize
 
 from .. import core as m
-from .hmc import MeshHMC, MeshFlips, MeshMonteCarlo
+from .hmc import MeshHMC, MeshFlips, MeshMonteCarlo, get_step_counters
 from .mesh import Mesh, read_trimesh
 from .config import update_config_defaults, config_to_params, print_config
 from .output import make_output, create_backup, \
@@ -46,7 +47,7 @@ def setup_energy_manager(config):
 
     return estore, mesh
 
-def write_checkpoint_handle(config, fix_step=None):
+def write_checkpoint_handle(config):
     """Create checkpoint write handle.
 
     Args:
@@ -64,12 +65,11 @@ def write_checkpoint_handle(config, fix_step=None):
 
     conf = copy.deepcopy(config)
 
-    def _write_checkpoint(mesh, estore, step):
+    def _write_checkpoint(mesh, estore, step={}):
         """Write checkpoint with signature (mesh, estore, step)."""
 
-        # don't always set hmc-init-step, e.g. when doing minimzation
-        if not fix_step is None:
-            step = fix_step
+        if not isinstance(step, dict):
+            raise TypeError("kwarg 'step' must be dict-like")
 
         # update config
         upd = {
@@ -78,7 +78,7 @@ def write_checkpoint_handle(config, fix_step=None):
                 "continuation_delta":  estore.eparams.continuation_params.delta,
             },
             "HMC": {
-                "init_step": config["HMC"].getint("init_step") + step,
+                "init_step": json.dumps(step),
             },
         }
         conf.read_dict(upd)
@@ -195,7 +195,6 @@ def run_mc(mesh, estore, config):
         "output_step":  config["HMC"].getint("thin"),
         "cpt_step":     config["GENERAL"].getint("checkpoint_every"),
         "refresh_step": config["SURFACEREPULSION"].getint("refresh"),
-        "init_step":    config["HMC"].getint("init_step"),
         "num_steps":    config["HMC"].getint("num_steps"),
         "write_cpt":    cpt_writer,
     }
@@ -210,7 +209,6 @@ def run_mc(mesh, estore, config):
         "initial_temperature":   cmc.getfloat("initial_temperature"),
         "cooling_factor":        cmc.getfloat("cooling_factor"),
         "cooling_start_step":    cmc.getint("start_cooling"),
-        "init_step":             cmc.getint("init_step"),
         "info_step":             config["GENERAL"].getint("info"),
     }
     hmc = MeshHMC(mesh, funcs.fun, funcs.grad, options=options)
@@ -219,14 +217,17 @@ def run_mc(mesh, estore, config):
     options = {
         "flip_type":  cmc["flip_type"],
         "flip_ratio": cmc.getfloat("flip_ratio"),
-        "init_step":  cmc.getint("init_step"),
         "info_step":  config["GENERAL"].getint("info"),
     }
-    flips = MeshFlips(mesh, estore, options)
+    flips = MeshFlips(mesh, estore, options=options)
+
+    # initialize counters
+    step_count = get_step_counters()
+    step_count.update(json.loads(cmc.get("init_step")))
 
     # setup combined-step markov chain
-    mmc = MeshMonteCarlo(hmc, flips, callback=funcs.callback)
-   
+    mmc = MeshMonteCarlo(hmc, flips, step_count, callback=funcs.callback)
+
     # run sampling 
     mmc.run(cmc.getint("num_steps"))
 
@@ -234,7 +235,7 @@ def run_mc(mesh, estore, config):
     mesh.x = hmc.x
 
     # write final checkpoint
-    cpt_writer(mesh, estore, cmc.getint("num_steps"))
+    cpt_writer(mesh, estore, mmc.counter)
 
 def run_minim(mesh, estore, config):
     """Run (precursor) minimization.
@@ -260,7 +261,7 @@ def run_minim(mesh, estore, config):
         refresh = 1
 
     # init checkpoint writer (no support/need for 'init_step' in minim)
-    cpt_writer = write_checkpoint_handle(config, fix_step=0)
+    cpt_writer = write_checkpoint_handle(config)
 
     # function, gradient and callback
     options = {
@@ -274,6 +275,13 @@ def run_minim(mesh, estore, config):
     }
     funcs = TimingEnergyEvaluators(mesh, estore, output, options)
 
+    # the callback has trimem-specific step counters as postional arg
+    # which scipy's optimizers can't handle; so wrap this locally here
+    step_count = get_step_counters()
+    def _cb(x):
+        funcs.callback(x, step_count)
+        step_count["move"] += 1
+        
     # run minimization
     options = {
         "maxiter": config["MINIMIZATION"].getint("maxiter"),
@@ -283,7 +291,7 @@ def run_minim(mesh, estore, config):
         funcs.fun,
         mesh.x,
         jac=funcs.grad,
-        callback=funcs.callback,
+        callback=_cb,
         method="L-BFGS-B",
         options=options
     )
@@ -295,4 +303,4 @@ def run_minim(mesh, estore, config):
     estore.print_info(mesh.trimesh)
 
     # write final checkpoint
-    cpt_writer(mesh,estore,0)
+    cpt_writer(mesh,estore)

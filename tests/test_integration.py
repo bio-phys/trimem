@@ -40,7 +40,7 @@ continuation_delta = 0.0
 continuation_lambda = 1.0
 [HMC]
 num_steps = 10
-;init_step = 0
+;init_step = {{}}
 step_size = {step_size}
 traj_steps = 10
 momentum_variance = 1.0
