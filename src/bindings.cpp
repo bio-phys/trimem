@@ -871,15 +871,14 @@ void expose_flips(py::module& m)
 
         Performs a sweep over a fraction ``flip_ratio`` of edges in ``mesh``
         in a batch parallel fashion albeit maintaining chain ergodicity.
-        To this end, a batch of edges is selected at random by each thread
-        from a thread-local pool of edges. If an edge is free to be flipped
-        independently, i.e., no overlap of its patch with the patch of other
-        edges (realized by a locking mechanism), it is flipped and its
-        differential contribution to the Hamiltonian is evaluated in parallel
-        for the whole batch. Ergodicity is maintained by subsequently evaluating
-        the Metropolis criterion for each edge in the batch sequentially. This
-        is repeated for a number of ``flip_ratio / batch_size * mesh.n_edges``
-        times.
+        To this end, a batch of edges is selected at random. If an edge is free
+        to be flipped independently, i.e., no overlap of its patch with the
+        patch of other edges (realized by a locking mechanism), it is flipped
+        and its differential contribution to the Hamiltonian is evaluated in
+        parallel for the whole batch. Ergodicity is maintained by subsequently
+        evaluating the Metropolis criterion for each edge in the batch
+        sequentially. This is repeated for a number of
+        ``flip_ratio / batch_size * mesh.n_edges`` times.
 
         Args:
             mesh (TriMesh): input mesh to be used
