@@ -4,6 +4,8 @@ A simple xdmf writer that writes a series of triangle meshes as
 grid collection. It is not a generic xdmf writer but specific to the
 use case in trimem, in particular to the writing of temporal series of meshes
 as xdmf's collections of grids. Data is stored in hdf5 format.
+
+[https://www.xdmf.org/index.php/XDMF_Model_and_Format]
 """
 
 import pathlib
@@ -34,6 +36,7 @@ class XdmfWriter:
         self.data_counter = 0
         self.step_counter = 0
 
+        # init xml tree
         self.xdmf   = ET.Element("Xdmf", Version="3.0")
         self.domain = ET.SubElement(self.xdmf, "Domain")
         self.grids  = ET.SubElement(self.domain,
@@ -41,6 +44,17 @@ class XdmfWriter:
                                     Name="Trajectory",
                                     GridType="Collection",
                                     CollectionType="Temporal")
+
+        # init time steps
+        self.time     = ET.SubElement(self.grids, "Time", TimeType="HyperSlab")
+        self.timedata = ET.SubElement(self.time,
+                                      "DataItem",
+                                      NumberType="Int",
+                                      Dimensions="3")
+
+    def _write_time(self):
+        """Write hyperslab 'start stride count' string."""
+        return "0 1 {}".format(self.step_counter)
 
     def _write_data(self, data):
         """Write data to the hdf storage."""
@@ -100,6 +114,9 @@ class XdmfWriter:
                               Precision=prec,
         )
         data.text = self._write_data(cells)
+
+        # update time steps
+        self.timedata.text = self._write_time()
 
         self.step_counter +=1
 

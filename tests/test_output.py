@@ -98,10 +98,21 @@ def test_writer(writer, data):
         assert collection.attrib["CollectionType"] == "Temporal"
         assert collection.attrib["GridType"] == "Collection"
         assert collection.attrib["Name"] == "Trajectory"
-        assert len(collection) == 2
+        assert len(collection) == 3
+
+        # time steps
+        time = collection[0]
+        assert time.tag == "Time"
+        assert time.attrib["TimeType"] == "HyperSlab"
+
+        data = time[0]
+        assert data.tag == "DataItem"
+        assert data.attrib["NumberType"] == "Int"
+        assert data.attrib["Dimensions"] == "3"
+        assert data.text == "0 1 1"
 
         # first grid
-        grid1 = collection[0]
+        grid1 = collection[1]
         assert grid1.tag == "Grid"
         assert grid1.attrib["Name"] == "Step 0"
         assert grid1.attrib["GridType"] == "Uniform"
@@ -138,7 +149,7 @@ def test_writer(writer, data):
         assert np.linalg.norm(cells - re_cells) < 1.0e-12
 
         # second grid
-        grid1 = collection[1]
+        grid1 = collection[2]
         assert grid1.tag == "Grid"
         assert grid1.attrib["Name"] == "Step 1"
         assert grid1.attrib["GridType"] == "Uniform"
