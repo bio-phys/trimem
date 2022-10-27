@@ -1,5 +1,6 @@
 /** \file nlist.cpp
  */
+#include <memory>
 
 #include "cell_list.h"
 #include "verlet_list.h"

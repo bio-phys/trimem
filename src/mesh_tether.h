@@ -4,6 +4,8 @@
 #ifndef MESH_TETHER_H
 #define MESH_TETHER_H
 
+#include <memory>
+
 #include "defs.h"
 #include "params.h"
 #include "mesh_util.h"
