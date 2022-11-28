@@ -40,6 +40,11 @@ def excl(request):
     d.nn   = request.param[1]
     return d
 
+@pytest.fixture(params=[0.2, 0.5, 1.2])
+def rlist(request):
+    """Parametrize test on rlist."""
+    return request.param
+
 def get_nlist(mesh, ltype, rlist, excl):
     """Get a neighbour list."""
 
@@ -53,24 +58,25 @@ def get_nlist(mesh, ltype, rlist, excl):
 # -----------------------------------------------------------------------------
 #                                                                       test --
 # -----------------------------------------------------------------------------
-def test_distance_matrix(data):
+def test_distance_matrix(data, rlist):
     """Verify distance matrix againt kdtee implementation."""
 
     mesh = data.mesh
     x = mesh.points()
 
-    nl = get_nlist(mesh, data.ltype, 0.2, 0)
+    nl = get_nlist(mesh, data.ltype, rlist, 0)
 
     # compute distance matrix
     d,i,j = nl.distance_matrix(mesh, 0.123)
-    A = coo_matrix((d,(i,j)), shape=(len(x),len(x)))
-    M = A + A.T # kdtree gives full matrix
+    M = coo_matrix((d,(i,j)), shape=(len(x),len(x)))
+    if data.ltype == "cell-list":
+        M = M + M.T # kdtree and verlet-lists gives full matrix
 
     # compare against kd-tree distance computation
     tree = KDTree(x)
     C = tree.sparse_distance_matrix(tree, 0.123)
 
-    assert (C-M).max() == 0.0
+    assert np.allclose(C.todense(), M.todense())
 
 def test_exclusion(data, excl):
     """Test neighbour lists exclusion level."""

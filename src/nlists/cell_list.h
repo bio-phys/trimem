@@ -60,7 +60,7 @@ struct CellList : NeighbourListT<exclusion>
       {
           real dim = box_max[k] - box_min[k] + box_eps;
           int nk     = int(dim/rlist);
-          r_list[k]   = (nk > 0) ? dim/nk : box_eps;
+          r_list[k]   = (nk > 0) ? dim/nk : dim;
           shape[k]    = (nk > 0) ? nk : 1;
       }
       strides = { 1, shape[0], shape[0]*shape[1] };
