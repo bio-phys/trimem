@@ -2,6 +2,13 @@ image: gitlab-registry.mpcdf.mpg.de/mpcdf/module-image
 
 variables:
   GIT_SUBMODULE_STRATEGY: normal
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/pip-cache"
+
+cache:
+  paths:
+    - "$CI_PROJECT_DIR/pip-cache"
+  key: "$CI_PROJECT_ID"
+
 
 workflow:
   rules:
