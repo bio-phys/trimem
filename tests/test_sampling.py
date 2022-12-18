@@ -87,7 +87,7 @@ def test_mesh_hmc():
 
     hmc.run(10)
 
-    assert np.linalg.norm(hmc.x - ref_hmc) < 1.0e-14
+    assert np.allclose(hmc.x,ref_hmc)
 
 @pytest.fixture(params=["flip_parallel", "flip_serial"])
 def flip_type(request):
