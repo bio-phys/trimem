@@ -1,0 +1,11 @@
+prefix=/nfs/scistore15/saricgrp/mwasserm/trimem_sbeady/_skbuild/linux-x86_64-3.11/cmake-install/src/trimem
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: libOpenMesh
+Description: OpenMesh library
+Version: 8.1
+
+Libs: -L${libdir} -lOpenMeshCore -lOpenMeshTools
+Cflags: -I${includedir}

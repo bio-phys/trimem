@@ -1,0 +1,9 @@
+Metadata-Version: 2.1
+Name: trimem
+Version: 0.2.1
+Summary: Tools for the simulation of lipid membranes according to the Helfrich theory
+Author: Trimem Team
+License: GPLv3
+Provides-Extra: tests
+Provides-Extra: docs
+License-File: LICENSE
