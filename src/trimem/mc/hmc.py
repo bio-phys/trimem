@@ -9,6 +9,10 @@ proposals into the Monte Carlo framework.
 import numpy as np
 from collections import Counter
 
+#!
+import time
+from datetime import datetime, timedelta
+
 from .. import core as m
 
 def _vv_integration(x0, p0, force, m, dt, N):
@@ -344,24 +348,35 @@ class MeshMonteCarlo:
         hmc,
         flips,
         counter=get_step_counters(),
-        callback=None
+        callback=None,
+        extra_callback=None
     ):
         """Initialize."""
         self.hmc   = hmc
         self.flips = flips
         self.cb    = (lambda x, s: None) if callback is None else callback
+        self.cbe = (lambda x, s: None) if extra_callback is None else extra_callback
 
         # make counters consistent (! works only for mutables)
         self.counter       = counter
         self.hmc.counter   = counter
         self.flips.counter = counter
 
+
+        self.timearray_loc=np.zeros(2)
+
+
     def step(self):
+
         """Make one step each with each algorithm."""
         if np.random.choice(2) == 0:
+            t_fix = time.time()
             self.hmc.step()
+            self.timearray_loc[0] += (time.time() - t_fix)
         else:
+            t_fix = time.time()
             self.flips.step()
+            self.timearray_loc[1] += (time.time() - t_fix)
 
     def run(self, N):
         """Run for N steps."""
@@ -369,4 +384,6 @@ class MeshMonteCarlo:
             self.step()
             self.hmc.info()
             self.flips.info()
+            self.cbe(self.timearray_loc)
             self.cb(self.flips.mesh.x, self.counter)
+

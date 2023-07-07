@@ -18,7 +18,7 @@ from .mesh import Mesh, read_trimesh
 from .config import update_config_defaults, config_to_params, print_config
 from .output import make_output, create_backup, \
                     CheckpointWriter, CheckpointReader
-from .evaluators import TimingEnergyEvaluators
+from .evaluators import TimingEnergyEvaluators, PerformanceEnergyEvaluators
 from .. import __version__
 
 
@@ -197,8 +197,9 @@ def run_mc(mesh, estore, config):
         "refresh_step": config["SURFACEREPULSION"].getint("refresh"),
         "num_steps":    config["HMC"].getint("num_steps"),
         "write_cpt":    cpt_writer,
+        "prefix" :      config["GENERAL"]["output_prefix"]
     }
-    funcs = TimingEnergyEvaluators(mesh, estore, output, options)
+    funcs = PerformanceEnergyEvaluators(mesh, estore, output, options)
 
     # setup hmc to sample vertex positions
     cmc  = config["HMC"]
@@ -226,7 +227,7 @@ def run_mc(mesh, estore, config):
     step_count.update(json.loads(cmc.get("init_step")))
 
     # setup combined-step markov chain
-    mmc = MeshMonteCarlo(hmc, flips, step_count, callback=funcs.callback)
+    mmc = MeshMonteCarlo(hmc, flips, step_count, callback=funcs.callback,extra_callback=funcs.extra_callback)
 
     # run sampling 
     mmc.run(cmc.getint("num_steps"))
