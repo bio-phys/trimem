@@ -1,8 +1,11 @@
+build
+**/*.so
+**/*.so.*
 _skbuild
 dist
 public
 src/trimem/_version.py
-*.egg-info
+**/*.egg-info
 .eggs
 *.so
 __pycache__

@@ -1,2 +1,0 @@
-[console_scripts]
-mc_app = trimem.mc.app:cli

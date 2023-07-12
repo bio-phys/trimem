@@ -1,5 +1,0 @@
-/nfs/scistore15/saricgrp/mwasserm/trimem_sbeady/_skbuild/linux-x86_64-3.11/cmake-install/src/trimem/./core.cpython-311-x86_64-linux-gnu.so
-/nfs/scistore15/saricgrp/mwasserm/trimem_sbeady/_skbuild/linux-x86_64-3.11/cmake-install/src/trimem/./libtrimem.so
-/nfs/scistore15/saricgrp/mwasserm/trimem_sbeady/_skbuild/linux-x86_64-3.11/cmake-install/src/trimem/./libOpenMeshCore.so.8.1
-/nfs/scistore15/saricgrp/mwasserm/trimem_sbeady/_skbuild/linux-x86_64-3.11/cmake-install/src/trimem/./libOpenMeshCore.so
-/nfs/scistore15/saricgrp/mwasserm/trimem_sbeady/_skbuild/linux-x86_64-3.11/cmake-install/src/trimem/./testd

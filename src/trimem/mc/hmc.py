@@ -8,6 +8,7 @@ proposals into the Monte Carlo framework.
 
 import numpy as np
 from collections import Counter
+import concurrent.futures
 
 #!
 import time
@@ -37,6 +38,8 @@ def get_step_counters():
             Counter with keys for vertex-moves and edge-flips.
     """
     return Counter(move=0, flip=0)
+
+
 
 _hmc_default_options = {
     "mass":                  1.0,
@@ -111,6 +114,7 @@ class HMC:
         self.fT    = options["cooling_factor"]
         self.cN    = options["cooling_start_step"]
         self.istep = options["info_step"]
+        self.actual_step=0
 
         # pretty print options
         print("\n---------------------------------------")
@@ -176,15 +180,25 @@ class HMC:
         """Make one step."""
 
         # update temperature
-        i = sum(self.counter.values()) #py3.10: self.counter.total()
+        #i=2*self.actual_step
+        i = sum(self.counter.values())
+
+        #py3.10: self.counter.total()
         Tn = np.exp(-self.fT * (i - self.cN)) * self.Tinit
+
+
         self.T = max(min(Tn, self.Tinit), self.Tmin)
 
+
+
+
         # make a step
+
         self._step()
 
         # update step count
         self.counter["move"] += 1
+        self.actual_step+=1
 
     def run(self, N):
         """Run HMC for N steps."""
@@ -347,9 +361,11 @@ class MeshMonteCarlo:
         self,
         hmc,
         flips,
+        timearray,
         counter=get_step_counters(),
         callback=None,
         extra_callback=None
+
     ):
         """Initialize."""
         self.hmc   = hmc
@@ -361,9 +377,11 @@ class MeshMonteCarlo:
         self.counter       = counter
         self.hmc.counter   = counter
         self.flips.counter = counter
+        self.hmc_steps=0
+        self.flip_steps=0
 
 
-        self.timearray_loc=np.zeros(2)
+        self.timearray_loc=timearray
 
 
     def step(self):
@@ -373,10 +391,12 @@ class MeshMonteCarlo:
             t_fix = time.time()
             self.hmc.step()
             self.timearray_loc[0] += (time.time() - t_fix)
+            self.hmc_steps+=1
         else:
             t_fix = time.time()
             self.flips.step()
             self.timearray_loc[1] += (time.time() - t_fix)
+            self.flip_steps+=1
 
     def run(self, N):
         """Run for N steps."""
@@ -386,4 +406,10 @@ class MeshMonteCarlo:
             self.flips.info()
             self.cbe(self.timearray_loc)
             self.cb(self.flips.mesh.x, self.counter)
+
+
+
+
+
+
 
