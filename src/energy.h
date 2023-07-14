@@ -22,6 +22,8 @@ public:
     // constructors
     EnergyManager(const TriMesh& mesh,
                   const EnergyParams& params);
+    // static constructor
+    static EnergyManagerDirect(const EnergyParams& params);
 
     // update reference properties
     void update_reference_properties();

@@ -257,6 +257,7 @@ def run_mc(mesh, config,i_reset):
         with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
             future = executor.submit(run_substep,i_reset,xf,config,counter,timer)
             xf,counter,timer=future.result()
+    return xf
 
 
 
