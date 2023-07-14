@@ -22,10 +22,12 @@ public:
     // constructors
     EnergyManager(const TriMesh& mesh,
                   const EnergyParams& params);
-    // static constructor
-    static EnergyManagerDirect(const EnergyParams& params);
+    EnergyManager(const TriMesh& mesh,
+                const EnergyParams& params,
+                const VertexProperties& vertex_properties);
 
-    // update reference properties
+
+  // update reference properties
     void update_reference_properties();
     VertexProperties interpolate_reference_properties() const;
 
@@ -40,6 +42,7 @@ public:
 
     // print status information
     void print_info(const TriMesh& mesh);
+
 
     // energy parameters
     EnergyParams params;

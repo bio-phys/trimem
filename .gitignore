@@ -1,6 +1,8 @@
+**/*.so
+**/*.dylib
 build
 cmake-build-*/
-.idea
+.idea/
 **/*.so
 **/*.so.*
 _skbuild

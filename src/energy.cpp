@@ -11,8 +11,10 @@
 namespace trimem {
 
 EnergyManager::EnergyManager(const TriMesh& mesh,
-                             const EnergyParams& energy_params) :
-  params(energy_params)
+                             const EnergyParams& energy_params,
+                             const VertexProperties& vertex_properties) :
+  params(energy_params),
+  initial_props(vertex_properties)
 {
     // setup bond potential
     bonds = make_bonds(params.bond_params);
@@ -24,11 +26,10 @@ EnergyManager::EnergyManager(const TriMesh& mesh,
     repulse = make_repulsion(*nlist, params.repulse_params);
 
     // evaluate properties from mesh
-    initial_props = properties(mesh);
 }
 
-EnergyManager::EnergyManagerDirect(const EnergyParams& energy_params) :
-  params(energy_params)
+EnergyManager::EnergyManager(const TriMesh& mesh,const EnergyParams& energy_params) :
+    params(energy_params)
 {
     // setup bond potential
     bonds = make_bonds(params.bond_params);
@@ -91,20 +92,6 @@ VertexProperties EnergyManager::properties(const TriMesh& mesh)
 
     return props;
 }
-
-VertexProperties EnergyManager::properties_direct(const real area,
-                                   const real volume,
-                                   const real curvature
-                                   const real bending,
-                                   const real tethering,
-                                   const real repulsion)
-{
-    VertexProperties p{ areal, volume, curvature, bending, tethering, repulsion };
-
-    // Creates directly vertex properties from correspond input values
-    return p;
-}
-
 
 real EnergyManager::energy(const TriMesh& mesh)
 {

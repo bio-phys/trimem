@@ -701,6 +701,23 @@ void expose_energy(py::module& m){
             the neighbour list structures for the repulsion penalty.
             )pbdoc"
         )
+        .def(
+            py::init<const TriMesh&, const EnergyParams&, const VertexProperties &>(),
+            py::arg("mesh"),
+            py::arg("eparams"),
+            py::arg("vertex_properties"),
+            R"pbdoc(
+            Initialization.
+
+            Initializes the EnergyManager's state from the initial ``mesh``
+            and the parametrization provided by ``eparams``. This comprises
+            the setup of the initial state of the parameter continuation,
+            the set up of the reference properties for `area`, `volume` and
+            `curvature` (see :attr:`initial_props`) according to the current
+            state of the parameter continuation as well as the construction of
+            the neighbour list structures for the repulsion penalty.
+            )pbdoc"
+        )
 
         .def(
             "properties",
