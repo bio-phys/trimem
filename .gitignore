@@ -1,4 +1,6 @@
 build
+cmake-build-*/
+.idea
 **/*.so
 **/*.so.*
 _skbuild
