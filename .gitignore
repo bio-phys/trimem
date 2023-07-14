@@ -12,3 +12,4 @@ src/trimem/_version.py
 *.so
 __pycache__
 *.swp
+venv

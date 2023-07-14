@@ -27,6 +27,22 @@ EnergyManager::EnergyManager(const TriMesh& mesh,
     initial_props = properties(mesh);
 }
 
+EnergyManager::EnergyManagerDirect(const EnergyParams& energy_params) :
+  params(energy_params)
+{
+    // setup bond potential
+    bonds = make_bonds(params.bond_params);
+
+    // setup neighbour list
+    nlist = make_nlist(mesh, params);
+
+    // setup mesh repulsion
+    repulse = make_repulsion(*nlist, params.repulse_params);
+
+    // evaluate properties from mesh
+    initial_props = properties(mesh);
+}
+
 VertexProperties EnergyManager::interpolate_reference_properties() const
 {
     auto& cparams = params.continuation_params;
@@ -75,6 +91,20 @@ VertexProperties EnergyManager::properties(const TriMesh& mesh)
 
     return props;
 }
+
+VertexProperties EnergyManager::properties_direct(const real area,
+                                   const real volume,
+                                   const real curvature
+                                   const real bending,
+                                   const real tethering,
+                                   const real repulsion)
+{
+    VertexProperties p{ areal, volume, curvature, bending, tethering, repulsion };
+
+    // Creates directly vertex properties from correspond input values
+    return p;
+}
+
 
 real EnergyManager::energy(const TriMesh& mesh)
 {

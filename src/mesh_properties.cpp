@@ -48,6 +48,9 @@ VertexProperties vertex_properties(const TriMesh& mesh,
     return p;
 }
 
+
+
+
 void vertex_properties_grad(const TriMesh& mesh,
                             const BondPotential& bonds,
                             const SurfaceRepulsion& repulse,
