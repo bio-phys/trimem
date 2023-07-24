@@ -69,13 +69,7 @@ struct EnergyParams
   //! parameters for the repulsion penalty
   SurfaceRepulsionParams repulse_params;
 
-  //!INCLUDING THE INITIAL PROPERTIES AS ENERGY_PARAM
-  real init_area = 1;
-  real init_volume = 1;
-  real init_curvature = 1;
-  real init_bending = 1;
-  real init_tethering = 1;
-  real init_repulsion = 1;
+
 };
 
 }

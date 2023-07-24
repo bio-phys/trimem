@@ -8,27 +8,45 @@ proposals into the Monte Carlo framework.
 
 import numpy as np
 from collections import Counter
-import concurrent.futures
 
-#!
+
 import time
 from datetime import datetime, timedelta
 
 from .. import core as m
+import pathlib
+
+
 
 def _vv_integration(x0, p0, force, m, dt, N):
     """Velocity verlet integration (using momentum instead of velocity)."""
 
+
     x = x0
     p = p0
     a = force(x)
+    dts=dt**2
+    minv=1/m
+    #p=p.reshape(x.shape)
+   # print(x.shape,p.shape,a.shape)
+    #a=a.reshape(x.shape)
+
     for i in range(N):
-        x  = x + (p * dt + 0.5 * a * dt**2) / m
+
+        x  +=  (p * dt + 0.5 * a * dts) * minv
+        #x=add_pos(x,p,dt,dts,a,minv)
         an = force(x)
-        p  = p + 0.5 * (a + an) * dt
+       # an = an.reshape(x.shape)
+
+
+        p  +=  0.5 * (a + an) * dt
+        #p=add_mom(p, a, an, dt)
         a  = an
 
+
     return x, p
+
+
 
 def get_step_counters():
     """Counter to manage the accounting of steps for moves and flips.
@@ -115,6 +133,10 @@ class HMC:
         self.cN    = options["cooling_start_step"]
         self.istep = options["info_step"]
         self.actual_step=0
+        #self.h_new=0
+        #self.h_old=0
+       # self.acc_which=0
+        #self.energyfile_name='energies.dat'
 
         # pretty print options
         print("\n---------------------------------------")
@@ -134,6 +156,8 @@ class HMC:
         # initial state
         self.x = x
 
+
+
     def _hamiltonian(self,x,p):
         """Evaluate Hamiltonian."""
         return self.nlog_prob(x) + 0.5 * p.ravel().dot(p.ravel()) / self.m
@@ -141,6 +165,9 @@ class HMC:
     def _step(self):
         """Metropolis step."""
 
+
+
+        #p=draw_momentum(self.m,self.T,self.x.shape)
         # adjust momentum variance due to current temperature
         p_var = self.m*self.T
 
@@ -152,6 +179,11 @@ class HMC:
         xn, pn = _vv_integration(self.x, p, force, self.m, self.dt, self.L)
 
         # evaluate energies
+
+        #self.h_new = self._hamiltonian(xn, pn)
+       # self.h_old = self._hamiltonian(self.x,p)
+
+        #dh = (self.h_new - self.h_old) / self.T
         dh = (self._hamiltonian(xn, pn) - self._hamiltonian(self.x,p)) / self.T
 
         # compute acceptance probability: min(1, np.exp(-de))
@@ -161,6 +193,9 @@ class HMC:
         if acc:
             self.x    = xn
             self.acc += 1
+            #self.acc_which = 1
+        #else:
+            #self.acc_which = 0
 
         # update internal step counter
         self.i += 1
@@ -200,12 +235,29 @@ class HMC:
         self.counter["move"] += 1
         self.actual_step+=1
 
+        #self.write_energy()
+
+
     def run(self, N):
         """Run HMC for N steps."""
         for i in range(N):
             self.step()
             self.info()
             self.cb(self.x, self.counter)
+
+
+#    def write_energy(self):
+#        i=sum(self.counter.values())
+#        if i % 50 == 0:
+
+#            with open(self.energyfile_name,'a+') as f:
+#                if self.acc_which:
+#                    f.write(f'{i} {self.h_new}\n')
+#                else:
+#                    f.write(f'{i} {self.h_old}\n')
+
+
+
 
 
 class MeshHMC(HMC):
@@ -340,6 +392,8 @@ class MeshFlips:
             self.info()
 
 
+
+
 class MeshMonteCarlo:
     """MonteCarlo with two-step moves.
 
@@ -406,6 +460,14 @@ class MeshMonteCarlo:
             self.flips.info()
             self.cbe(self.timearray_loc)
             self.cb(self.flips.mesh.x, self.counter)
+
+
+
+
+
+
+
+
 
 
 

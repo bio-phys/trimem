@@ -18,17 +18,11 @@ import tracemalloc
 
 class Timer():
     "Storage for timer state to reinitialize PerformanceEnergyEvaluator after Reset"
-    def __init__(self):
-        self.performance_start=time.time()
-        self.performance_timestamps=[]
-        self.timearray=np.zeros(2)
-        self.timearray_new=np.zeros(2)
-
-
-
-
-
-
+    def __init__(self,ptime,ts,ta,tan):
+        self.performance_start=ptime
+        self.performance_timestamps=ts
+        self.timearray=ta
+        self.timearray_new=tan
 
 _eval_default_options = {
     "info_step":    100,
@@ -197,10 +191,14 @@ class EnergyEvaluators:
         if self.out_step and (i % self.out_step == 0):
             self.output.write_points_cells(self.mesh.x, self.mesh.f)
         if self.cpt_step and (i % self.cpt_step == 0):
-            self.write_cpt(self.mesh, self.estore, steps)
+            self.write_cpt()
         if self.refresh_step and (i % self.refresh_step == 0):
             self.estore.update_repulsion(self.mesh.trimesh)
         self.estore.update_reference_properties()
+
+        if  (i % 250==0):
+            with open(f'energies_vol{self.estore.eparams.volume_frac*100:03.0f}_cur{self.estore.eparams.curvature_frac*100:03.0f}.dat','a+') as f:
+                f.write(f'{i} {self.estore.energy(self.mesh.trimesh)}\n')
 
         #######
         #if i==1:
@@ -257,7 +255,7 @@ class PerformanceEnergyEvaluators(EnergyEvaluators):
         self.n          = options["num_steps"] // self.info_step
         self.start      = datetime.now()
         self.timer = timerinp
-        self.performance_increment = 10
+        self.performance_increment = 1000
         self.prefix=options['prefix']
         self.process = psutil.Process()
 
@@ -318,13 +316,13 @@ class PerformanceEnergyEvaluators(EnergyEvaluators):
 
 
 
-        if i==1:
-            open(f'{self.prefix}_energy_tot.dat','w')
-        if i>5000000 and (i % 50 == 0):
-            with open('energy_tot.dat','a') as file:
-                file.write(f'{self.estore.energy(self.mesh.trimesh)}\n')
+        #if i==1:
+        #    open(f'{self.prefix}_energy_tot.dat','w')
+        #if i>5000000 and (i % 50 == 0):
+        #    with open('energy_tot.dat','a') as file:
+        #        file.write(f'{self.estore.energy(self.mesh.trimesh)}\n')
 
-        #if i%500==0:
+        #if i%50==0:
         #    snapshot = tracemalloc.take_snapshot()
         #    top_stats = snapshot.statistics('lineno')
         #    with open('allocation.dat','a') as file:

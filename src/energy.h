@@ -20,6 +20,7 @@ class EnergyManager
 public:
 
     // constructors
+
     EnergyManager(const TriMesh& mesh,
                   const EnergyParams& params);
     EnergyManager(const TriMesh& mesh,
@@ -30,6 +31,8 @@ public:
   // update reference properties
     void update_reference_properties();
     VertexProperties interpolate_reference_properties() const;
+
+//EnergyManager createEnergyManager() const;
 
     // update repulsion potential
     void update_repulsion(const TriMesh& mesh);

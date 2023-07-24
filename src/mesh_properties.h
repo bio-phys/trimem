@@ -21,6 +21,8 @@ struct TVertexProperties
     T tethering;
     T repulsion;
 
+
+
     TVertexProperties<T>& operator+=(const TVertexProperties<T>& lhs)
     {
         area      += lhs.area;
@@ -83,5 +85,11 @@ void vertex_properties_grad(const TriMesh& mesh,
                             const std::vector<VertexProperties>& props,
                             std::vector<VertexPropertiesGradient>& d_props);
 
+
+
 }
+
+
+
+
 #endif

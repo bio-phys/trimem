@@ -94,44 +94,6 @@ def write_checkpoint_handle(config):
 
     return _write_checkpoint
 
-def read_checkpoint(config, restartnum):
-    """Read checkpoint file.
-
-    Acquire checkpoint prefix from config and read the checkpoint with
-    number 'restartnum'.
-
-    Note: Continuation params are taken from the checkpoint.
-    Note: 'init_step' is set from the HMC section if given.
-
-    Args:
-        config (dict-like): run-config file.
-        restartnum (int): checkpoint file number to read.
-
-    Returns:
-        A tuple (mesh, config) with mesh being of type :class:`Mesh` and
-        config being of type `ConfigParser`.
-    """
-
-    prefix = config["GENERAL"]["restart_prefix"]
-
-    cpt = CheckpointReader(prefix, restartnum)
-    points, cells, conf = cpt.read()
-
-    # TODO: restart logic (see issue 26)
-    upd = {
-        "ENERGY": {
-            "continuation_delta":  conf["ENERGY"]["continuation_delta"],
-            "continuation_lambda": conf["ENERGY"]["continuation_lambda"],
-        },
-        "DEFAULT": {
-            "init_step": conf["HMC"]["init_step"],
-        }
-    }
-    config.read_dict(upd)
-
-    print("Read checkpoint:", cpt.fname)
-
-    return Mesh(points, cells), config
 
 def run(config, restart=None):
     """Run algorithm.

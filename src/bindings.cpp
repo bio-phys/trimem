@@ -214,6 +214,8 @@ void expose_properties(py::module& m)
         )pbdoc"
         )
         .def(py::init())
+
+
         .def_readwrite(
             "area",
             &VertexProperties::area,
@@ -685,6 +687,7 @@ void expose_energy(py::module& m){
             )pbdoc"
         )
 
+
         .def(
             py::init<const TriMesh&, const EnergyParams&>(),
             py::arg("mesh"),
@@ -702,7 +705,7 @@ void expose_energy(py::module& m){
             )pbdoc"
         )
         .def(
-            py::init<const TriMesh&, const EnergyParams&, const VertexProperties &>(),
+            py::init<const TriMesh&, const EnergyParams&, const VertexProperties&>(),
             py::arg("mesh"),
             py::arg("eparams"),
             py::arg("vertex_properties"),

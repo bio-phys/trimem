@@ -2,31 +2,18 @@
  * \brief Helfrich Energy functional on a OpenMesh::TriMesh.
  */
 #include "energy.h"
-
+#include "mesh_properties.h"
 #include "mesh_tether.h"
 #include "nlists/nlist.h"
 #include "mesh_repulsion.h"
 #include "kernel.h"
+#include <iostream>
+#include <fstream>
 
 namespace trimem {
 
-EnergyManager::EnergyManager(const TriMesh& mesh,
-                             const EnergyParams& energy_params,
-                             const VertexProperties& vertex_properties) :
-  params(energy_params),
-  initial_props(vertex_properties)
-{
-    // setup bond potential
-    bonds = make_bonds(params.bond_params);
 
-    // setup neighbour list
-    nlist = make_nlist(mesh, params);
 
-    // setup mesh repulsion
-    repulse = make_repulsion(*nlist, params.repulse_params);
-
-    // evaluate properties from mesh
-}
 
 EnergyManager::EnergyManager(const TriMesh& mesh,const EnergyParams& energy_params) :
     params(energy_params)
@@ -43,6 +30,27 @@ EnergyManager::EnergyManager(const TriMesh& mesh,const EnergyParams& energy_para
     // evaluate properties from mesh
     initial_props = properties(mesh);
 }
+
+    EnergyManager::EnergyManager(const TriMesh& mesh,
+                                 const EnergyParams& energy_params,
+                                 const VertexProperties& vertex_properties):
+            params(energy_params),
+            initial_props(vertex_properties)
+
+    {
+
+    
+        // setup bond potential
+        bonds = make_bonds(params.bond_params);
+
+        // setup neighbour list
+        nlist = make_nlist(mesh, params);
+
+        // setup mesh repulsion
+        repulse = make_repulsion(*nlist, params.repulse_params);
+
+        // evaluate properties from mesh
+    }
 
 VertexProperties EnergyManager::interpolate_reference_properties() const
 {
@@ -140,6 +148,7 @@ std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
     return gradient;
 }
 
+
 void EnergyManager::print_info(const TriMesh& mesh)
 {
   auto props     = properties(mesh);
@@ -169,3 +178,5 @@ void EnergyManager::print_info(const TriMesh& mesh)
 
 
 }
+
+
