@@ -233,6 +233,7 @@ class TriSim():
         self.rparams.rlist = rlist
         self.rparams.exclusion_level = exclusion_level
         self.rparams.lc1 = rep_lc1
+        #self.rparams.lc1 = l*0.001
         self.rparams.r = rep_r
 
             # translate energy params
@@ -462,7 +463,10 @@ class TriSim():
             mesh (mesh.Mesh): initial geometry.
             estore (EnergyManager): EnergyManager.
             config (dict-like): run-config file.
+
+
         """
+        refresh_safe = self.algo_params.refresh
 
 
 
@@ -470,6 +474,7 @@ class TriSim():
             wstr = f"SURFACEREPULSION::refresh is set to {self.algo_params.refresh}, " + \
                    "which is ignored in in minimization."
             warnings.warn(wstr)
+
             self.algo_params.refresh = 1
 
         step_count = Counter(move=0, flip=0)
@@ -483,17 +488,19 @@ class TriSim():
             "maxiter": self.algo_params.maxiter,
             "disp": 0,
 
+
         }
         res = minimize(
             self.fun,
             self._ravel(self.mesh.x),
             #self.mesh.x,
-            jac=self._ravel(self.grad),
+            jac=self.grad,
             callback=_cb,
             method="L-BFGS-B",
             options=options
         )
         self.mesh.x = res.x.reshape(self.mesh.x.shape)
+        self.algo_params.refresh=refresh_safe
 
         # print info
         print("\n-- Minimization finished at iteration", res.nit)
@@ -539,7 +546,7 @@ class TriSim():
             float:
                 Value of the Energy represented by ``self.estore``.
         """
-        return self.estore.energy(self.mesh.trimesh)
+        return self._ravel(self.estore.energy(self.mesh.trimesh))
 
     @_update_mesh
     def grad(self, x):
@@ -560,7 +567,7 @@ class TriSim():
                 Gradient with respect to `x` of the Energy represented by
                 ``self.estore``.
         """
-        return self.estore.gradient(self.mesh.trimesh)
+        return self._ravel(self.estore.gradient(self.mesh.trimesh))
 
     @_update_mesh
     def callback(self, x, steps):

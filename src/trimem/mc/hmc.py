@@ -25,6 +25,7 @@ def _vv_integration(x0, p0, force, m, dt, N):
     x = x0
     p = p0
     a = force(x)
+    a=a.reshape(x.shape)
     dts=dt**2
     minv=1/m
     #p=p.reshape(x.shape)
@@ -36,7 +37,7 @@ def _vv_integration(x0, p0, force, m, dt, N):
         x  +=  (p * dt + 0.5 * a * dts) * minv
         #x=add_pos(x,p,dt,dts,a,minv)
         an = force(x)
-       # an = an.reshape(x.shape)
+        an = an.reshape(x.shape)
 
 
         p  +=  0.5 * (a + an) * dt
