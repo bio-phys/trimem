@@ -40,6 +40,32 @@ VertexProperties edge_vertex_properties(TriMesh& mesh,
     return props;
 }
 
+
+VertexPropertiesNSR edge_vertex_properties_nsr(TriMesh& mesh,
+                                       const EdgeHandle& eh,
+                                       const BondPotential& bonds
+                                       )
+
+{
+    VertexPropertiesNSR props{ 0.0, 0.0, 0.0, 0.0};
+
+    for (int i=0; i<2; i++)
+    {
+        // vertex properties of the first face
+        auto heh = mesh.halfedge_handle(eh, i);
+
+        auto ve = mesh.to_vertex_handle(heh);
+        props += vertex_properties_nsr(mesh, bonds, ve);
+
+        auto next_heh = mesh.next_halfedge_handle(heh);
+        ve = mesh.to_vertex_handle(next_heh);
+        props += vertex_properties_nsr(mesh, bonds,  ve);
+    }
+
+    return props;
+}
+
+
 std::unordered_set<int> flip_patch(TriMesh& mesh, const EdgeHandle& eh)
 {
     // get all edges blocked by a flip of eh

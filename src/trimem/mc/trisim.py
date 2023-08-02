@@ -39,13 +39,13 @@ class Timer():
 
 
 class InitialState():
-    def __init__(self,area,volume,curvature,bending,tethering,repulsion):
+    def __init__(self,area,volume,curvature,bending,tethering):
         self.area=area
         self.volume=volume
         self.curvature=curvature
         self.bending=bending
         self.tethering=tethering
-        self.repulsion=repulsion
+       # self.repulsion=repulsion
 
 
 
@@ -175,7 +175,7 @@ class TriSim():
                  curvature=1.0,
                  bending=1.0,
                  tethering=1.0,
-                 repulsion=1.0,
+                 #repulsion=1.0,
 
                  ptime=time.time(),
                  ptimestamp=[],
@@ -275,13 +275,13 @@ class TriSim():
                 energy_increment)
 
         if self.initialize:
-            self.estore = m.EnergyManager(self.mesh.trimesh, self.eparams)
+            self.estore = m.EnergyManagerNSR(self.mesh.trimesh, self.eparams)
             self.initial_state=InitialState(self.estore.initial_props.area,
                                             self.estore.initial_props.volume,
                                             self.estore.initial_props.curvature,
                                             self.estore.initial_props.bending,
-                                            self.estore.initial_props.tethering,
-                                            self.estore.initial_props.repulsion)
+                                            self.estore.initial_props.tethering)
+                                            #self.estore.initial_props.repulsion)
 
 
 
@@ -295,19 +295,19 @@ class TriSim():
                                               volume,
                                               curvature,
                                               bending,
-                                              tethering,
-                                              repulsion)
-            self.init_props = m.VertexProperties()
+                                              tethering
+                                              )
+            self.init_props = m.VertexPropertiesNSR()
             self.init_props.area = self.initial_state.area
             self.init_props.volume = self.initial_state.volume
             self.init_props.curvature = self.initial_state.curvature
             self.init_props.bending = self.initial_state.bending
             self.init_props.tethering = self.initial_state.tethering
-            self.init_props.repulsion = self.initial_state.repulsion
+           # self.init_props.repulsion = self.initial_state.repulsion
 
 
 
-            self.estore = m.EnergyManager(self.mesh.trimesh, self.eparams, self.init_props)
+            self.estore = m.EnergyManagerNSR(self.mesh.trimesh, self.eparams, self.init_props)
 
 
         # BOOKKEEPING
@@ -416,7 +416,7 @@ class TriSim():
                  self.estore.initial_props.curvature,
                  self.estore.initial_props.bending,
                  self.estore.initial_props.tethering,
-                 self.estore.initial_props.repulsion,
+                 #self.estore.initial_props.repulsion,
                  self.timer.performance_start,
                  self.timer.performance_timestamps,
                  self.timer.timestamps,
@@ -512,9 +512,6 @@ class TriSim():
         self.reset_counter()
         #self.reset_output_counter()
 
-
-
-   # getting rid of energy evaluators (replace funcs on top and implement callbacks (also performance properly in TriSim -> ToD.o )
     def _update_mesh(func):
         """Decorates a method with an update of the mesh vertices.
 
@@ -570,6 +567,27 @@ class TriSim():
         return self._ravel(self.estore.gradient(self.mesh.trimesh))
 
     @_update_mesh
+    def grad_unraveled(self, x):
+        """Evaluate gradient.
+
+        Updates ``self.mesh`` with ``x`` and calls ``self.estore.gradient(x)``.
+
+        Args:
+            x (ndarray[float]): (N,3) array of vertex positions with N being
+                the number of vertices in ``self.mesh``.
+            args: ignored
+
+        Keyword Args:
+            kwargs: ignored
+
+        Returns:
+            ndarray[float]:
+                Gradient with respect to `x` of the Energy represented by
+                ``self.estore``.
+        """
+        return self.estore.gradient(self.mesh.trimesh)
+
+    @_update_mesh
     def callback(self, x, steps):
 
 
@@ -603,8 +621,8 @@ class TriSim():
             self.output.write_points_cells(self.mesh.x, self.mesh.f)
         if self.output_params.checkpoint_every and (i % self.output_params.checkpoint_every == 0):
             self.cpt_writer()
-        if self.algo_params.refresh and (i % self.algo_params.refresh == 0):
-            self.estore.update_repulsion(self.mesh.trimesh)
+       # if self.algo_params.refresh and (i % self.algo_params.refresh == 0):
+        #    self.estore.update_repulsion(self.mesh.trimesh)
         self.estore.update_reference_properties()
 
         if self.output_params.energy_increment and (i % self.output_params.energy_increment==0):
@@ -661,6 +679,7 @@ class TriSim():
     def update_energy_parameters(self):
         self.eparams = self.estore.eparams
 
+
     def reset_counter(self,move=0,flip=0):
 
         self.counter = Counter(move=move, flip=flip)
@@ -676,6 +695,10 @@ class TriSim():
     def update_output_counter(self,ocn):
         self.output_params.output_counter = ocn
 
+    def update_output(self):
+        self.output = make_output(self.output_params.output_format, self.output_params.output_prefix,
+                                  self.output_params.output_counter, callback=self.update_output_counter)
+
     def subprocess(self):
         print('made it into a subprocess')
         self.mmc.run(self.algo_params.reinitialize_every)
@@ -690,20 +713,13 @@ class TriSim():
 
 def master_process(trisim):
 
-    print('made it into master process')
+
 
 
     for i_p in range(np.int64(trisim.algo_params.num_steps/trisim.algo_params.reinitialize_every)):
-        print ('am about to start futures')
+
         with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
-            print('creating tastk')
-            try:
-                future = executor.submit(trisim.subprocess)
-            except Exception as exc:
-
-                print (f'generated an exception: {exc}')
-
-            print('submitting tastk')
+            future = executor.submit(trisim.subprocess)
             trisim = future.result()
 
     return trisim

@@ -248,6 +248,59 @@ void expose_properties(py::module& m)
         );
 }
 
+
+
+void expose_properties_nsr(py::module& m)
+{
+    py::class_<VertexPropertiesNSR>(
+        m,
+        "VertexPropertiesNSR",
+        R"pbdoc(Container for vertex-averaged properties.
+
+        The vertex averaged quantities `area`, `volume`, `curvature` and
+        `bending energy` are at the core of the evaluations involved in the
+        Helfrich functional that is represented by :class:`EnergyManager`.
+        class:`VertexProperties` encapsulates access to these quantities. It
+        further allows for the automatic reduction on vectors of
+        :class:`VertexProperties` by implementing the operators
+        ``+=`` and ``-=``.
+
+        Its current usage in trimem implies an AoS approach that might be
+        replaced by an SoA approach if required by performance considerations.
+        In this case the idea is to still keep the container 'interface' as
+        is and manage the data layout behind the scenes.
+        )pbdoc"
+        )
+        .def(py::init())
+
+
+        .def_readwrite(
+            "area",
+            &VertexPropertiesNSR::area,
+            "Face area"
+        )
+        .def_readwrite(
+            "volume",
+            &VertexPropertiesNSR::volume,
+            "Face volume"
+        )
+        .def_readwrite(
+            "curvature",
+            &VertexPropertiesNSR::curvature,
+            "Edge curvature"
+        )
+        .def_readwrite(
+            "bending",
+            &VertexPropertiesNSR::bending,
+            "Bending energy"
+        )
+        .def_readwrite(
+            "tethering",
+            &VertexPropertiesNSR::tethering,
+            "Tether regularization"
+        );
+}
+
 void expose_mesh_utils(py::module& m)
 {
     m.def(
@@ -856,6 +909,184 @@ void expose_energy(py::module& m){
         );
 }
 
+
+void expose_energy_nsr(py::module& m){
+
+    py::class_<EnergyManagerNSR>(
+            m,
+            "EnergyManagerNSR",
+            R"pbdoc(
+            Helfrich functional evaluation.
+
+            Manages a particular parametrization of the Helfrich functional
+            with additional penalties and tether-regularization. At its core
+            it provides methods :func:`energy` and :func:`gradient` for the
+            evaluation of the full Hamiltonian and its gradient.
+            )pbdoc"
+        )
+
+
+        .def(
+            py::init<const TriMesh&, const EnergyParams&>(),
+            py::arg("mesh"),
+            py::arg("eparams"),
+            R"pbdoc(
+            Initialization.
+
+            Initializes the EnergyManager's state from the initial ``mesh``
+            and the parametrization provided by ``eparams``. This comprises
+            the setup of the initial state of the parameter continuation,
+            the set up of the reference properties for `area`, `volume` and
+            `curvature` (see :attr:`initial_props`) according to the current
+            state of the parameter continuation as well as the construction of
+            the neighbour list structures for the repulsion penalty.
+            )pbdoc"
+        )
+        .def(
+            py::init<const TriMesh&, const EnergyParams&, const VertexPropertiesNSR&>(),
+            py::arg("mesh"),
+            py::arg("eparams"),
+            py::arg("vertex_properties"),
+            R"pbdoc(
+            Initialization.
+
+            Initializes the EnergyManager's state from the initial ``mesh``
+            and the parametrization provided by ``eparams``. This comprises
+            the setup of the initial state of the parameter continuation,
+            the set up of the reference properties for `area`, `volume` and
+            `curvature` (see :attr:`initial_props`) according to the current
+            state of the parameter continuation as well as the construction of
+            the neighbour list structures for the repulsion penalty.
+            )pbdoc"
+        )
+
+        .def(
+            "properties",
+            &EnergyManagerNSR::properties,
+            py::arg("mesh"),
+            R"pbdoc(
+            Evaluation of vertex averaged properties.
+
+            Triggers the evaluation of a vector of vertex-averaged properties
+            :class:`VertexProperties` that comprises the basic per-vertex
+            quantities.
+
+            Args:
+                mesh (TriMesh): mesh representing the state to be evaluated
+                    defined by vertex positions as well as connectivity.
+
+            Returns:
+                (N,1) array of :class:`VertexProperties` with N
+                being the number of vertices.
+            )pbdoc"
+        )
+
+        .def(
+            "energy",
+                static_cast<real (EnergyManagerNSR::*)(const TriMesh&)>(
+                    &EnergyManagerNSR::energy),
+            py::arg("mesh"),
+            R"pbdoc(
+            Evaluation of the Hamiltonian.
+
+            Args:
+                mesh (TriMesh): mesh representing the state to be evaluated
+                    defined by vertex positions as well as connectivity.
+
+            Returns:
+                The value of the nonlinear Hamiltonian by computing the
+                vector of VertexProperties and reducing it to the value
+                of the Hamiltonian.
+            )pbdoc"
+        )
+
+        .def(
+            "energy",
+            static_cast<real (EnergyManagerNSR::*)(const VertexPropertiesNSR&)>
+                (&EnergyManagerNSR::energy),
+            py::arg("vprops"),
+            R"pbdoc(
+            Evaluation of the Hamiltonian.
+
+            Args:
+                vprops (VertexProperties): vector of VertexProperties that has
+                    already been evaluated beforehand by :func:`properties`.
+
+            Returns:
+                The value of the nonlinear Hamiltonian by directly reducing
+                on the provided VertexProperties ``vprops``.
+            )pbdoc"
+        )
+
+        .def(
+            "gradient",
+            [](EnergyManagerNSR& _self, const TriMesh& mesh){
+                auto grad = _self.gradient(mesh);
+                return tonumpy(grad[0], grad.size());
+            },
+            py::arg("mesh"),
+            R"pbdoc(
+            Evaluate gradient of the Hamiltonian.
+
+            Args:
+                mesh (TriMesh): mesh representing the state to be evaluated
+                    defined by vertex positions as well as connectivity.
+
+            Returns:
+                (N,3) array of the gradient of the Hamiltonian given by
+                :func:`energy` with respect to the vertex positions.
+                N is the number of vertices in ``mesh``.
+            )pbdoc"
+        )
+
+        .def(
+            "update_reference_properties",
+            &EnergyManagerNSR::update_reference_properties,
+            R"pbdoc(
+            Update reference configurations.
+
+            Uses the parameter continuation defined in the parametrization
+            :attr:`eparams` to update reference values for `area`, `volume`
+            and `curvature` from the target configuration.
+            )pbdoc"
+        )
+
+
+
+        .def(
+            "print_info",
+            &EnergyManagerNSR::print_info,
+            py::call_guard<py::scoped_ostream_redirect,
+            py::scoped_estream_redirect>(),
+            py::arg("mesh"),
+            "Print energy information evaluated on the state given by ``mesh``."
+        )
+
+        .def_readonly(
+            "eparams",
+            &EnergyManagerNSR::params,
+            R"pbdoc(
+            Parametrization of the Hamiltonian.
+
+            :type: EnergyParams
+            )pbdoc"
+         )
+
+        .def_readonly(
+            "initial_props",
+            &EnergyManagerNSR::initial_props,
+            R"pbdoc(
+            Initial reference properties.
+
+            Initial reference properties computed from the definition of the
+            target properties for `area`, `volume` and `curvature`. Created
+            upon construction.
+            )pbdoc"
+        );
+}
+
+
+
 void expose_flips(py::module& m)
 {
     m.def(
@@ -883,6 +1114,61 @@ void expose_flips(py::module& m)
     m.def(
         "pflip",
         &flip_parallel_batches,
+        py::arg("mesh"),
+        py::arg("estore"),
+        py::arg("flip_ratio"),
+        R"pbdoc(
+        Batch parallel flip sweep.
+
+        Performs a sweep over a fraction ``flip_ratio`` of edges in ``mesh``
+        in a batch parallel fashion albeit maintaining chain ergodicity.
+        To this end, a batch of edges is selected at random. If an edge is free
+        to be flipped independently, i.e., no overlap of its patch with the
+        patch of other edges (realized by a locking mechanism), it is flipped
+        and its differential contribution to the Hamiltonian is evaluated in
+        parallel for the whole batch. Ergodicity is maintained by subsequently
+        evaluating the Metropolis criterion for each edge in the batch
+        sequentially. This is repeated for a number of
+        ``flip_ratio / batch_size * mesh.n_edges`` times.
+
+        Args:
+            mesh (TriMesh): input mesh to be used
+            estore (EnergyManager): instance of :class:`EnergyManager` used in
+                combination with the ``mesh`` to evaluate energy differences
+                necessary for flip acceptance/rejection.
+            flip_ratio (float): ratio of edges to test (must be in [0,1]).
+        )pbdoc"
+    );
+}
+
+
+void expose_flips_nsr(py::module& m)
+{
+    m.def(
+        "flip_nsr",
+        &flip_serial_nsr,
+        py::arg("mesh"),
+        py::arg("estore"),
+        py::arg("flip_ratio"),
+        R"pbdoc(
+        Serial flip sweep.
+
+        Performs a sweep over a fraction ``flip_ratio`` of edges in ``mesh``
+        trying to flip each edge sequentially and evaluating the energies
+        associated to the flip against the Metropolis criterion.
+
+        Args:
+            mesh (TriMesh): input mesh to be used
+            estore (EnergyManager): instance of :class:`EnergyManager` used in
+                combination with the ``mesh`` to evaluate energy differences
+                necessary for flip acceptance/rejection.
+            flip_ratio (float): ratio of edges to test (must be in [0,1]).
+        )pbdoc"
+    );
+
+    m.def(
+        "pflip_nsr",
+        &flip_parallel_batches_nsr,
         py::arg("mesh"),
         py::arg("estore"),
         py::arg("flip_ratio"),
@@ -1076,11 +1362,21 @@ PYBIND11_MODULE(core, m) {
     // expose parameters
     expose_parameters(m);
 
+
+
     // expose energy
     expose_energy(m);
 
+    // expose properties nsr
+    expose_properties_nsr(m);
+    // expose energy nsr
+    expose_energy_nsr(m);
+
     // expose flips
     expose_flips(m);
+
+        // expose flips
+    expose_flips_nsr(m);
 
     // expose neighbour lists
     expose_nlists(m);

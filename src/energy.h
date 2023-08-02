@@ -63,5 +63,49 @@ public:
     std::unique_ptr<NeighbourList> nlist;
 };
 
+
+class EnergyManagerNSR
+{
+public:
+
+    // constructors
+
+    EnergyManagerNSR(const TriMesh& mesh,
+                  const EnergyParams& params);
+    EnergyManagerNSR(const TriMesh& mesh,
+                const EnergyParams& params,
+                const VertexPropertiesNSR& vertex_properties);
+
+
+  // update reference properties
+    void update_reference_properties();
+    VertexPropertiesNSR interpolate_reference_properties() const;
+
+//EnergyManager createEnergyManager() const;
+
+
+    // energy and gradient evaluation
+    VertexPropertiesNSR properties(const TriMesh& mesh);
+    real energy(const TriMesh& mesh);
+    real energy(const VertexPropertiesNSR& props);
+    std::vector<Point> gradient(const TriMesh& mesh);
+
+    // print status information
+    void print_info(const TriMesh& mesh);
+
+
+    // energy parameters
+    EnergyParams params;
+
+    // management of reference properties
+    VertexPropertiesNSR initial_props;
+
+    // bond potential
+    std::unique_ptr<BondPotential> bonds;
+
+};
+
+
+
 }
 #endif

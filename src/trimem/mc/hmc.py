@@ -5,11 +5,10 @@ Additionally, a multi-proposal Monte Carlo algorithm is available that is
 capable to integrate trimem-specific edge-flip functionality as flip
 proposals into the Monte Carlo framework.
 """
+import copy
 
 import numpy as np
 from collections import Counter
-
-
 import time
 from datetime import datetime, timedelta
 
@@ -18,31 +17,37 @@ import pathlib
 
 
 
-def _vv_integration(x0, p0, force, m, dt, N):
+def _vv_integration(x0, p0, force, m, dt, N,target,kappa_p):
     """Velocity verlet integration (using momentum instead of velocity)."""
+
 
 
     x = x0
     p = p0
     a = force(x)
     a=a.reshape(x.shape)
+    a[0]+=kappa_p*(target-x[0])
     dts=dt**2
     minv=1/m
-    #p=p.reshape(x.shape)
-   # print(x.shape,p.shape,a.shape)
-    #a=a.reshape(x.shape)
+
 
     for i in range(N):
 
+
         x  +=  (p * dt + 0.5 * a * dts) * minv
-        #x=add_pos(x,p,dt,dts,a,minv)
+
         an = force(x)
+
         an = an.reshape(x.shape)
+        a[0] += kappa_p * (target - x[0])
+
 
 
         p  +=  0.5 * (a + an) * dt
-        #p=add_mom(p, a, an, dt)
+
         a  = an
+
+
 
 
     return x, p
@@ -134,6 +139,18 @@ class HMC:
         self.cN    = options["cooling_start_step"]
         self.istep = options["info_step"]
         self.actual_step=0
+
+        #PULLING
+
+        self.kappa_p=1000
+        self.dist_rel=1.0
+        self.dist_rate=0.001
+        self.x0=copy.deepcopy(x[0])
+        #self.com = copy.deepcopy(np.sum(x,axis=0)/x.shape[0])
+        #self.target=self.com+(self.x0-self.com)*self.dist_rel
+        self.target=self.x0*self.dist_rel
+
+
         #self.h_new=0
         #self.h_old=0
        # self.acc_which=0
@@ -161,10 +178,13 @@ class HMC:
 
     def _hamiltonian(self,x,p):
         """Evaluate Hamiltonian."""
-        return self.nlog_prob(x) + 0.5 * p.ravel().dot(p.ravel()) / self.m
+        return self.nlog_prob(x) + 0.5 * p.ravel().dot(p.ravel()) / self.m+self.kappa_p*np.sum((self.target-x[0])**2)
 
     def _step(self):
         """Metropolis step."""
+
+
+
 
 
 
@@ -177,7 +197,9 @@ class HMC:
 
         # integrate trajectory
         force = lambda x: -self.grad_nlog_prob(x)
-        xn, pn = _vv_integration(self.x, p, force, self.m, self.dt, self.L)
+        xn, pn = _vv_integration(self.x, p, force, self.m, self.dt, self.L,self.target,self.kappa_p)
+
+
 
         # evaluate energies
 
@@ -194,9 +216,12 @@ class HMC:
         if acc:
             self.x    = xn
             self.acc += 1
+
             #self.acc_which = 1
         #else:
             #self.acc_which = 0
+
+
 
         # update internal step counter
         self.i += 1
@@ -204,6 +229,7 @@ class HMC:
     def info(self):
         """Print algorithmic information."""
         i_total = sum(self.counter.values())
+
         if self.istep and i_total % self.istep == 0:
             ar = self.acc/self.i if not self.i == 0 else 0.0
             print("\n-- HMC-Step ", self.counter["move"])
@@ -211,6 +237,14 @@ class HMC:
             print("----- temperature:", self.T)
             self.acc = 0
             self.i   = 0
+
+            with open('pull_force_.dat', 'a+') as f:
+                F = self.kappa_p * (self.target - self.x[0])
+                f.write(
+                    f'{np.sqrt(np.sum(self.target ** 2))} {self.target[0]} {self.target[1]} {self.target[2]} {np.sqrt(np.sum((self.target - self.x0) ** 2))} {np.sqrt(np.sum((self.target - self.x[0]) ** 2))} {F[0]} {F[1]} {F[2]} {np.sqrt(np.sum(F ** 2))/self.kappa_p} {np.sqrt(np.sum(self.x0))}\n')
+
+
+
 
     def step(self):
         """Make one step."""
@@ -234,7 +268,12 @@ class HMC:
 
         # update step count
         self.counter["move"] += 1
-        self.actual_step+=1
+        self.actual_step += 1
+
+        self.dist_rel = 1.0 + i*self.dist_rate
+        self.target = self.x0 * self.dist_rel
+
+
 
         #self.write_energy()
 
@@ -245,6 +284,7 @@ class HMC:
             self.step()
             self.info()
             self.cb(self.x, self.counter)
+
 
 
 #    def write_energy(self):
@@ -358,9 +398,9 @@ class MeshFlips:
         if self.ft == "none" or self.fr == 0.0:
             self._flips = lambda: 0
         elif self.ft == "serial":
-            self._flips = lambda: m.flip(self.mesh.trimesh, self.estore, self.fr)
+            self._flips = lambda: m.flip_nsr(self.mesh.trimesh, self.estore, self.fr)
         elif self.ft == "parallel":
-            self._flips = lambda: m.pflip(self.mesh.trimesh, self.estore, self.fr)
+            self._flips = lambda: m.pflip_nsr(self.mesh.trimesh, self.estore, self.fr)
         else:
             raise ValueError("Wrong flip-type: {}".format(self.ft))
 
@@ -456,6 +496,7 @@ class MeshMonteCarlo:
     def run(self, N):
         """Run for N steps."""
         for i in range(N):
+
             self.step()
             self.hmc.info()
             self.flips.info()
