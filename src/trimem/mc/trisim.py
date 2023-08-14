@@ -427,9 +427,15 @@ class TriSim():
                  self.counter["flip"]
                                )
 
+
+
+    # checkpoint witing
+
     def make_checkpoint_handle(self):
 
         return self.make_checkpoint
+
+
 
     def make_checkpoint(self, force_name=None):
 
@@ -525,6 +531,20 @@ class TriSim():
         wrap.__name__ = func.__name__
         return wrap
 
+
+    def _update_mesh_one(func):
+        """Decorates a method with an update of the mesh vertices.
+
+        The method must have signature f(self, x, \*args, \*\*kwargs) with
+        x being the new vertex coordinates.
+        """
+        def wrap(self,  lmp, ntimestep, nlocal, tag, x,f,  *args, **kwargs):
+            self.mesh.x = x.reshape(self.mesh.x.shape)
+            return func(self, lmp, ntimestep, nlocal, tag, x,f, *args, **kwargs)
+        wrap.__doc__  = func.__doc__
+        wrap.__name__ = func.__name__
+        return wrap
+
     @_update_mesh
     def fun(self, x):
         """Evaluate energy.
@@ -566,6 +586,9 @@ class TriSim():
         """
         return self._ravel(self.estore.gradient(self.mesh.trimesh))
 
+
+
+
     @_update_mesh
     def grad_unraveled(self, x):
         """Evaluate gradient.
@@ -586,6 +609,18 @@ class TriSim():
                 ``self.estore``.
         """
         return self.estore.gradient(self.mesh.trimesh)
+
+
+
+
+
+    @_update_mesh_one
+    def callback_one(self, lmp, ntimestep, nlocal, tag, x, f):
+
+        f[:]=self.estore.gradient(self.mesh.trimesh)
+
+
+
 
     @_update_mesh
     def callback(self, x, steps):

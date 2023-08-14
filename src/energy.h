@@ -89,6 +89,7 @@ public:
     real energy(const TriMesh& mesh);
     real energy(const VertexPropertiesNSR& props);
     std::vector<Point> gradient(const TriMesh& mesh);
+    void gradient_direct(const TriMesh& mesh,std::vector<Point>);
 
     // print status information
     void print_info(const TriMesh& mesh);

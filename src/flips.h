@@ -20,6 +20,6 @@ int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, const real& flip
 
 int flip_serial_nsr(TriMesh& mesh, EnergyManagerNSR& estore, const real& flip_ratio);
 
-int flip_parallel_batches_nsr(TriMesh& mesh, EnergyManagerNSR& estore, const real& flip_ratio);
+std::vector<std::array<int,4>> flip_parallel_batches_nsr(TriMesh& mesh, EnergyManagerNSR& estore, const real& flip_ratio);
 }
 #endif

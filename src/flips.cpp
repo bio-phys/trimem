@@ -13,6 +13,7 @@
 #include "energy.h"
 #include "mesh_properties.h"
 #include "omp_guard.h"
+#include "mesh_util.h"
 
 namespace trimem {
 
@@ -232,7 +233,7 @@ int flip_serial_nsr(TriMesh& mesh, EnergyManagerNSR& estore, const real& flip_ra
     return acc;
 }
 
-int flip_parallel_batches_nsr(TriMesh& mesh, EnergyManagerNSR& estore, const real& flip_ratio)
+std::vector<std::array<int,4>> flip_parallel_batches_nsr(TriMesh& mesh, EnergyManagerNSR& estore, const real& flip_ratio)
 {
     if (flip_ratio > 1.0)
         throw std::range_error("flip_ratio must be <= 1.0");
@@ -250,6 +251,10 @@ int flip_parallel_batches_nsr(TriMesh& mesh, EnergyManagerNSR& estore, const rea
         omp_init_lock(&lock);
 
     int acc  = 0;
+    std::array<int,4> flip_loc;
+    std::vector<std::array<int,4>> flip_ids;
+
+
 #pragma omp parallel reduction(+:acc)
     {
         int ithread = omp_get_thread_num();
@@ -261,10 +266,15 @@ int flip_parallel_batches_nsr(TriMesh& mesh, EnergyManagerNSR& estore, const rea
         std::uniform_int_distribution<int> propose(0, nedges-1);
         int iflips = (int) std::ceil(nflips / nthread);
 
+
+
+
         for (int i=0; i<iflips; i++)
         {
 #pragma omp barrier
             EdgeHandle eh(-1);
+
+
 
             {
                 std::vector<OmpGuard> guards;
@@ -304,6 +314,16 @@ int flip_parallel_batches_nsr(TriMesh& mesh, EnergyManagerNSR& estore, const rea
                 {
                     e0 = en;
                     acc += 1;
+
+                    flip_loc[0]=(mesh.from_vertex_handle(mesh.halfedge_handle(eh,1)).idx());
+                    flip_loc[1]=(mesh.to_vertex_handle(mesh.halfedge_handle(eh,1)).idx());
+                    mesh.flip(eh);
+                    flip_loc[2]=(mesh.from_vertex_handle(mesh.halfedge_handle(eh,1)).idx());
+                    flip_loc[3]=(mesh.to_vertex_handle(mesh.halfedge_handle(eh,1)).idx());
+                    mesh.flip(eh);
+                    flip_ids.push_back(flip_loc);
+
+
                 }
                 else
                 {
@@ -313,8 +333,10 @@ int flip_parallel_batches_nsr(TriMesh& mesh, EnergyManagerNSR& estore, const rea
             }
         }
     } // parallel
+    flip_loc[0]=acc;
+    flip_ids.push_back(flip_loc);
 
-    return acc;
+    return flip_ids;
 }
 
 

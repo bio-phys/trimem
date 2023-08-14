@@ -174,6 +174,8 @@ void expose_mesh(py::module& m)
             "Returns handle to ``halfedge`` next to ``halfedge`` he."
         );
 
+
+
     m.def(
         "read_mesh",
         &read_mesh,
@@ -1025,6 +1027,27 @@ void expose_energy_nsr(py::module& m){
                 return tonumpy(grad[0], grad.size());
             },
             py::arg("mesh"),
+            R"pbdoc(
+            Evaluate gradient of the Hamiltonian.
+
+            Args:
+                mesh (TriMesh): mesh representing the state to be evaluated
+                    defined by vertex positions as well as connectivity.
+
+            Returns:
+                (N,3) array of the gradient of the Hamiltonian given by
+                :func:`energy` with respect to the vertex positions.
+                N is the number of vertices in ``mesh``.
+            )pbdoc"
+        )
+
+        .def(
+            "gradient_direct",
+            [](EnergyManagerNSR& _self, const TriMesh& mesh, std::vector<Point> gradient_res){
+
+            },
+            py::arg("mesh"),
+            py::arg("gradient_res"),
             R"pbdoc(
             Evaluate gradient of the Hamiltonian.
 

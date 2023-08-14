@@ -26,7 +26,7 @@ def _vv_integration(x0, p0, force, m, dt, N,target,kappa_p):
     p = p0
     a = force(x)
     a=a.reshape(x.shape)
-    a[0]+=kappa_p*(target-x[0])
+    #a[0]+=kappa_p*(target-x[0])
     dts=dt**2
     minv=1/m
 
@@ -39,7 +39,7 @@ def _vv_integration(x0, p0, force, m, dt, N,target,kappa_p):
         an = force(x)
 
         an = an.reshape(x.shape)
-        a[0] += kappa_p * (target - x[0])
+        #a[0] += kappa_p * (target - x[0])
 
 
 
@@ -178,7 +178,7 @@ class HMC:
 
     def _hamiltonian(self,x,p):
         """Evaluate Hamiltonian."""
-        return self.nlog_prob(x) + 0.5 * p.ravel().dot(p.ravel()) / self.m+self.kappa_p*np.sum((self.target-x[0])**2)
+        return self.nlog_prob(x) + 0.5 * p.ravel().dot(p.ravel()) / self.m#+self.kappa_p*np.sum((self.target-x[0])**2)
 
     def _step(self):
         """Metropolis step."""

@@ -298,6 +298,38 @@ std::vector<Point> EnergyManagerNSR::gradient(const TriMesh& mesh)
     return gradient;
 }
 
+void EnergyManagerNSR::gradient_direct(const TriMesh& mesh,std::vector<Point> gradient_res)
+{
+    const size_t n = mesh.n_vertices();
+
+    // update properties
+    VertexPropertiesNSR props{ 0, 0, 0, 0, 0};
+    std::vector<VertexPropertiesNSR> vprops(n, props);
+
+    EvaluatePropertiesNSR eval_kernel(params, mesh, *bonds, vprops);
+    parallel_for(n, eval_kernel);
+
+    ReducePropertiesNSR reduce_kernel(vprops);
+    parallel_reduction(n, reduce_kernel, props);
+
+    // reference properties
+    auto ref_props = interpolate_reference_properties();
+
+    // properties gradients
+    VertexPropertiesGradientNSR zeros
+      { Point(0), Point(0), Point(0), Point(0), Point(0) };
+    std::vector<VertexPropertiesGradientNSR> gprops(n, zeros);
+    EvaluatePropertiesGradientNSR pg_kernel(
+        mesh, *bonds, vprops, gprops);
+    parallel_for(n, pg_kernel);
+
+    // evaluate gradient
+    std::vector<Point> gradient(n, Point(0));
+    EvaluateGradientNSR g_kernel(params, props, ref_props, gprops, gradient);
+    parallel_for(n, g_kernel);
+
+    gradient_res=gradient;
+}
 
 void EnergyManagerNSR::print_info(const TriMesh& mesh)
 {
