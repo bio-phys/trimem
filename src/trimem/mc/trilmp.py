@@ -1,3 +1,5 @@
+
+
 import warnings
 from datetime import datetime, timedelta
 import psutil
@@ -19,6 +21,12 @@ from copy import deepcopy
 import numpy as np
 import time
 from scipy.optimize import minimize
+
+import omp_thread_count
+
+
+
+
 
 
 from ctypes import *
@@ -46,8 +54,20 @@ class InitialState():
         self.curvature=curvature
         self.bending=bending
         self.tethering=tethering
-
-
+        
+class Beads():
+    def __init__(self,n_types,bead_int,bead_int_params,bead_pos,bead_vel,bead_sizes,bead_masses,bead_types,self_interaction,self_interaction_params):
+        self.n_beads=bead_pos.shape[0]
+        self.n_types=n_types
+        self.positions=bead_pos
+        self.velocities=bead_vel
+        self.types=bead_types
+        self.masses=bead_masses
+        self.bead_interaction=bead_int
+        self.bead_interaction_params=bead_int_params
+        self.bead_sizes=bead_sizes                      ## diameter
+        self.self_interaction=self_interaction
+        self.self_interaction_params=self_interaction_params
 
 
 class OutputParams():
@@ -127,7 +147,7 @@ class TriLmp():
                  n_search="cell-list",
                  rlist=0.1,
                  exclusion_level=2,
-                 rep_lc1=0.0,
+                 rep_lc1=1.0,
                  rep_r= 2,
                  delta= 0.0,
                  lam= 1.0,
@@ -155,6 +175,8 @@ class TriLmp():
                  start_cooling=0,
                  maxiter=10,
                  refresh=1,
+
+                 thermal_velocities=True,
 
                  #OUTPUT
                  info=10,
@@ -185,7 +207,22 @@ class TriLmp():
                  stime=datetime.now(),
 
                  move_count=0,
-                 flip_count=0
+                 flip_count=0,
+
+
+
+
+                 # BEADS
+                 n_types=0,
+                 bead_int='lj/cut/omp',
+                 bead_int_params=(0,0),
+                 bead_pos=np.zeros((0,0)),
+                 bead_vel=None,
+                 bead_sizes=None,
+                 bead_masses=1.0,
+                 bead_types=[],
+                 self_interaction=False,
+                 self_interaction_params=(0,0)
 
 
 
@@ -193,13 +230,15 @@ class TriLmp():
 
         self.initialize = initialize
 
+
+        # used for minim
         self.flatten = True
         if self.flatten:
             self._ravel = lambda x: np.ravel(x)
         else:
             self._ravel = lambda x: x
 
-
+        # different bond types
         self._bond_enums = {
             "Edge": m.BondType.Edge,
             "Area": m.BondType.Area
@@ -208,19 +247,29 @@ class TriLmp():
 
 
 
-        ## trimeshes
+        ## Mesh
         self.mesh = Mesh(points=mesh_points, cells=mesh_faces)
         self.mesh_temp = Mesh(points=mesh_points, cells=mesh_faces)
         self.n_vertices=self.mesh.x.shape[0]
 
-        ##beads
+        ## Beads
+
+        self.beads=Beads(n_types,
+                         bead_int,
+                         bead_int_params,
+                         bead_pos,
+                         bead_vel,
+                         bead_sizes,
+                         bead_masses,
+                         bead_types,
+                         self_interaction,
+                         self_interaction_params)
 
 
 
 
 
-
-
+        ## Bond Parameters
 
         self.bparams = m.BondParams()
         if issubclass(type(bond_type), str):
@@ -234,25 +283,33 @@ class TriLmp():
             self.bparams.lc0 = 1.25 * l
             self.bparams.lc1 = 0.75 * l
             self.bparams.a0 = a
+
         else:
             self.bparams.lc0 = lc0
             self.bparams.lc1 = lc1
             self.bparams.a0  = a0
 
+
+        ## Surface Repulsion Parametes
         self.rparams = m.SurfaceRepulsionParams()
         self.rparams.n_search = n_search
         self.rparams.rlist = rlist
         self.rparams.exclusion_level = exclusion_level
-        self.rparams.lc1 = rep_lc1
+
+        self.rparams.lc1 = self.bparams.lc1/0.75 #rep_lc1
         #self.rparams.lc1 = l*0.001
         self.rparams.r = rep_r
 
+
+        # Continuation Params
             # translate energy params
 
         self.cp = m.ContinuationParams()
         self.cp.delta = delta
         self.cp.lam = lam
 
+
+        ## Energy Params
         self.eparams = m.EnergyParams()
         self.eparams.kappa_b = kappa_b
         self.eparams.kappa_a = kappa_a
@@ -267,11 +324,13 @@ class TriLmp():
         self.eparams.repulse_params = self.rparams
         self.eparams.continuation_params = self.cp
 
+
+        # Algorithmic Params
         self.algo_params=AlgoParams(num_steps,reinitialize_every,init_step,step_size,traj_steps,
                  momentum_variance,flip_ratio,flip_type,initial_temperature,
                  cooling_factor,start_cooling,maxiter,refresh)
 
-
+        # Output Params
         self.output_params=OutputParams(info,
                  thin,
                  out_every,
@@ -285,6 +344,8 @@ class TriLmp():
                 performance_increment,
                 energy_increment)
 
+
+        ## Energy Manager Initialisation
         if self.initialize:
             # setup energy manager with initial mesh
             self.estore = m.EnergyManagerNSR(self.mesh.trimesh, self.eparams)
@@ -296,18 +357,7 @@ class TriLmp():
                                             self.estore.initial_props.tethering)
                                             #self.estore.initial_props.repulsion)
 
-
-
-
-
-
             self.initialize=False
-
-
-
-
-
-
 
         else:
             # reinitialize using saved initial state properties (for reference potential V, A, dA)
@@ -328,73 +378,80 @@ class TriLmp():
             self.estore = m.EnergyManagerNSR(self.mesh.trimesh, self.eparams, self.init_props)
 
 
+    # set Mass Vector
+        self.masses = []
+        for i in range(self.n_vertices):
+            self.masses.append(self.algo_params.momentum_variance)
+
+        if self.beads.n_beads:
+            if self.beads.n_types > 1:
+                for i in range(self.beads.n_beads):
+                    self.masses.append(self.beads.masses[self.beads.types[i]-2])
+            else:
+                for i in range(self.beads.n_beads):
+                    self.masses.append(self.beads.masses)
+        self.masses=np.asarray(self.masses)
+
 
     #   SETTING UP LAMMPS
+
+
         # create internal lammps instance
         self.lmp = lammps()
-        self.L = PyLammps(ptr=self.lmp,verbose=True)
-        # use basic setup for system
-        basic_system = f"""              units lj
+        self.L = PyLammps(ptr=self.lmp,verbose=False)
+
+        # basic setup for system
+        self.pure_MD=False
+
+
+
+        basic_system = f"""             units lj
                                         dimension 3
+                                        package omp {omp_thread_count.get_thread_count()}
+                                        log none
+                                        
                                         
                                         
                                         atom_style	hybrid bond charge
-                                        
                                         atom_modify sort 0 0.0
                                         
-                                        
-                                        
-                                        
-                                        
-                                        
-                                        
+         
                                         region box block -5 5 -5 5 -5 5
-                                        create_box 1 box bond/types 1 extra/bond/per/atom 10 extra/special/per/atom 10
+                                        create_box {1+self.beads.n_types} box bond/types 1 extra/bond/per/atom 10 extra/special/per/atom 6
                                          
                                         run_style verlet
-                                        thermo_modify lost ignore norm no
-
-                                        fix 1 all  nve/limit 2.0
-                                        fix ext all external pf/callback 1 1
-                                        fix_modify ext energy yes
-                                        timestep 0.00007
                                         
-                                        special_bonds coul 0.0 0.0 0.0
+                                        fix 1 all  nve/limit 0.6
+                                        
+                                        fix ext all external pf/callback 1 1
+                                       
+                                        timestep {self.algo_params.step_size}
+                                        
+                                        special_bonds lj/coul 0.0 0.0 0.0
                                         bond_style zero nocoeff
                                         bond_coeff 1 1 0.0
                                         
                                         
-                                        pair_style coul/debye {1/(0.5*l)} {1.5*l}
-                                        pair_coeff * *
-                                        pair_coeff 1 1 {1.5*l}
-                                        
-                                        mass            1 1.0
                                         dielectric  1.0
+                                        compute th_ke all ke
+                                        compute th_pe all pe pair
                                         
+                                        thermo {self.algo_params.traj_steps}                                        
+                                        thermo_style custom c_th_pe c_th_ke
+                                        thermo_modify norm no
                                         
-                                        
-                                        
-                                        
-                                        
+                                        info styles compute out log 
                                         
                                         """
-        #pair_style
-        #zero
-        #1
-        #nocoeff
-        # pair_coeff 1 1
-        #thermo 1000
-        #
 
 
-        # initial verlocities
+        # initial verlocities (thermal -> redraw velocities each hmc step
 
-
+        self.thermal_velocities=thermal_velocities
         self.atom_props = f"""     
                 
-                
-                velocity        all create {self.algo_params.initial_temperature} 1298371 mom yes dist gaussian   
-
+                velocity        all create {self.algo_params.initial_temperature} 1298371 mom yes dist gaussian 
+        
                 """
 
         # set vertex atomtype to 1
@@ -402,55 +459,99 @@ class TriLmp():
 
         # initialize lammps
         self.lmp.commands_string(basic_system)
-
-        # create vertices
-        #self.lmp.create_atoms(self.mesh.x.shape[0], range(1,self.mesh.x.shape[0]+1), atype, np.ravel(self.mesh.x));
-       # self.x0 = self.lmp.numpy.extract_atom("x")[0].copy()
-
-        # set random thermal velocities
+        self.set_repulsion()
 
 
-        #set initial bond topology from mesh
+        #get initial bond topology from mesh
         self.edges = trimesh.Trimesh(vertices=self.mesh.x, faces=self.mesh.f).edges_unique
         self.edges=np.unique(self.edges,axis=0)
-        print('yo')
-        with open('bonds.in','w') as f:
+
+
+
+        print(self.beads.n_beads)
+        print(f'{1+self.beads.n_types}')
+        with open('bonds.in', 'w') as f:
             f.write('\n\n')
-            f.write(f'{self.mesh.x.shape[0]} atoms\n')
+            f.write(f'{self.mesh.x.shape[0]+self.beads.n_beads} atoms\n')
             f.write(f'{self.edges.shape[0]} bonds\n\n')
 
-            f.write(f'1 atom types\n')
+            f.write(f'{1+self.beads.n_types} atom types\n')
             f.write(f'1 bond types\n\n')
 
-            f.write(f'Atoms #bond\n\n')
-            for i in range(self.mesh.x.shape[0]):
-                f.write(f'{i+1} 1  {self.mesh.x[i,0]} {self.mesh.x[i,1]} {self.mesh.x[i,2]} 1 1.0 \n')
+            f.write('Masses\n\n')
+            f.write(f'1 {self.algo_params.momentum_variance}\n')
+            if self.beads.n_beads:
+                for i in range(self.beads.n_types):
 
-            #f.write(f'{self.mesh.x.shape[0]+1} {self.mesh.x[0,0]} {self.mesh.x[0,1]} {self.mesh.x[0,2]} 1 2\n')
-            f.write(f'Bonds #zero\n\n')
+                    f.write(f'{i+2} {self.beads.masses[i]}\n')
+
+
+            f.write(f'Atoms # hybrid\n\n')
+            for i in range(self.n_vertices):
+                f.write(f'{i + 1} 1  {self.mesh.x[i, 0]} {self.mesh.x[i, 1]} {self.mesh.x[i, 2]} 1 1.0 \n')
+
+            if self.beads.n_beads:
+                if self.beads.n_types>1:
+                    for i in range(self.beads.n_beads):
+                        f.write(f'{self.n_vertices+1+i} {self.beads.types[i]} {self.beads.positions[i,0]} {self.beads.positions[i,1]} {self.beads.positions[i,2]} 1 1.0\n')
+                else:
+                    for i in range(self.beads.n_beads):
+                        f.write(f'{self.n_vertices+1+i} 2 {self.beads.positions[i,0]} {self.beads.positions[i,1]} {self.beads.positions[i,2]} 1 1.0\n')
+
+
+            # f.write(f'{self.mesh.x.shape[0]+1} {self.mesh.x[0,0]} {self.mesh.x[0,1]} {self.mesh.x[0,2]} 1 2\n')
+            f.write(f'Bonds # zero\n\n')
 
             for i in range(self.edges.shape[0]):
-                f.write(f'{i+1} 1 {self.edges[i, 0] + 1} {self.edges[i, 1] + 1}\n')
+                f.write(f'{i + 1} 1 {self.edges[i, 0] + 1} {self.edges[i, 1] + 1}\n')
+
 
 
         self.lmp.command('read_data bonds.in add merge')
-        self.lmp.commands_string(self.atom_props)
+        if self.thermal_velocities:
+            self.lmp.commands_string(self.atom_props)
+        else:
+            self.lmp.command('velocity all zero linear')
 
-                #self.lmp.command(f'create_bonds single/bond 1 {self.edges[i, 0]+1} {self.edges[i, 1]+1}  ') #special yes?
+        if self.beads.velocities:
+            for i in range(self.n_vertices,self.n_vertices+self.beads.n_beads):
+                self.L.atoms[i].velocity=self.beads.velocities[i,:]
 
-        #self.lmp.command(f'create_bonds single/bond 1 {self.edges[i, 0] + 1} {self.edges[i, 1] + 1}  ')
 
 
-        # set callback for helfrich gradient to be handed to lammps vie fix external "ext"
+
+
+
+        # set callback for helfrich gradient to be handed to lammps via fix external "ext"
 
         self.lmp.set_fix_external_callback("ext", self.callback_one, self.lmp)
-        #self.L.command(f'create_bonds many all all 1 0.0 100.0 ')
+
+        self.set_bead_membrane_interaction()
+
+
+
+
+
+
+
+
 
 
 
 
         v=self.lmp.numpy.extract_atom("v")
-        self.energy=self.estore.energy(self.mesh.trimesh)+0.5 * v.ravel().dot(v.ravel())
+        #print(self.lmp.extract_compute('th_ke',LMP_STYLE_GLOBAL,LMP_TYPE_SCALAR))
+        self.pe=0.0
+        self.ke=0.5 * v.ravel().dot(v.ravel())
+        self.he=self.estore.energy(self.mesh.trimesh)
+        self.energy=self.pe+self.ke+self.he#+0.5 * v.ravel().dot(v.ravel())
+
+
+        print('now')
+
+        #print(self.L.eval('pe'))
+        print(self.energy)
+        print('and then')
         self.energy_new=0.0
         #self.v=np.zeros()
 
@@ -519,16 +620,19 @@ class TriLmp():
 
         if nf:
 
-            del_com='remove special'
+            del_com='remove'
 
             for i in range(nf):
-                #if i == nf-1:
-                del_com = 'remove special'
+                if i == nf-1:
+                    del_com = 'remove special'
 
                 self.lmp.command(f'create_bonds single/bond 1 {flip_id[i][0] + 1} {flip_id[i][1] + 1}')
                 self.lmp.command(f'group flip_off id {flip_id[i][2] + 1} {flip_id[i][3] + 1}')
                 self.lmp.command(f'delete_bonds flip_off bond 1 {del_com}')
                 self.lmp.command('group flip_off clear')
+
+                    #self.lmp.command(f'delete_bonds flip_off bond 1 special')
+
 
                 #ids+=f'{flip_id[i*4+2]+1} {flip_id[i*4+3]+1} '
            # print(ids)
@@ -559,7 +663,7 @@ class TriLmp():
         """Make one step."""
         flip_ids=self._flips()
         self.mesh.f[:]=self.mesh.f
-        print(flip_ids)
+        #print(flip_ids)
         self.lmp_flip(flip_ids)
 
 
@@ -573,78 +677,147 @@ class TriLmp():
 
 
     def hmc_step(self):
+        if not self.pure_MD:
 
-        # setting temperature
-        i = sum(self.counter.values())
-        Tn = np.exp(-self.algo_params.cooling_factor * (i - self.algo_params.start_cooling)) * self.algo_params.initial_temperature
-        self.T = max(min(Tn, self.algo_params.initial_temperature), 10e-4)
+            # setting temperature
+            i = sum(self.counter.values())
+            Tn = np.exp(-self.algo_params.cooling_factor * (i - self.algo_params.start_cooling)) * self.algo_params.initial_temperature
+            self.T = max(min(Tn, self.algo_params.initial_temperature), 10e-4)
 
-        self.T=1.0
-
-
-
-
-        # safe mesh for reset in case of rejection
-        self.mesh_temp=copy(self.mesh)
-
-        #calute energy
-        #future make a flag system to avoid double calculation if lst step was also hmc step
-
-        self.atom_props = f"""     
-                        mass            1 1.0
-                        velocity        all create {self.T} {np.random.randint(1,9999999)} mom yes dist gaussian   
-
-                        """
+            #self.T=1.0
 
 
 
 
-        #self.lmp.commands_string(self.atom_props)
-
-        # use ke from lammps to get kinetic energy
-        v = self.lmp.numpy.extract_atom("v")
-
-
-        self.energy = self.estore.energy(self.mesh_temp.trimesh) + 0.5 * v.ravel().dot(v.ravel())
-        #self.energy = x[:, 0].dot(x[:, 0])*0.5  + 0.5 * v.ravel().dot(v.ravel())
-
-        #run MD trajectory
-
-        #self.lmp.command(f'run {self.algo_params.traj_steps}')
-        #self.mesh.x[:]=self.lmp.numpy.extract_atom("x")
-
-        self.L.run(self.algo_params.traj_steps)
-
-        #set global energy in lammps
-        #self.lmp.fix_external_set_energy_global("ext", self.estore.energy(self.mesh.trimesh))
-
-        # calculate energy difference -> future: do it all in lamps via the set command above (incl. SP and bead interactions)
-        v=self.lmp.numpy.extract_atom("v")
-        self.mesh.x[:] = self.lmp.numpy.extract_atom("x")
-        print(f'{0.5 * v.ravel().dot(v.ravel())} {self.estore.energy(self.mesh.trimesh)}')
-        self.energy_new=self.estore.energy(self.mesh.trimesh)+0.5 * v.ravel().dot(v.ravel())
+            # safe mesh for reset in case of rejection
+            self.mesh_temp=copy(self.mesh.x)
+            self.beads_temp=copy(self.beads.positions)
 
 
-        dh = (self.energy_new- self.energy) / self.T
+            #calute energy
+            #future make a flag system to avoid double calculation if lst step was also hmc step
+            if self.thermal_velocities:
+                 self.atom_props = f"""     
+                            
+                            velocity        all create {self.T} {np.random.randint(1,9999999)} mom yes dist gaussian   
+    
+                            """
+                 self.lmp.commands_string(self.atom_props)
+                 v = self.lmp.numpy.extract_atom("v")
+                 self.ke= 0.5 * (self.masses[:,np.newaxis]*v).ravel().dot(v.ravel())
+            else:
+                self.velocities_temp=self.lmp.numpy.extract_atom('v')
+
+            # use ke from lammps to get kinetic energy
 
 
-        # compute acceptance probability: min(1, np.exp(-de))
-        a = 1.0 if dh <= 0 else np.exp(-dh)
-        u = np.random.uniform()
-        acc = u <= a
-        if acc:
-            self.m_acc += 1
+
+
+            self.he = self.estore.energy(self.mesh.trimesh)
+            self.energy = self.pe + self.ke + self.he
+
+
+
+           #
+           # self.energy = 0#(self.estore.energy(self.mesh_temp.trimesh)+self.lmp.numpy.extract_compute("th_ke", LMP_STYLE_GLOBAL, LMP_TYPE_SCALAR)
+                           # +self.lmp.numpy.extract_compute("th_pe", LMP_STYLE_GLOBAL, LMP_TYPE_SCALAR))#+ 0.5 * v.ravel().dot(v.ravel())
+
+            #self.energy = x[:, 0].dot(x[:, 0])*0.5  + 0.5 * v.ravel().dot(v.ravel())
+
+            #run MD trajectory
+
+            self.lmp.command(f'run {self.algo_params.traj_steps}')
+
+
+
+            #self.L.run(self.algo_params.traj_steps)
+
+            #set global energy in lammps
+            #self.lmp.fix_external_set_energy_global("ext", self.estore.energy(self.mesh.trimesh))
+
+            # calculate energy difference -> future: do it all in lamps via the set command above (incl. SP and bead interactions)
+            #v=self.lmp.numpy.extract_atom("v")
+            if not self.beads.n_beads:
+                self.mesh.x[:] = self.lmp.numpy.extract_atom("x")
+            else:
+                pos_alloc=self.lmp.numpy.extract_atom("x")
+                self.mesh.x[:] = pos_alloc[:self.n_vertices]
+                self.beads.positions[:] = pos_alloc[self.n_vertices:self.n_vertices+self.beads.n_beads]
+
+            # kinetic and potential energy via LAMMPS
+            self.ke_new=self.lmp.numpy.extract_compute("th_ke",LMP_STYLE_GLOBAL,LMP_TYPE_SCALAR)
+            self.pe_new=self.lmp.numpy.extract_compute("th_pe", LMP_STYLE_GLOBAL, LMP_TYPE_SCALAR)
+
+
+            # add helfrich energy via Trimem
+            self.energy_new = self.estore.energy(self.mesh.trimesh) + self.ke_new + self.pe_new
+
+
+            dh = (self.energy_new- self.energy) / self.T
+            print(dh)
+
+
+
+            # compute acceptance probability: min(1, np.exp(-de))
+            a = 1.0 if dh <= 0 else np.exp(-dh)
+            u = np.random.uniform()
+            acc = u <= a
+            if acc:
+                self.m_acc += 1
+                self.ke=copy(self.ke_new)
+                self.pe=copy(self.pe_new)
+
+            else:
+                # reset positions if rejected
+                if not self.beads.n_beads:
+
+                    self.mesh.x[:]=self.mesh_temp[:]
+                    atoms_alloc=self.L.atoms
+                    if self.thermal_velocities:
+                        for i in range(self.n_vertices):
+                            atoms_alloc[i].position[:]=self.mesh_temp[i,:]
+                    else:
+                        for i in range(self.n_vertices):
+                            atoms_alloc[i].position[:]=self.mesh_temp[i,:]
+                            atoms_alloc[i].velocity[:]=self.velocities_temp[i,:]
+
+
+                else:
+
+                    self.mesh.x[:] = self.mesh_temp[:]
+                    self.beads.positions[:] = self.beads_temp[:]
+                    atoms_alloc = self.L.atoms
+
+                    if self.thermal_velocities:
+                        for i in range(self.n_vertices):
+                            atoms_alloc[i].position[:] = self.mesh_temp[i, :]
+
+                        for i in range(self.n_vertices,self.n_vertices+self.beads.n_beads):
+                            atoms_alloc[i].position[:] = self.beads_temp[i-self.n_vertices, :]
+                    else:
+                        for i in range(self.n_vertices):
+                            atoms_alloc[i].position[:] = self.mesh_temp[i, :]
+                            atoms_alloc[i].velocity[:] = self.velocities_temp[i,:]
+
+                        for i in range(self.n_vertices, self.n_vertices + self.beads.n_beads):
+                            atoms_alloc[i].position[:] = self.beads_temp[i - self.n_vertices, :]
+                            atoms_alloc[i].velocity[:] = self.velocities_temp[i, :]
+
+
+                    #self.lmp.command(f'set atom {i+1} x {self.mesh_temp.x[i,0]} y {self.mesh_temp.x[i,1]} z {self.mesh_temp.x[i,2]} ')
+
+            self.m_i += 1
+
+            self.counter["move"] += 1
 
         else:
-            # reset positions if rejected
-            self.mesh.x[:]=self.mesh_temp.x[:]
-            for i in range(v.shape[0]):
-                self.L.atoms[i].position[:]=self.mesh_temp.x[i,:]
-                #self.lmp.command(f'set atom {i+1} x {self.mesh_temp.x[i,0]} y {self.mesh_temp.x[i,1]} z {self.mesh_temp.x[i,2]} ')
+            self.lmp.command(f'run {self.algo_params.traj_steps}')
+            self.m_acc += 1
+            self.m_i += 1
 
-        self.m_i += 1
+            self.counter["move"] += 1
 
-        self.counter["move"] += 1
+
 
 
 
@@ -715,7 +888,7 @@ class TriLmp():
         """
         def wrap(self,  lmp, ntimestep, nlocal, tag, x,f,  *args, **kwargs):
 
-            self.mesh.x = x.reshape(self.mesh.x.shape)
+            self.mesh.x = x[:self.n_vertices].reshape(self.mesh.x[:self.n_vertices].shape)
             self.lmp.fix_external_set_energy_global("ext", self.estore.energy(self.mesh.trimesh))
             return func(self, lmp, ntimestep, nlocal, tag, x,f, *args, **kwargs)
         wrap.__doc__  = func.__doc__
@@ -731,7 +904,7 @@ class TriLmp():
     def callback_one(self, lmp, ntimestep, nlocal, tag, x, f):
         #print(tag)
         #tag_clear=[x-1 for x in tag if x <= self.n_vertices]
-        f[:]=-self.estore.gradient(self.mesh.trimesh)
+        f[:self.n_vertices]=-self.estore.gradient(self.mesh.trimesh)
         #self.lmp.fix_external_set_energy_global("ext", self.estore.energy(self.mesh.trimesh))
 
     @_update_mesh_one
@@ -1086,4 +1259,144 @@ class TriLmp():
     def update_output(self):
         self.output = make_output(self.output_params.output_format, self.output_params.output_prefix,
                                   self.output_params.output_counter, callback=self.update_output_counter)
+
+
+
+
+##### TABLE LOOKUP FOR SURFACE REPULSION
+
+    # this funtion creates a python file implementing the repulsive part of the tether potential as surface repulsion readable by
+    # the lammps pair_style python
+    def make_srp_python(self):
+        with open('trilmp_srp_pot.py','w') as f:
+            f.write(f"""\
+from __future__ import print_function
+import numpy as np
+
+class LAMMPSPairPotential(object):
+    def __init__(self):
+        self.pmap=dict()
+        self.units='lj'
+    def map_coeff(self,name,ltype):
+        self.pmap[ltype]=name
+    def check_units(self,units):
+        if (units != self.units):
+           raise Exception("Conflicting units: %s vs. %s" % (self.units,units))
+
+
+class SRPTrimem(LAMMPSPairPotential):
+    def __init__(self):
+        super(SRPTrimem,self).__init__()
+        # set coeffs: kappa_r, cutoff, r (power)
+        #              4*eps*sig**12,  4*eps*sig**6
+        self.units = 'lj'
+        self.coeff = {{'C'  : {{'C'  : ({self.eparams.repulse_params.lc1},{self.eparams.kappa_r},{self.eparams.repulse_params.r})  }} }}
+
+    def compute_energy(self, rsq, itype, jtype):
+        coeff = self.coeff[self.pmap[itype]][self.pmap[jtype]]
+
+        srp1 = coeff[0]
+        srp2 = coeff[1]
+        srp3 = coeff[2]
+        r = np.sqrt(rsq)
+        rl=r-srp1
+
+        e=0.0
+        e+=np.exp(r/rl)
+        e/=r**srp3
+        e*=srp2
+
+        return e
+
+    def compute_force(self, rsq, itype, jtype):
+        coeff = self.coeff[self.pmap[itype]][self.pmap[jtype]]
+        srp1 = coeff[0]
+        srp2 = coeff[1]
+        srp3 = coeff[2]
+
+        r = np.sqrt(rsq)
+        f=0.0
+
+        rp = r ** (srp3 + 1)
+        rl=r-srp1
+        f=srp1/(rl*rl)+srp3/r
+        f/=rp
+        f*=np.exp(r/rl)
+        f*=srp2
+
+        return f    
+""")
+
+    # uses the pair_style defined above to create a lookup table used as actual pair_style in the vertex-vertex interaction in Lammps
+    # table should be treated as a coulomb interaction by lamb and hence is subject to 1-2, 1-3 or 1-4 neighbourhood exclusion of special bonds
+    # used to model the mesh topology
+    def set_repulsion(self):
+        coeff=''
+        for i in range(self.beads.n_types):
+            coeff+='C '
+        python_pair_style = f"""pair_style python {self.eparams.repulse_params.lc1}
+                                 pair_coeff * * trilmp_srp_pot.SRPTrimem C {coeff}
+                                 shell rm -f trimem_srp.table
+                                 pair_write  1 1 2000 rsq 0.000001 {self.eparams.repulse_params.lc1} trimem_srp.table trimem_srp 1.0 1.0
+                                 pair_style none 
+                                 pair_style table/omp linear 2000
+                                 pair_coeff * * trimem_srp.table trimem_srp
+                                 
+            
+                                 """
+
+        if self.eparams.repulse_params.lc1:
+            self.make_srp_python()
+            self.lmp.commands_string(python_pair_style)
+            return
+        else:
+            return
+
+
+    ### simple test case for bead interaction with membrane via LJ potential
+    def set_bead_membrane_interaction(self):
+        if not self.beads.n_beads:
+            return
+        else:
+            if self.beads.n_types==1:
+                bead_ljd=0.5 * (self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)
+
+                ## STILL NEED TO PARAMETRIZE GLOBAL CUTOFF
+                reciprocal_lj=f""" pair_style {self.beads.bead_interaction} {4*bead_ljd}                                           
+                                   pair_coeff 1 2 {self.beads.bead_interaction_params[0]} {bead_ljd} {bead_ljd*self.beads.bead_interaction_params[1]}  
+                                   pair_coeff 1 1 0 0 0 
+                                   pair_coeff 2 2 0 0 0 
+                                
+            """
+                self.lmp.commands_string(reciprocal_lj)
+            else:
+                bead_ljd = 0.5 * (self.estore.eparams.bond_params.lc1 + np.max(self.beads.bead_sizes))
+                self.lmp.command(f'pair_style {self.beads.bead_interaction} {4*bead_ljd}')
+                self.lmp.command(f'pair_coeff 1 1 0 0 0')
+
+                for i in range(self.beads.n_types):
+                    bead_ljd = 0.5 * (self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes[i])
+                    self.lmp.command(f'pair_coeff 1 {i+2}  {self.beads.bead_interaction_params[i][0]} {bead_ljd} {bead_ljd*self.beads.bead_interaction_params[i][1]}')
+
+                    if self.beads.self_interaction:
+                        for j in range(i,self.beads.n_types):
+                            bead_ljd = 0.5 * (self.beads.bead_sizes[i] + self.beads.bead_sizes[i])
+                            self.lmp.command(
+                                f'pair_coeff {i+2} {j + 2} {self.beads.self_interaction_params[0]} {bead_ljd} {bead_ljd * self.beads.self_interaction_params[1]}')
+                    else:
+                        for j in range(i,self.beads.n_types):
+
+                            self.lmp.command(
+                                f'pair_coeff {i + 2} {j + 2} 0 0 0')
+
+
+
+
+
+
+
+
+
+
+
 
