@@ -218,7 +218,7 @@ class TriLmp():
                  bead_int_params=(0,0),
                  bead_pos=np.zeros((0,0)),
                  bead_vel=None,
-                 bead_sizes=None,
+                 bead_sizes=0.0,
                  bead_masses=1.0,
                  bead_types=[],
                  self_interaction=False,
@@ -288,6 +288,9 @@ class TriLmp():
             self.bparams.lc0 = lc0
             self.bparams.lc1 = lc1
             self.bparams.a0  = a0
+
+
+
 
 
         ## Surface Repulsion Parametes
@@ -377,6 +380,8 @@ class TriLmp():
             #recreate energy manager
             self.estore = m.EnergyManagerNSR(self.mesh.trimesh, self.eparams, self.init_props)
 
+        self.l0 = self.estore.eparams.bond_params.lc1 / 0.75
+
 
     # set Mass Vector
         self.masses = []
@@ -398,26 +403,44 @@ class TriLmp():
 
         # create internal lammps instance
         self.lmp = lammps()
-        self.L = PyLammps(ptr=self.lmp,verbose=False)
+        self.L = PyLammps(ptr=self.lmp,verbose=True)
 
         # basic setup for system
-        self.pure_MD=False
+        self.pure_MD=True
+        add_tether = False
+        self.nonreciprocal=True
+
+
+
+
+        ## Tether settings fore pulling
+        tether_text='bond_coeff * * 0.0'
+        n_bond_types=1
+        if add_tether:
+            n_bond_types=2
+            tether_text="""
+            bond_style harmonic/omp
+            bond_coeff 1 1 0.0
+            bond_coeff 2 10000 0.1
+            """
+
 
 
 
         basic_system = f"""             units lj
                                         dimension 3
                                         package omp {omp_thread_count.get_thread_count()}
+                                        
                                         log none
                                         
                                         
                                         
-                                        atom_style	hybrid bond charge
+                                        atom_style	hybrid bond charge 
                                         atom_modify sort 0 0.0
                                         
          
-                                        region box block -5 5 -5 5 -5 5
-                                        create_box {1+self.beads.n_types} box bond/types 1 extra/bond/per/atom 10 extra/special/per/atom 6
+                                        region box block -10 10 -10 10 -10 10
+                                        create_box {1+self.beads.n_types} box bond/types {n_bond_types} extra/bond/per/atom 14 extra/special/per/atom 14
                                          
                                         run_style verlet
                                         
@@ -429,12 +452,13 @@ class TriLmp():
                                         
                                         special_bonds lj/coul 0.0 0.0 0.0
                                         bond_style zero nocoeff
-                                        bond_coeff 1 1 0.0
+                                        {tether_text}
+                                        
                                         
                                         
                                         dielectric  1.0
                                         compute th_ke all ke
-                                        compute th_pe all pe pair
+                                        compute th_pe all pe pair bond
                                         
                                         thermo {self.algo_params.traj_steps}                                        
                                         thermo_style custom c_th_pe c_th_ke
@@ -445,14 +469,7 @@ class TriLmp():
                                         """
 
 
-        # initial verlocities (thermal -> redraw velocities each hmc step
 
-        self.thermal_velocities=thermal_velocities
-        self.atom_props = f"""     
-                
-                velocity        all create {self.algo_params.initial_temperature} 1298371 mom yes dist gaussian 
-        
-                """
 
         # set vertex atomtype to 1
        # atype = np.ndarray.tolist(np.ones((self.mesh.x.shape[0]), dtype=np.int64))
@@ -468,22 +485,30 @@ class TriLmp():
 
 
 
-        print(self.beads.n_beads)
-        print(f'{1+self.beads.n_types}')
+
+
+
+
         with open('bonds.in', 'w') as f:
             f.write('\n\n')
             f.write(f'{self.mesh.x.shape[0]+self.beads.n_beads} atoms\n')
-            f.write(f'{self.edges.shape[0]} bonds\n\n')
+            f.write(f'{self.edges.shape[0]+np.int64(add_tether)} bonds\n\n')
 
             f.write(f'{1+self.beads.n_types} atom types\n')
-            f.write(f'1 bond types\n\n')
+            if add_tether:
+                f.write(f'2 bond types\n\n')
+            else:
+                f.write(f'1 bond types\n\n')
 
             f.write('Masses\n\n')
             f.write(f'1 {self.algo_params.momentum_variance}\n')
             if self.beads.n_beads:
                 for i in range(self.beads.n_types):
+                    if self.beads.n_types>1:
 
-                    f.write(f'{i+2} {self.beads.masses[i]}\n')
+                        f.write(f'{i+2} {self.beads.masses[i]}\n')
+                    else:
+                        f.write(f'{i + 2} {self.beads.masses}\n')
 
 
             f.write(f'Atoms # hybrid\n\n')
@@ -505,17 +530,65 @@ class TriLmp():
             for i in range(self.edges.shape[0]):
                 f.write(f'{i + 1} 1 {self.edges[i, 0] + 1} {self.edges[i, 1] + 1}\n')
 
+            if add_tether:
+                d_temp=1000
+                h=0
+                for i in range(self.n_vertices):
+                    d_temp2=np.sum((self.mesh.x[i,:]-self.beads.positions[0,:])**2)
+                    if d_temp>d_temp2:
+                        d_temp=d_temp2
+                        h=i
 
+                f.write(f'{self.edges.shape[0]+1} 2 {h+1} {self.n_vertices+1}\n')
+
+                # initial verlocities (thermal -> redraw velocities each hmc step
+
+
+
+        self.thermal_velocities = thermal_velocities
+        self.atom_props = f"""     
+
+                        velocity vertices create {self.algo_params.initial_temperature} 1298371 mom yes dist gaussian 
+
+                        """
 
         self.lmp.command('read_data bonds.in add merge')
+        self.lmp.command('group vertices type 1')
+        for i in range(self.beads.n_types):
+            self.lmp.command(f'group beads_{i+2} type {i+2}')
+
+
+
+
+        self.langevin_thermo=True
+        if self.langevin_thermo:
+            sc0=self.algo_params.momentum_variance/self.l0
+            bds = ''
+            if self.beads.n_types:
+                if self.beads.n_types>1:
+                    bds = ''
+                    for i in range(self.beads.n_types):
+                        bds += f'scale {i + 2} {(self.beads.masses[i] / self.beads.bead_sizes[i])/sc0} '
+                else:
+                    bds=f'scale 2 {(self.beads.masses / self.beads.bead_sizes)/sc0} '
+
+
+
+
+            lv_thermo_comm=f"""
+                            fix lvt all langevin {self.algo_params.initial_temperature*1} {self.algo_params.initial_temperature*1} 0.03 1 {bds}
+                            
+                            """
+            self.lmp.commands_string(lv_thermo_comm)
+
         if self.thermal_velocities:
             self.lmp.commands_string(self.atom_props)
         else:
             self.lmp.command('velocity all zero linear')
 
-        if self.beads.velocities:
+        if np.any(self.beads.velocities):
             for i in range(self.n_vertices,self.n_vertices+self.beads.n_beads):
-                self.L.atoms[i].velocity=self.beads.velocities[i,:]
+                self.L.atoms[i].velocity=self.beads.velocities[i-self.n_vertices,:]
 
 
 
@@ -526,7 +599,17 @@ class TriLmp():
 
         self.lmp.set_fix_external_callback("ext", self.callback_one, self.lmp)
 
-        self.set_bead_membrane_interaction()
+
+
+        #set bead interactions
+        if self.beads.n_types:
+            print('SETTING NONRECIPROCAL INTERACTIONS')
+
+            self.set_nonreciprocal_bead_membrane_interaction()
+
+
+        with open('mem_size.dat','w') as f:
+            f.write(f'{self.estore.eparams.bond_params.lc1}')
 
 
 
@@ -699,7 +782,7 @@ class TriLmp():
             if self.thermal_velocities:
                  self.atom_props = f"""     
                             
-                            velocity        all create {self.T} {np.random.randint(1,9999999)} mom yes dist gaussian   
+                            velocity        vertices create {self.T} {np.random.randint(1,9999999)} mom yes dist gaussian   
     
                             """
                  self.lmp.commands_string(self.atom_props)
@@ -1005,6 +1088,8 @@ class TriLmp():
             #with open('bonds_topo.xyz','a+') as f:
             #    for i in range(bonds_lmp.shape[0])
             #    f.write(f'{i}')
+
+
 
 
 
@@ -1328,7 +1413,7 @@ class SRPTrimem(LAMMPSPairPotential):
 """)
 
     # uses the pair_style defined above to create a lookup table used as actual pair_style in the vertex-vertex interaction in Lammps
-    # table should be treated as a coulomb interaction by lamb and hence is subject to 1-2, 1-3 or 1-4 neighbourhood exclusion of special bonds
+    # table should be treated as a coulomb interaction by lammps and hence is subject to 1-2, 1-3 or 1-4 neighbourhood exclusion of special bonds
     # used to model the mesh topology
     def set_repulsion(self):
         coeff=''
@@ -1393,6 +1478,54 @@ class SRPTrimem(LAMMPSPairPotential):
 
 
 
+
+##### nonreciprocal interactions
+
+    def set_nonreciprocal_bead_membrane_interaction(self):
+        exponent=7
+        print(f'\n\n\nthingy:{3.5 * 0.5 * (self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)}')
+        non_rec_command=f"""
+variable sigma12         equal {(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes):.4f} 
+variable activity_1      equal 50.0
+variable mobility_2      equal -1.0
+variable activity_2      equal 10.0
+variable mobility_1      equal -1.0
+variable cutoff_nonrec   equal {2.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes):.4f}
+variable exponent        equal {exponent}
+variable scale_nonrep    equal {1/2**exponent:.4f}
+# ----------------------
+# soft-core (harmonic) repulsion  
+# ----------------------
+variable k_harmonic        equal 200000
+variable lc_harmonic_11    equal 0.1
+variable lc_harmonic_22    equal 1.0
+variable lc_harmonic_12    equal {0.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)}
+
+
+# PAIR STYLES
+# ----------------------
+pair_style hybrid/overlay harmonic/cut nonreciprocal ${{cutoff_nonrec}} ${{scale_nonrep}} ${{exponent}} ${{sigma12}} 
+pair_coeff 1 1 nonreciprocal 0 0 0 0 0 0   
+pair_coeff 2 2 nonreciprocal 0 0 0 0 0 0
+pair_coeff 1 2 harmonic/cut ${{k_harmonic}} ${{lc_harmonic_12}}
+
+pair_coeff 2 2 harmonic/cut ${{k_harmonic}} ${{lc_harmonic_22}}
+pair_coeff 1 1 harmonic/cut 0 ${{lc_harmonic_22}}
+pair_coeff 1 2 nonreciprocal ${{activity_1}} ${{activity_2}} ${{mobility_1}} ${{mobility_2}} ${{cutoff_nonrec}}
+
+neigh_modify one 20000 page 200000
+
+
+shell rm -f nonrec.table
+pair_write  1 2 1000 r 0.000001 {2} nonrec.table nonrec 1.0 1.0    
+        """
+
+
+        print(non_rec_command)
+
+        print('\n\n\n')
+
+        self.lmp.commands_string(non_rec_command)
 
 
 
