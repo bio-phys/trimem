@@ -24,7 +24,7 @@ from copy import deepcopy
 import numpy as np
 import time
 from scipy.optimize import minimize
-
+rea
 
 
 class Timer():

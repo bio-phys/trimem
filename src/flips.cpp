@@ -251,6 +251,7 @@ std::vector<std::array<int,4>> flip_parallel_batches_nsr(TriMesh& mesh, EnergyMa
         omp_init_lock(&lock);
 
     int acc  = 0;
+    int nattempt = 0;
     std::array<int,4> flip_loc;
     std::vector<std::array<int,4>> flip_ids;
 
@@ -304,6 +305,7 @@ std::vector<std::array<int,4>> flip_parallel_batches_nsr(TriMesh& mesh, EnergyMa
             // evaluate energy
 #pragma omp critical
             {
+                nattempt += 1;
                 props -= dprops;
                 real en  = estore.energy(props);
                 real de = en - e0;
@@ -334,6 +336,10 @@ std::vector<std::array<int,4>> flip_parallel_batches_nsr(TriMesh& mesh, EnergyMa
         }
     } // parallel
     flip_loc[0]=acc;
+    flip_loc[1]=nflips;
+    flip_loc[2]=nattempt;
+    flip_loc[3]=0;
+
     flip_ids.push_back(flip_loc);
 
     return flip_ids;
