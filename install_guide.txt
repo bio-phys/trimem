@@ -1,0 +1,26 @@
+Firt create a conda environment here we will call it "Trienv"
+
+conda create -n Trienv
+
+conda install -n Trienv scikit-build libgcc psutil
+download trilmp from git
+
+git clone --recurse-submodules
+git submodule update
+
+cd trilmp_sbeady
+
+make a local install (to be able to make changes if necessry)
+
+pip intall -e .
+
+
+
+copy shared libaries to src -> name depends on system and python verison! in my case
+cp _skbuild/linux-x86_64-3.11/cmake-build/core.cpython-39-x86_64-linux-gnu.so src/trimem/.
+cp _skbuild/linux-x86_64-3.11/cmake-build/libtrimem.so src/trimem/.
+cp _skbuild/linux-x86_64-3.9/cmake-build/Build/lib/* src/trimem/.
+
+
+install lammps!
+

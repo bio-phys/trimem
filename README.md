@@ -1,7 +1,9 @@
-# Trimem
+# TriLmp
 
-**Trimem** is a python package for the Monte Carlo simulation of lipid
-membranes according to the Helfrich theory [^Helfrich1973].
+**TriLmp** is a modified version of the **Trimem** python package for the Monte Carlo simulation of lipid
+membranes according to the Helfrich theory [^Helfrich1973]. It allows for the direct use for MD simulations
+in connection with LAMMPS via the python interface of the latter. Hereby the calculation of the surface repulsion
+is dealt with by LAMMPS instead of Trimem.
 
 [^Helfrich1973]: Helfrich, W. (1973) Elastic properties of lipid bilayers:
   Theory and possible experiments. Zeitschrift für Naturforschung C,
@@ -9,7 +11,9 @@ membranes according to the Helfrich theory [^Helfrich1973].
 
 ## Installation
 
-Trimem can be installed using pip:
+We suggest installing TriLmp in a conda environment
+
+TriLmp can be installed using pip:
 
 ```bash
  git clone --recurse-submodules https://github.com/bio-phys/trimem.git

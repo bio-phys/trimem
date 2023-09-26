@@ -3,6 +3,7 @@
 import warnings
 from datetime import datetime, timedelta
 import psutil
+import os
 
 from copy import copy
 
@@ -10,21 +11,20 @@ import trimesh
 from .. import core as m
 from trimem.core import TriMesh
 from trimem.mc.mesh import Mesh
-#from .evaluators import PerformanceEnergyEvaluators,  TimingEnergyEvaluators
-#from .hmc import MeshHMC, MeshFlips, MeshMonteCarlo, get_step_counters
+
 from trimem.mc.output import make_output
 from collections import Counter
-#import concurrent.futures
+
 import pickle
 import pathlib
-#from copy import deepcopy
+
 import numpy as np
 import time
 from scipy.optimize import minimize
 
 import omp_thread_count
 
-from trimem.mc.trilmp_h5 import H5TrajectoryWriter
+import trimem.mc.trilmp_h5
 
 
 
@@ -54,7 +54,7 @@ The overall structure of the programm is
 -Internal classes used by TriLmp
 -TriLmp Object
 
--- Default Parameters
+-- Default Parameters -> description of all parameters
 -- Initialization of Internal classes using parameters
 -- Init. of TRIMEM EnergyManager used for gradient/energy of helfrich hamiltonian
 
@@ -68,7 +68,7 @@ The overall structure of the programm is
 -- RUN Functions -> simulation utility to be used in script
 -- CALLBACK and OUTPUT 
 -- Some Utility Functions
--- Minimize Functions
+-- Minimize Function -> GD for preconditionining states for HMC
 -- Pickle + Checkpoint Utility
 -- LAMMPS scrips used for setup
 
@@ -559,7 +559,7 @@ class TriLmp():
 
         # create internal lammps instance
         self.lmp = lammps()
-        self.L = PyLammps(ptr=self.lmp,verbose=True)
+        self.L = PyLammps(ptr=self.lmp,verbose=False)
 
         ###########################################
         #            Optional Tethers             #
@@ -595,7 +595,7 @@ class TriLmp():
                                         dimension 3
                                         package omp {omp_thread_count.get_thread_count()}
                                         
-                                        log none
+                                        
                                         
                                         atom_style	hybrid bond charge 
                                         atom_modify sort 0 0.0
@@ -627,6 +627,11 @@ class TriLmp():
                                         thermo_modify norm no
                                         
                                         info styles compute out log 
+                                        
+                                        
+                                        echo log
+                                        log none
+                                        
                                         
                                         """
 
@@ -699,6 +704,9 @@ class TriLmp():
 
                 # initial verlocities (thermal -> redraw velocities each hmc step
 
+
+
+        # initialize LAMMPS
         self.lmp.command('read_data sim_setup.in add merge')
 
 
@@ -778,7 +786,7 @@ class TriLmp():
         # Temperature in LAMMPS set to fixed initial temperature
         self.T = self.algo_params.initial_temperature
 
-        # approx. initialization of energy components
+        # approx. initialization of energy components (i.e. first step for HMC will probably be accepted, irrelevant for pureMD)
         v=self.lmp.numpy.extract_atom("v")
         self.pe=0.0
         self.ke=0.5 * self.algo_params.momentum_variance*v.ravel().dot(v.ravel())
@@ -813,7 +821,7 @@ class TriLmp():
 
         self.cpt_writer = self.make_checkpoint_handle()
         self.process=psutil.Process()
-        self.n = self.algo_params.num_steps // self.output_params.info
+        self.n= self.algo_params.num_steps // self.output_params.info if self.output_params.info!=0 else 0.0
 
 
         self.info_step = max(self.output_params.info, 0)
@@ -829,16 +837,25 @@ class TriLmp():
        #####                   TRAJECTORY WRITER SETTINGS                        #####
        ###############################################################################
         if self.output_params.output_format=='xyz' or self.output_params.output_format=='vtu' or self.output_params.output_format=='xdmf':
-             self.output = make_output(self.output_params.output_format, self.output_params.output_prefix,
+             self.output = lambda i : make_output(self.output_params.output_format, self.output_params.output_prefix,
                                   self.output_params.output_counter, callback=self.update_output_counter)
         if self.output_params.output_format == 'lammps_txt':
-            def lammps_output(self,i):
+            def lammps_output(i):
                self.L.command(f'write_data {self.output_params.output_prefix}.s{i}.txt')
-            self.output=lambda: lammps_output
+
+            self.output = lambda i: lammps_output(i)
+
+        if self.output_params.output_format == 'lammps_txt_folder':
+            os.system('rm -r lmp_trj')
+            os.system('mkdir lmp_trj')
+            def lammps_output(i):
+                self.L.command(f'write_data lmp_trj/{self.output_params.output_prefix}.s{i}.txt')
+            self.output=lambda i: lammps_output(i)
+
         if self.output_params.output_format == 'h5_custom':
-            self.h5writer=H5TrajectoryWriter(self)
-            self.h5writer._init_struct()
-            self.output = lambda: self.h5writer._write_state
+            self.h5writer=trimem.mc.trilmp_h5.H5TrajectoryWriter(self.output_params)
+            self.h5writer._init_struct(self.lmp,self.mesh,self.beads,self.estore)
+            self.output = lambda i: self.h5writer._write_state(self.lmp,self.mesh,i)
 
        #############################################################################
         #####                           FLIPPING                                #####
@@ -978,11 +995,11 @@ class TriLmp():
 
             #run MD trajectory
 
-            self.lmp.command(f'run {self.algo_params.traj_steps}')
+            #self.lmp.command(f'run {self.algo_params.traj_steps}')
 
 
 
-            #self.L.run(self.algo_params.traj_steps)
+            self.L.run(self.algo_params.traj_steps)
 
             #set global energy in lammps
             #self.lmp.fix_external_set_energy_global("ext", self.estore.energy(self.mesh.trimesh))
@@ -1112,12 +1129,15 @@ class TriLmp():
 
 
 
-    def run(self,N):
+    def run(self,N=0):
+        if N==0:
+            N=self.algo_params.num_steps
+
         if self.algo_params.switch_mode=='random':
-            self.step = lambda: self.step_random(self)
-            sim_steps=N,
-        if self.algo_params.switch_mode=='alternating':
-            self.step = lambda: self.step_alternate(self)
+            self.step = lambda: self.step_random()
+            sim_steps=N
+        elif self.algo_params.switch_mode=='alternating':
+            self.step = lambda: self.step_alternate()
             sim_steps=np.int64(np.floor(N/2))
         else:
             raise ValueError("Wrong switchmode: {}. Use 'random' or 'alternating' ".format(self.algo_params.flip_type))
