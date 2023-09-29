@@ -23,48 +23,57 @@ To set up a conda environment including some prerequisites use:
 
 ```bash
 conda create -n Trienv
-conda install -n Trienv scikit-build libgcc 
+conda install -n Trienv scikit-build libgcc pybind11
+conda activate Trienv
 ```
 Make sure the evironment is activated throughout the rest of the setup!
 
+### Trimem/Trilmp
 TriLmp can be installed using pip:
 Note that this folder will be the actual location of the modules with an editable install.
-I.e. if you change something in the python code here, effects will be imediate.
+I.e. if you change something in the python code here, effects will be immediate.
 In case you want to change something on the c++ side: run "python3 setup.py build" to compile and copy 
 the libaries to the src/trimem folder as described below.
 
 ```bash
  git clone --recurse-submodules https://github.com/Saric-Group/trimem_sbeady.git
- git submodule update
+ 
  cd trimem_sbeady
+ git submodule update
  pip install -e .
 ```
 
-Finally some shared libraries have to be copied manually from a build folder. 
+In case they are not build during install one can compile the shared libraries
+using
+```bash
+python3 setup.py build
+```
+
+Finally some shared libraries have to be copied manually from the _skbuild folder. 
 The names depends on system and python verison!
--> all the .so files should be located in the src/trimem folder
+-> all the .so files should be placed in the src/trimem folder
 
 ```bash
-cp _skbuild/linux-x86_64-3.11/cmake-build/core.cpython-39-x86_64-linux-gnu.so src/trimem/.
+cp _skbuild/linux-x86_64-3.11/cmake-build/core.cpython-311-x86_64-linux-gnu.so src/trimem/.
 cp _skbuild/linux-x86_64-3.11/cmake-build/libtrimem.so src/trimem/.
 cp _skbuild/linux-x86_64-3.11/cmake-build/Build/lib/* src/trimem/.
 ```
 
+### LAMMPS
 LAMMPs has to be installed using python shared libraries and some packages (can be extended).
 If you already have lammps you might just have to reinstall it. In any case you will have to 
 perform the python install using your Trienv environment.
 
-To get lammps from git
+To get lammps from git ( go back to the directory where you want to have your install folder)
 
 ```bash
 git clone -b stable https://github.com/lammps/lammps.git lammps
 ```
-
+!!!! IMPORTANT !!!!
 Before proceeding further you have to place some files in the lammps/src folder to enable the nonreciprocal and nonreciprocal/omp pair_styles.
 In the folder nonrec in the trimem_sbeady repositry you find pair_nonreciprocal.cpp/.h and pair_nonreciprocal_omp.cpp/.h .
 The two files pair_nonreciprocal have to be placed in the lammps/src folder and the two pair_nonreciprocal_omp files in the lammps/src/OPENMP folder.
 Now we can start installing the LAMMPS. First go to the lammps directory and create the build folder.
-
 ```bash
 cd lammps                
 mkdir build
@@ -74,7 +83,7 @@ cd build
 Next we have to determine the python executable path. You can do that from the python console
 using
 ```bash
-python3                
+python3              
 import sys
 print(sys.executable)
 ```
@@ -83,20 +92,23 @@ which should print something like
 ```bash
 /nfs/scistore15/saricgrp/Your_folder/.conda/envs/Trienv/bin/python3
 ```
-and will be referred to as "python_path" in the next bash command. 
--D PKG_ASPHERE=yes is not stricly necessary bet here you can add whatever you have in mind for your simulations.
+and will be referred to as "python_path" in the next bash command. Not that this enables PyLammps this specific conda environment only! 
+
+Now we can set up the makefiles and build LAMMPS w
+REMARK: -D PKG_ASPHERE=yes is not stricly necessary in what comes next, but instead you can add whatever package you have in mind for your simulations.
 
 ```bash
 cmake -D BUILD_OMP=yes -D BUILD_SHARED_LIBS=yes -D PYTHON_EXECUTABLE="python_path" -D PKG_MOLECULE=yes -D PKG_PYTHON=yes -D PKG_OPENMP=yes -D PKG_EXTRA-PAIR=yes -D PKG_ASPHERE=yes ../cmake
-
 cmake --build .
 ```
 
-Finally to make LAMMPS accessible for python 
+Finally to make LAMMPS accessible for python, i.e. making and copying the shared libaries.
 
 ```bash
 make install-python
 ```
+
+
 
 
 

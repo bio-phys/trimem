@@ -63,7 +63,7 @@ The overall structure of the programm is
 --- Setting up Basic system
 --- calling Lammps functions to set thermostat and interactions
 
--- FLIPPING Functions for 
+-- FLIPPING Functions  
 -- HMC/MD Functions + Wrapper Functions used on TRIMEM side
 -- RUN Functions -> simulation utility to be used in script
 -- CALLBACK and OUTPUT 
@@ -191,7 +191,8 @@ class AlgoParams():
                  langevin_seed,
                  pure_MD,
                  switch_mode,
-                 box
+                 box,
+                 additional_command
                  ):
 
         self.num_steps=num_steps
@@ -214,6 +215,7 @@ class AlgoParams():
         self.pure_MD=pure_MD
         self.switch_mode=switch_mode
         self.box=box
+        self.additional_command=additional_command
 
 
 
@@ -243,7 +245,7 @@ class TriLmp():
                  n_search="cell-list",  # neighbour list types ('cell and verlet') -> NOT USED TODO
                  rlist=0.1,             # neighbour list cutoff -> NOT USED TODO
                  exclusion_level=2,     # neighbourhood exclusion setting -> NOT IMPLEMENTED TODO
-                 rep_lc1=1.0,           # lower onset for surface repusion (default set below)
+                 rep_lc1=None,           # lower onset for surface repusion (default set below)
                  rep_r= 2,              # steepness for repulsion potential
                  delta= 0.0,            # "timestep" parameter continuation for hamiltonian
                  lam= 1.0,              # cross-over parameter continuation for hamiltonian (see trimem -> NOT FULLY FUNCTIONAL YET)
@@ -288,6 +290,8 @@ class TriLmp():
                  pure_MD=True,                  # accept every MD trajectory
                  switch_mode='random',          # 'random' or 'alernating' -> either random choice of flip-or-move
                  box=(-10,10,-10,10,-10,10),    # Simulation BOX (periodic)
+                 additional_command=None,        # add a LAMMPS command """ COMMAND 1
+                                                #                          COMMAND 2  ...    """ at the end of LAMMPS initialisation
 
 
 
@@ -399,7 +403,9 @@ class TriLmp():
         self.bparams.r = bond_r
 
         # default setting for bonds related to average distance of initial mesh
-
+        ###############################################
+        # !! MEMBRANE LENGTHSCALES ARE SET HERE  !!   #
+       ################################################
         if (lc1 is None) and (lc0 is None) and self.initialize:
             a, l = m.avg_tri_props(self.mesh.trimesh)
             self.bparams.lc0 = 1.25 * l
@@ -409,6 +415,9 @@ class TriLmp():
             self.bparams.lc0 = lc0
             self.bparams.lc1 = lc1
             self.bparams.a0  = a0
+
+
+        print(f'l0={self.bparams.lc0/1.25}\nlc1={self.bparams.lc1}\nlc0={self.bparams.lc0}\n')
 
 
         #################################
@@ -434,7 +443,7 @@ class TriLmp():
         #self.rparams.lc1 = l*0.001
         self.rparams.r = rep_r
 
-
+        print(f'l0={self.bparams.lc0 / 1.25}\nlc1={self.bparams.lc1}\nlc0={self.bparams.lc0}\nr_lc0={self.rparams.lc1}\n')
         ###############################
         #  PARAMETER CONTINUATION     #
         ###############################
@@ -479,7 +488,7 @@ class TriLmp():
                 langevin_seed,
                 pure_MD,
                 switch_mode,
-                box)
+                box,additional_command)
 
        ###############################
        #     OUTPUT PARAMETERS       #
@@ -565,7 +574,10 @@ class TriLmp():
         #            Optional Tethers             #
         ###########################################
         #default
-        tether_text='bond_coeff * * 0.0'
+        bond_text="""
+                    special_bonds lj/coul 0.0 0.0 0.0
+                    bond_style zero nocoeff
+                    bond_coeff * * 0.0  """
         n_bond_types=1
         n_tethers=0
         add_tether=False
@@ -574,10 +586,13 @@ class TriLmp():
             add_tether=True
             n_tethers=self.beads.n_beads
             n_bond_types=2
-            tether_text=f"""
-            bond_style harmonic/omp
-            bond_coeff 1 1 0.0
-            bond_coeff 2 {self.beads.bead_interaction_params[0]} {self.beads.bead_interaction_params[0]}
+            bond_text=f"""
+            special_bonds lj/coul 0.0 0.0 0.0
+            bond_style hybrid zero harmonic/omp
+            bond_coeff 1 zero 0.0
+            bond_coeff 2 harmonic/omp {self.beads.bead_interaction_params[0]} {self.beads.bead_interaction_params[1]}
+            special_bonds lj/coul 0.0 0.0 0.0
+            
             """
 
         ############################################################
@@ -612,10 +627,9 @@ class TriLmp():
                                        
                                         timestep {self.algo_params.step_size}
                                         
-                                        special_bonds lj/coul 0.0 0.0 0.0
-                                        bond_style zero nocoeff
-                                        {tether_text}
                                         
+                                        
+                                        {bond_text} 
                                         
                                         
                                         dielectric  1.0
@@ -637,7 +651,12 @@ class TriLmp():
 
         # initialize lammps
         self.lmp.commands_string(basic_system)
+
+
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # set Surface repulsion
         self.set_repulsion()
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
         #################################################
@@ -651,6 +670,7 @@ class TriLmp():
 
         with open('sim_setup.in', 'w') as f:
             f.write('\n\n')
+
             f.write(f'{self.mesh.x.shape[0]+self.beads.n_beads} atoms\n')
             f.write(f'{self.edges.shape[0]+n_tethers} bonds\n\n')
 
@@ -659,6 +679,12 @@ class TriLmp():
                 f.write(f'2 bond types\n\n')
             else:
                 f.write(f'1 bond types\n\n')
+
+          #  f.write('Bond Coeffs\n\n')
+          #  f.write(f'1 zero nocoeff\n')
+          #  if add_tether:
+          #      f.write(f'2 harmonic/omp {self.beads.bead_interaction_params[0]} {self.beads.bead_interaction_params[1]}\n')
+
 
             f.write('Masses\n\n')
             f.write(f'1 {self.algo_params.momentum_variance}\n')
@@ -685,7 +711,7 @@ class TriLmp():
 
 
             # f.write(f'{self.mesh.x.shape[0]+1} {self.mesh.x[0,0]} {self.mesh.x[0,1]} {self.mesh.x[0,2]} 1 2\n')
-            f.write(f'Bonds # zero\n\n')
+            f.write(f'Bonds # zero special\n\n')
 
             for i in range(self.edges.shape[0]):
                 f.write(f'{i + 1} 1 {self.edges[i, 0] + 1} {self.edges[i, 1] + 1}\n')
@@ -694,15 +720,16 @@ class TriLmp():
                 for i in range(n_tethers):
                     d_temp=10^6
                     h=0
-                    for i in range(self.n_vertices):
-                        d_temp2=np.sum((self.mesh.x[i,:]-self.beads.positions[0,:])**2)
+                    for j in range(self.n_vertices):
+                        d_temp2=np.sum((self.mesh.x[j,:]-self.beads.positions[0,:])**2)
                         if d_temp>d_temp2:
                             d_temp=d_temp2
-                            h=i
+                            h=j
+
 
                     f.write(f'{self.edges.shape[0]+1+i} 2 {h+1} {self.n_vertices+1+i}\n')
 
-                # initial verlocities (thermal -> redraw velocities each hmc step
+
 
 
 
@@ -782,6 +809,13 @@ class TriLmp():
                 print('SETTING RECIPROCAL INTERACTIONS')
                 self.set_bead_membrane_interaction()
 
+        if self.beads.bead_interaction=='custom':
+            self.lmp.commands_string(self.beads.bead_interaction_params)
+
+        if self.algo_params.additional_command:
+            self.lmp.commands_string(self.algo_params.additional_command)
+
+
         # set temperature TODO: no implementation of the simulated annealing for MD mode yet
         # Temperature in LAMMPS set to fixed initial temperature
         self.T = self.algo_params.initial_temperature
@@ -846,8 +880,11 @@ class TriLmp():
             self.output = lambda i: lammps_output(i)
 
         if self.output_params.output_format == 'lammps_txt_folder':
-            os.system('rm -r lmp_trj')
-            os.system('mkdir lmp_trj')
+            try:
+                os.system('mkdir lmp_trj')
+            except:
+                return
+
             def lammps_output(i):
                 self.L.command(f'write_data lmp_trj/{self.output_params.output_prefix}.s{i}.txt')
             self.output=lambda i: lammps_output(i)
@@ -1479,6 +1516,7 @@ class TriLmp():
                  self.algo_params.pure_MD,
                  self.algo_params.switch_mode,
                                self.algo_params.box,
+                 self.algo_params.additional_command,
 
 
 
@@ -1522,7 +1560,7 @@ class TriLmp():
                                self.beads.self_interaction_params
                                )
 
-
+###################################################################
 
     ### checkpoints using pickle
     def make_checkpoint_handle(self):
@@ -1548,15 +1586,6 @@ class TriLmp():
                 pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
         print(f'made cp:{cptfname}')
-
-
-######################################################################
-#                  WRITE TRAJCECTORY DATA                            #
-######################################################################
-
-
-
-
 
 
 
@@ -1692,15 +1721,29 @@ class SRPTrimem(LAMMPSPairPotential):
                                  shell rm -f trimem_srp.table
                                  pair_write  1 1 2000 rsq 0.000001 {self.eparams.repulse_params.lc1} trimem_srp.table trimem_srp 1.0 1.0
                                  pair_style none 
-                                 pair_style table/omp linear 2000
-                                 pair_coeff * * trimem_srp.table trimem_srp
-                                 
-            
                                  """
+
+        # setting SRP as only interaction in case of no beads present
+        set_srp_only= f"""
+                                 pair_style table/omp linear 2000
+                                 pair_coeff 1 1 table/omp trimem_srp.table trimem_srp
+                                 pair_modify pair table/omp special lj/coul 0.0 0.0 0.0
+                                 
+                                 
+                                 """
+        # not used here but in case someone wants to use it for custom style combinatins as a example
+        set_srp_hybrid = f"""
+                            pair_style hybrid lj/cut/omp 0.1 table/omp linear 2000
+                            pair_coeff 1 1 table/omp trimem_srp.table trimem_srp
+                            pair_modify pair table/omp special lj/coul 0.0 0.0 0.0
+                            pair_coeff 2 2 lj/cut/omp 0.0 0.0
+                            pair_coeff 1 2 lj/cut/omp 0.0 0.0"""
 
         if self.eparams.repulse_params.lc1:
             self.make_srp_python()
             self.lmp.commands_string(python_pair_style)
+            if self.beads.n_types==0:
+                self.lmp.commands_string(set_srp_only)
             return
         else:
             return
@@ -1715,32 +1758,35 @@ class SRPTrimem(LAMMPSPairPotential):
                 bead_ljd=0.5 * (self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)
 
                 ## STILL NEED TO PARAMETRIZE GLOBAL CUTOFF
-                reciprocal_lj=f""" pair_style {self.beads.bead_interaction} {4*bead_ljd}                                           
-                                   pair_coeff 1 2 {self.beads.bead_interaction_params[0]} {bead_ljd} {bead_ljd*self.beads.bead_interaction_params[1]}  
-                                   pair_coeff 1 1 0 0 0 
-                                   pair_coeff 2 2 0 0 0 
+                reciprocal_lj=f""" pair_style hybrid {self.beads.bead_interaction} {4*bead_ljd} table/omp linear 2000                                        
+                                   pair_coeff 1 2 {self.beads.bead_interaction} {self.beads.bead_interaction_params[0]} {bead_ljd} {bead_ljd*self.beads.bead_interaction_params[1]}  
+                                   pair_coeff 1 1 table/omp trimem_srp.table trimem_srp
+                                   pair_modify pair table/omp special lj/coul 0.0 0.0 0.0
+                                   pair_coeff 2 2 {self.beads.bead_interaction} 0 0 0 
                                 
             """
                 self.lmp.commands_string(reciprocal_lj)
             else:
                 bead_ljd = 0.5 * (self.estore.eparams.bond_params.lc1 + np.max(self.beads.bead_sizes))
-                self.lmp.command(f'pair_style {self.beads.bead_interaction} {4*bead_ljd}')
-                self.lmp.command(f'pair_coeff 1 1 0 0 0')
+                self.lmp.command(f'pair_style hybrid {self.beads.bead_interaction} {4*bead_ljd} table/omp linear 2000')
+                self.lmp.command(f'pair_coeff 1 1 table/omp trimem_srp.table trimem_srp')
+                self.lmp.command(f'pair_modify pair table/omp special lj/coul 0.0 0.0 0.0')
+
 
                 for i in range(self.beads.n_types):
                     bead_ljd = 0.5 * (self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes[i])
-                    self.lmp.command(f'pair_coeff 1 {i+2}  {self.beads.bead_interaction_params[i][0]} {bead_ljd} {bead_ljd*self.beads.bead_interaction_params[i][1]}')
+                    self.lmp.command(f'pair_coeff 1 {i+2} {self.beads.bead_interaction} {self.beads.bead_interaction_params[i][0]} {bead_ljd} {bead_ljd*self.beads.bead_interaction_params[i][1]}')
 
                     if self.beads.self_interaction:
                         for j in range(i,self.beads.n_types):
                             bead_ljd = 0.5 * (self.beads.bead_sizes[i] + self.beads.bead_sizes[i])
                             self.lmp.command(
-                                f'pair_coeff {i+2} {j + 2} {self.beads.self_interaction_params[0]} {bead_ljd} {bead_ljd * self.beads.self_interaction_params[1]}')
+                                f'pair_coeff {i+2} {j + 2} {self.beads.bead_interaction} {self.beads.self_interaction_params[0]} {bead_ljd} {bead_ljd * self.beads.self_interaction_params[1]}')
                     else:
                         for j in range(i,self.beads.n_types):
 
                             self.lmp.command(
-                                f'pair_coeff {i + 2} {j + 2} 0 0 0')
+                                f'pair_coeff {i + 2} {j + 2}  {self.beads.bead_interaction} 0 0 0')
 
 
 
@@ -1777,7 +1823,7 @@ variable lc_harmonic_12    equal {0.5*(self.estore.eparams.bond_params.lc1 + sel
 
 # PAIR STYLES
 # ----------------------
-pair_style hybrid/overlay harmonic/cut/omp nonreciprocal/omp ${{cutoff_nonrec}} ${{scale_nonrep}} ${{exponent}} ${{sigma12}} 
+pair_style hybrid/overlay harmonic/cut/omp nonreciprocal/omp ${{cutoff_nonrec}} ${{scale_nonrep}} ${{exponent}} ${{sigma12}} table/omp linear 2000
 pair_coeff 1 1 nonreciprocal/omp 0 0 0 0 0   
 pair_coeff 2 2 nonreciprocal/omp 0 0 0 0 0 
 pair_coeff 1 2 harmonic/cut/omp ${{k_harmonic}} ${{lc_harmonic_12}}
@@ -1785,6 +1831,9 @@ pair_coeff 1 2 harmonic/cut/omp ${{k_harmonic}} ${{lc_harmonic_12}}
 pair_coeff 2 2 harmonic/cut/omp ${{k_harmonic}} ${{lc_harmonic_22}}
 pair_coeff 1 1 harmonic/cut/omp 0 ${{lc_harmonic_22}}
 pair_coeff 1 2 nonreciprocal/omp ${{activity_1}} ${{activity_2}} ${{mobility_1}} ${{mobility_2}} ${{cutoff_nonrec}}
+
+pair_coeff 1 1 table/omp trimem_srp.table trimem_srp
+pair_modify pair table/omp special lj/coul 0.0 0.0 0.0
 
 neigh_modify one 5000 page 50000 every 100 check yes
 

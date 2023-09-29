@@ -10,7 +10,8 @@ from trimem.core import TriMesh
 import numpy as np
 import pickle
 
-
+### this is an exampe script for the trisim variant of TRIMEM -> not really used or outdated compared to trilmp
+### added here as it was used for the validation
 
 mesh = trimesh.creation.icosphere(5)
 mesh.vertices=mesh.vertices
