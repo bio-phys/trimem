@@ -881,7 +881,7 @@ class TriLmp():
 
         if self.output_params.output_format == 'lammps_txt_folder':
             try:
-                os.system('mkdir lmp_trj')
+                os.system('mkdir -p lmp_trj')
             except:
                 return
 
@@ -1725,11 +1725,11 @@ class SRPTrimem(LAMMPSPairPotential):
 
         # setting SRP as only interaction in case of no beads present
         set_srp_only= f"""
-                                 pair_style table/omp linear 2000
+                                 pair_style hybrid/overlap table/omp linear 2000 lj/cut/omp 0.0
+                                 pair_coeff 1 1 lj/cut/omp 0.0 0.0
                                  pair_coeff 1 1 table/omp trimem_srp.table trimem_srp
                                  pair_modify pair table/omp special lj/coul 0.0 0.0 0.0
-                                 
-                                 
+                
                                  """
         # not used here but in case someone wants to use it for custom style combinatins as a example
         set_srp_hybrid = f"""
