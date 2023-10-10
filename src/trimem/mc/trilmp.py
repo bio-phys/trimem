@@ -769,7 +769,7 @@ class TriLmp():
                     bds=f'scale 2 {(self.beads.masses / self.beads.bead_sizes)/sc0} '
 
             lv_thermo_comm=f"""
-                            fix lvt all langevin {self.algo_params.initial_temperature*1} {self.algo_params.initial_temperature*1} 0.03 2 {bds}
+                            fix lvt all langevin {self.algo_params.initial_temperature} {self.algo_params.initial_temperature}  {self.algo_params.langevin_damp} {self.algo_params.langevin_seed} zero yes {bds}
                             
                             """
             self.lmp.commands_string(lv_thermo_comm)
@@ -856,7 +856,7 @@ class TriLmp():
 
         if self.output_params.output_format == 'lammps_txt_folder':
             try:
-                os.system('mkdir lmp_trj')
+                os.system('mkdir -p lmp_trj')
             except:
                 return
 
