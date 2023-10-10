@@ -1,0 +1,6 @@
+lmp_trj
+lj_test_trilmp_performance.dat
+log.lammps
+sim_setup.in
+trimem_srp.table
+trilmp_srp_pot.py

@@ -1,12 +1,14 @@
 
+import faulthandler
+faulthandler.enable()
+
+
 import trimesh
 from trimem.core import TriMesh
 import numpy as np
 import pickle
 
 from trimem.mc.trilmp import TriLmp, load_checkpoint
-
-
 
 
 
@@ -41,7 +43,7 @@ import trimesh
 import trimem.core as m
 from trimem.core import TriMesh
 from trimem.mc.mesh import Mesh
-
+import trimesh.creation
 
 mesh = trimesh.creation.icosphere(5)
 mesh.vertices=mesh.vertices*2

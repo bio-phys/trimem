@@ -140,7 +140,6 @@ automatically installed:
 * scipy
 * h5py
 * meshio
-* omp_thread_count
 * psutil
 
 Documentation and tests further require:

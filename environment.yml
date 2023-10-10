@@ -1,0 +1,27 @@
+name: trilmp
+channels:
+  - conda-forge
+dependencies:
+  - python==3.11
+  - scikit-build
+  - cmake
+  - pybind11
+  - pip
+  
+  - numpy
+  - scipy
+  - h5py
+  - meshio
+  - trimesh
+  - psutil
+  - pytest
+  # - lammps #by default has no openmp package activated, so we build it.
+  # lammps reqs
+  
+  - cmake
+  - make
+  - compilers
+  - mpich #mpi
+  - llvm-openmp
+  
+  
