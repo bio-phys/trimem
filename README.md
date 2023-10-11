@@ -3,7 +3,7 @@
 **TriLmp** is a modified version of the **Trimem** python package for the Monte Carlo simulation of lipid
 membranes according to the Helfrich theory [^Helfrich1973]. It allows for the direct use for MD simulations
 in connection with LAMMPS via the python interface of the latter. Hereby the calculation of the surface repulsion
-is dealt with by LAMMPS instead of Trimem.
+is dealt with by LAMMPS instead of Trimem. For details on how to use the package, please refer to the HowTo_TriLMP.md file.
 
 [^Helfrich1973]: Helfrich, W. (1973) Elastic properties of lipid bilayers:
   Theory and possible experiments. Zeitschrift für Naturforschung C,
