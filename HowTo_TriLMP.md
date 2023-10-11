@@ -8,7 +8,7 @@ You can simulate meshes with 42 beads (```r=1```), 162 beads (```r=2```), 642 be
 
 The command creates a sphere of radius ```r_sphere = 1``` by default. 
 
-**2. Rescaling the edge lengths and lengthscale definition [Before initializing trilmp object]** 
+**2. NOT READY TO USE YET! Rescaling the edge lengths and lengthscale definition [Before initializing trilmp object]** 
 
 When you initially create your mesh, there will be an average edge length that depends both on ```r``` and ```r_sphere``` (see above). You can define the desired lengthscale of your system by rescaling the edge length. In the code below, we set the average edge length of the system to the position of the minimum in a Lennard-Jones potential (i.e., $r_{\min} = 2^{1/6}\sigma$).
 
