@@ -365,14 +365,14 @@ class TriLmp():
                  self_interaction_params=(0,0)
                  ):
 
-
+        
        ##################################
        #    SOME MINOR PREREQUESITES    #
        ##################################
 
         # initialize using mesh arguments?
         self.initialize = initialize
-
+        self.acceptance_rate = 0.0
         # used for minim
         self.flatten = True
         if self.flatten:
@@ -659,6 +659,7 @@ class TriLmp():
             info styles compute out log
 
             echo log
+            
         """)
 
         # initialize lammps
@@ -855,13 +856,10 @@ class TriLmp():
             self.output = lambda i: lammps_output(i)
 
         if self.output_params.output_format == 'lammps_txt_folder':
-            try:
-                os.system('mkdir -p lmp_trj')
-            except:
-                return
-
             def lammps_output(i):
                 self.L.command(f'write_data lmp_trj/{self.output_params.output_prefix}.s{i}.txt')
+
+            os.system('mkdir -p lmp_trj')
             self.output=lambda i: lammps_output(i)
 
         if self.output_params.output_format == 'h5_custom':
@@ -936,8 +934,13 @@ class TriLmp():
         """Print algorithmic information."""
         i_total = sum(self.counter.values())
         if self.output_params.info and i_total % self.output_params.info == 0:
-            n_edges = self.mesh.trimesh.n_edges()
+            # MMB CHANGED -- MAKING SURE THAT NUMBER OF EDGES KNOWS ABOUT THE FLIP RATIO
+            n_edges = self.mesh.trimesh.n_edges()*self.algo_params.flip_ratio
             ar      = self.f_acc / (self.f_i * n_edges) if not self.f_i == 0 else 0.0
+            self.acceptance_rate = ar
+            #print("Accepted", self.f_acc)
+            #print("Number of candidate edges", n_edges)
+            
             print("\n-- MCFlips-Step ", self.counter["flip"])
             print("----- flip-accept: ", ar)
             print("----- flip-rate:   ", self.algo_params.flip_ratio)
@@ -1308,13 +1311,18 @@ class TriLmp():
 
 
         if self.output_params.energy_increment and (i % self.output_params.energy_increment==0):
-            with open(f'energies_vol{self.estore.eparams.volume_frac*100:03.0f}_cur{self.estore.eparams.curvature_frac*100:03.0f}.dat','a+') as f:
-                f.write(f'{i} {self.estore.energy(self.mesh.trimesh)}\n')
 
-
-
-
-
+            # MMB CHANGE -- PRINT ENERGIES
+            self.ke_new=self.lmp.numpy.extract_compute("th_ke",LMP_STYLE_GLOBAL,LMP_TYPE_SCALAR)
+            self.pe_new=self.lmp.numpy.extract_compute("th_pe", LMP_STYLE_GLOBAL, LMP_TYPE_SCALAR)
+            
+            # MMB compute volume and area of the mesh
+            test_mesh = trimesh.Trimesh(vertices=self.mesh.x, faces=self.mesh.f)
+            mesh_volume = test_mesh.volume
+            mesh_area   = test_mesh.area
+            with open(f'{self.output_params.output_prefix}_system.dat','a+') as f:
+                f.write(f'{i} {self.estore.energy(self.mesh.trimesh)} {self.ke_new} {self.pe_new} {self.acceptance_rate} {mesh_volume} {mesh_area}\n')
+            
         if self.output_params.info and (i % self.output_params.info == 0):
             self.timer.timestamps.append(time.time())
             if len(self.timer.timestamps) == 2:
