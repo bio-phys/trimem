@@ -8,7 +8,7 @@ You can simulate meshes with 42 beads (```r=1```), 162 beads (```r=2```), 642 be
 
 The command creates a sphere of radius ```r_sphere = 1``` by default. 
 
-**2. NOT READY TO USE YET! Rescaling the edge lengths and lengthscale definition [Before initializing trilmp object]** 
+**2. Rescaling the edge lengths and lengthscale definition [Before initializing trilmp object]** 
 
 When you initially create your mesh, there will be an average edge length that depends both on ```r``` and ```r_sphere``` (see above). You can define the desired lengthscale of your system by rescaling the edge length. In the code below, we set the average edge length of the system to the position of the minimum in a Lennard-Jones potential (i.e., $r_{\min} = 2^{1/6}\sigma$).
 
@@ -32,6 +32,7 @@ my_trilmp_object = TriLmp(parameters)
 
 TriLmp uses ```lj``` units for LAMMPS.
 
+
 **4. Running a simulation**
 
 To run a simulation, you need to use the ```run(N)``` method of the ```trilmp```. The parameter ```N``` controls the number of simulation steps, where a step consists of an MD run and an MC stage for bond flips (see details below). 
@@ -45,3 +46,7 @@ A single simulation step can look two different ways, depending on the parameter
 2. If ```switch_mode=='random'```, the program chooses randomly whether to run an MD simulation for ```traj_steps``` or to attempt to flip bonds in the mesh during a simulation step.
 
 TriMEM was designed to perform hybrid MC simulations. This means that after the MD run, it will decide whether to accept or reject the resulting configuration based on a Metropolis criterion. Instead, if you want to run a pure MD simulation, you need to make sure that the flag ```pure_MD=True``` is on during the initialization of the ```trilmp``` object. This way, the program will accept all configurations that result from the MD run. Additionally, make sure that ```thermal_velocities=False``` so that the program keeps track of the velocities at the end of the MD run instead of resetting them according to the Maxwell-Boltzmann distribution.
+
+**5. Opening the black box: A few notes on how the program works**
+
+- The program relies on TriMEM to compute the Helfrich hamiltonian for the membrane. This hamiltonian is used to compute the forces in the MD section of the run (see callback functions in source code). Surface repulsion (i.e., preventing the membrane from self-intersecting) is included as a ```pair_style python```, and passed to LAMMPS as a table.  
