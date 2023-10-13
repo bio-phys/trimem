@@ -8,7 +8,7 @@ You can simulate meshes with 42 beads (```r=1```), 162 beads (```r=2```), 642 be
 
 The command creates a sphere of radius ```r_sphere = 1``` by default. You can see several examples in the image below. The numbers correspond to the number of vertices in the mesh, while the number in parenthesis indicates the ```r``` value given to ```trimesh```.
 
-![DivisionMesh](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/62779299-7cca-4667-820c-c7ff4c1cc3ad)
+![DivisionMesh](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/c1f703f4-7071-4ad4-99f1-f2dc76404661)
 
 **2. Rescaling the edge lengths and lengthscale definition [Before initializing trilmp object]** 
 
