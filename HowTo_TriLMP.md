@@ -6,7 +6,7 @@ Controlled via the parameter ```r``` in ```trimesh.creation.icosphere(r, r_spher
 
 You can simulate meshes with 42 beads (```r=1```), 162 beads (```r=2```), 642 beads (```r=3```), 2562 beads (```r=4```) or 10242 beads (```r=5```), for example. 
 
-The command creates a sphere of radius ```r_sphere = 1``` by default. You can see several examples in the image below.
+The command creates a sphere of radius ```r_sphere = 1``` by default. You can see several examples in the image below. The numbers correspond to the number of vertices in the mesh, while the number in parenthesis indicates the ```r``` value given to ```trimesh```.
 
 ![DivisionMesh](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/62779299-7cca-4667-820c-c7ff4c1cc3ad)
 
