@@ -1693,17 +1693,18 @@ class TriLmp():
                 # soft-core (harmonic) repulsion
                 k_harmonic=self.beads.bead_interaction_params[6]
                 lc_harmonic_12=0.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)
-
+		lc_harmonic_22=self.beads.bead_sizes
+		
                 add_pair("harmonic/cut",cutoff_nonrec,"",dedent(f"""\
                     pair_coeff * * harmonic/cut 0 0 0 0 0
                     pair_coeff 1 2 harmonic/cut {k_harmonic} {lc_harmonic_12}
-                    pair_coeff 2 2 harmonic/cut {k_harmonic} 0.
+                    pair_coeff 2 2 harmonic/cut {k_harmonic} {lc_harmonic_22}
                 """))
 
-                sigma12=float(f"{(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)}:.4f")
+                sigma12=float(f"{0.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)}:.4f")
                 exponent=self.beads.bead_interaction_params[4]
                 scale_nonrep=float(f"{scale:.4f}")
-                add_pair("nonreciprocal", cutoff_nonrec,f"{scale_nonrep} {exponent} {sigma12}",dedent(f"""
+                add_pair("nonreciprocal", cutoff_nonrec,f"{cutoff_nonrec} {scale_nonrep} {exponent} {sigma12}",dedent(f"""
                     pair_coeff * * nonreciprocal 0 0 0 0 0
                     pair_coeff 1 2 nonreciprocal {activity_1} {activity_2} {mobility_1} {mobility_2} {cutoff_nonrec}
                 """))
