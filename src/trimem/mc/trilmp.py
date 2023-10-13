@@ -1686,7 +1686,8 @@ class TriLmp():
                 # the bead_interaction_params should be set to 'nonreciprocal'
                 # the parameters are handed as tuples (activity1,mobility1,activity2,mobility2,exponent,scale,k_harmonic,cut_mult)
                 # k_harmonic determines height of bead_membrane harmonic barrier and k_harm_beads the bead-bead repulsion (if bead_self_interaction is set to True) (to do)
-                if self.beads.bead_interaction_params[5]=='auto':
+                # SCALE BELOW MUST BE REVISED
+		if self.beads.bead_interaction_params[5]=='auto':
                     scale=(1+self.beads.bead_interaction_params[4])*0.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)*2**(-self.beads.bead_interaction_params[4])
                 else:
                     scale=self.beads.bead_interaction_params[5]
@@ -1696,23 +1697,24 @@ class TriLmp():
                 mobility_1=self.beads.bead_interaction_params[1]
                 activity_2=self.beads.bead_interaction_params[2]
                 mobility_2=self.beads.bead_interaction_params[3]
-                cutoff_nonrec=float(self.beads.bead_interaction_params[7]**(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)*0.5)
             
                 # soft-core (harmonic) repulsion
                 k_harmonic=self.beads.bead_interaction_params[6]
                 lc_harmonic_12=0.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)
 		lc_harmonic_22=self.beads.bead_sizes
 		
-                add_pair("harmonic/cut",cutoff_nonrec,"",dedent(f"""\
-                    pair_coeff * * harmonic/cut 0 0 0 0 0
+                add_pair("harmonic/cut","","",dedent(f"""\
+                    pair_coeff * * harmonic/cut 0 0
                     pair_coeff 1 2 harmonic/cut {k_harmonic} {lc_harmonic_12}
                     pair_coeff 2 2 harmonic/cut {k_harmonic} {lc_harmonic_22}
                 """))
 
-                sigma12=float(f"{0.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)}:.4f")
+                sigma12=float(0.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes))
+		cutoff_nonrec=float(sigma12*self.beads.bead_interaction_params[7])
+		    
                 exponent=self.beads.bead_interaction_params[4]
                 scale_nonrep=float(f"{scale:.4f}")
-                add_pair("nonreciprocal", cutoff_nonrec,f"{cutoff_nonrec} {scale_nonrep} {exponent} {sigma12}",dedent(f"""
+                add_pair("nonreciprocal", "",f"{cutoff_nonrec} {scale_nonrep} {exponent} {sigma12}",dedent(f"""
                     pair_coeff * * nonreciprocal 0 0 0 0 0
                     pair_coeff 1 2 nonreciprocal {activity_1} {activity_2} {mobility_1} {mobility_2} {cutoff_nonrec}
                 """))
