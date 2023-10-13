@@ -37,7 +37,7 @@ TriLmp uses ```lj``` units for LAMMPS.
 
 **4. Running a simulation**
 
-To run a simulation, you need to use the ```run(N)``` method of the ```trilmp```. The parameter ```N``` controls the number of simulation steps, where a step consists of an MD run and an MC stage for bond flips (see details below). 
+To run a simulation, you need to use the ```run(N)``` method of the ```trilmp``` object (i.e., add ```my_trilmp_object.run(N)``` once the ```trilmp``` object has been created). The parameter ```N``` controls the number of simulation steps, where a step consists of an MD run and an MC stage for bond flips (see details below). 
 
 - The length of the MD run is controlled by the parameter ```traj_steps``` (introduced during ```trilmp``` initialization). The timestep used for time-integration during the MD part of the simulation is controlled by ```step_size```.
 - The fraction of bonds in the membrane that we attempt to flip is controlled by ```flip_ratio``` (TriMEM is in charge of that).
