@@ -1693,11 +1693,11 @@ class TriLmp():
                 # soft-core (harmonic) repulsion
                 k_harmonic=self.beads.bead_interaction_params[6]
                 lc_harmonic_12=0.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)
-
+		lc_harmonic_22=self.beads.bead_sizes
                 add_pair("harmonic/cut",cutoff_nonrec,"",dedent(f"""\
                     pair_coeff * * harmonic/cut 0 0 0 0 0
                     pair_coeff 1 2 harmonic/cut {k_harmonic} {lc_harmonic_12}
-                    pair_coeff 2 2 harmonic/cut {k_harmonic} 0.
+                    pair_coeff 2 2 harmonic/cut {k_harmonic} {lc_harmonic_22}
                 """))
 
                 sigma12=float(f"{(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)}:.4f")
