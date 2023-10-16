@@ -10,6 +10,8 @@ The command creates a sphere of radius ```r_sphere = 1``` by default. You can se
 
 ![DivisionMesh](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/c1f703f4-7071-4ad4-99f1-f2dc76404661)
 
+***
+
 **2. Rescaling the edge lengths and lengthscale definition [Before initializing trilmp object]** 
 
 When you initially create your mesh, there will be an average edge length that depends both on ```r``` and ```r_sphere``` (see above). You can define the desired lengthscale of your system by rescaling the edge length. In the code below, we set the average edge length of the system to the position of the minimum in a Lennard-Jones potential (i.e., $r_{\min} = 2^{1/6}\sigma$).
@@ -24,6 +26,8 @@ mesh.vertices *= scaling
 
 When perfoming this type of scaling keep in mind that different ```r``` values will give you spheres with different radii: the larger ```r```, the larger the radius of the sphere for the same average edge length.
 
+***
+
 **3. Initialization of the trilmp object**
 
 You can initialize the ```trilmp``` object by creating an instance of the ```TriLmp``` class:
@@ -34,6 +38,7 @@ my_trilmp_object = TriLmp(parameters)
 
 TriLmp uses ```lj``` units for LAMMPS.
 
+***
 
 **4. Running a simulation**
 
@@ -49,6 +54,14 @@ A single simulation step can look two different ways, depending on the parameter
 
 TriMEM was designed to perform hybrid MC simulations. This means that after the MD run, it will decide whether to accept or reject the resulting configuration based on a Metropolis criterion. Instead, if you want to run a pure MD simulation, you need to make sure that the flag ```pure_MD=True``` is on during the initialization of the ```trilmp``` object. This way, the program will accept all configurations that result from the MD run. Additionally, make sure that ```thermal_velocities=False``` so that the program keeps track of the velocities at the end of the MD run instead of resetting them according to the Maxwell-Boltzmann distribution.
 
-**5. Opening the black box: A few notes on how the program works**
+***
+
+##5. Sampling data + printing out energies
+The program prints outputs at a user defined frequency.
+- Energy output (printed with frequency ```energy_increment``` steps) is stored in ```output_prefix```_system.dat. The columns in the file correspond to (1) total Trimem hamiltonian, (2) LAMMPS ```compute ke```, (3) LAMMPS ```compute pe```, (4) volume of the membrane, (5) area of the membrane, (6) bending energy/k_B (MUST multiply by bending modulus to get actual bending energy, see eq. 3 in Siggel et al., JChemPhys 2022), (7) tethering energy and (8) curvature (see eq. 6 in Siggel et al., JChemPhys 2022).
+
+***
+
+**6. Opening the black box: A few notes on how the program works**
 
 - The program relies on TriMEM to compute the Helfrich hamiltonian for the membrane. This hamiltonian is used to compute the forces in the MD section of the run (see callback functions in source code). Surface repulsion (i.e., preventing the membrane from self-intersecting) is included as a ```pair_style python```, and passed to LAMMPS as a table.  
