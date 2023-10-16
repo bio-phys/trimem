@@ -1,4 +1,4 @@
-# TriLMP usage
+![monitor_FR_0 1_TS_100_R_4](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/32e182fc-c224-43b8-8263-5e891f435c31)# TriLMP usage
 
 **1. Resolution of the mesh/membrane (i.e., number of vertices in the mesh) [Before initializing trilmp object]** 
 
@@ -42,7 +42,7 @@ TriLmp uses ```lj``` units for LAMMPS.
 
 **4. Running a simulation**
 
-To run a simulation, you need to use the ```run(N)``` method of the ```trilmp``` object (i.e., add ```my_trilmp_object.run(N)``` once the ```trilmp``` object has been created). The parameter ```N``` controls the number of simulation steps, where a step consists of an MD run and an MC stage for bond flips (see details below). 
+To run a simulation, you need to use the ```run(N)``` method of the ```trilmp``` object (i.e., add ```my_trilmp_object.run(N)``` once the ```trilmp``` object has been created). The parameter ```N``` controls the number of simulation steps, where a step consists of an MD run and an MC stage for bond flips (see details below). Please note than an MD run may consist of multiple steps itself.
 
 - The length of the MD run is controlled by the parameter ```traj_steps``` (introduced during ```trilmp``` initialization). The timestep used for time-integration during the MD part of the simulation is controlled by ```step_size```.
 - The fraction of bonds in the membrane that we attempt to flip is controlled by ```flip_ratio``` (TriMEM is in charge of that).
@@ -67,3 +67,21 @@ The program prints outputs at a user defined frequency.
 **6. Opening the black box: A few notes on how the program works**
 
 - The program relies on TriMEM to compute the Helfrich hamiltonian for the membrane. This hamiltonian is used to compute the forces in the MD section of the run (see callback functions in source code). Surface repulsion (i.e., preventing the membrane from self-intersecting) is included as a ```pair_style python```, and passed to LAMMPS as a table.  
+
+
+***
+
+# Validation and checks of the code
+
+**1. Monitoring energy of the system
+We can monitor the value of the Trimem Hamiltonian (see Trimem documentation), the total energy and the acceptance rate for the bond flips by plotting the data in ```output_prefix```_system.dat.  The figure below shows data for a membrane with ```r=4```, ```flip_ratio``` of 0.1 and MD trajectories with ```traj_steps=100``` steps. Note how this data also shows that the system is correctly equilibrating to the prescribed temperature, as $k_B T = 2/3 KE/N = 1.014$ (set temperature ```temperature = 1```).
+
+![monitor_FR_0 1_TS_100_R_4](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/e66aed1b-dc1a-4b87-9038-e3cd909725fe)
+
+The total energy of the membrane depends on the mesh resolution (the number of vertices and number of edges), as shown in the figure below. It also depends on its mechanical properties (compare the data for floppy, where $k_v = k_a = 10^5 ~k_B T$ with rigid, where $k_v = k_a = 10^6~k_B T$). Additionally, it seems to depend on the length of the MD stage in the program for short MD simulations. The energy of the membrane does not depend on the ```flip_ratio``` parameter (all three curves for ```flip_ratio = 0.1, 0.2 and 0.3``` are practically identical).
+
+![summary_energy](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/50006337-e608-46af-b709-d07f26307e20)
+
+Simulations with short MD stages also seem to give slightly lower temperature than expected, as shown in the figure below (data shown corresponds to 'floppy' and 'rigid' membranes (see above) with ```flip_ratio = 0.1, 0.2 and 0.3```).
+
+![summary_ke](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/7fb1e6b1-b9c9-4bb1-9585-7b518adaa7f4)
