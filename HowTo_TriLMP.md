@@ -56,7 +56,7 @@ TriMEM was designed to perform hybrid MC simulations. This means that after the 
 
 ***
 
-##5. Sampling data + printing out energies
+**5. Sampling data + printing out energies**
 The program prints outputs at a user defined frequency.
 - Energy output (printed with frequency ```energy_increment``` steps) is stored in ```output_prefix```_system.dat. The columns in the file correspond to (1) total Trimem hamiltonian, (2) LAMMPS ```compute ke```, (3) LAMMPS ```compute pe```, (4) volume of the membrane, (5) area of the membrane, (6) bending energy/k_B (MUST multiply by bending modulus to get actual bending energy, see eq. 3 in Siggel et al., JChemPhys 2022), (7) tethering energy and (8) curvature (see eq. 6 in Siggel et al., JChemPhys 2022).
 
