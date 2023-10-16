@@ -659,6 +659,7 @@ class TriLmp():
             info styles compute out log
 
             echo log
+            log none
             
         """)
 
@@ -1007,7 +1008,7 @@ class TriLmp():
 
             #run MD trajectory
 
-            #self.lmp.command(f'run {self.algo_params.traj_steps}')
+            #self.lmp.command(f'run {self.algo_params.traj_steps} post no')
 
 
 
@@ -1091,7 +1092,7 @@ class TriLmp():
             self.counter["move"] += 1
 
         else:
-            self.lmp.command(f'run {self.algo_params.traj_steps}')
+            self.lmp.command(f'run {self.algo_params.traj_steps} post no')
             self.m_acc += 1
             self.m_i += 1
 
@@ -1196,12 +1197,10 @@ class TriLmp():
 
     @_update_mesh_one
     def callback_one(self, lmp, ntimestep, nlocal, tag, x, f):
-        """!!!!!!!This function is used as callbeck to TRIMEM FROM LAMMPS!!!!!"""
+        """!!!!!!!This function is used as callback to TRIMEM FROM LAMMPS!!!!!"""
         #print(tag)
         #tag_clear=[x-1 for x in tag if x <= self.n_vertices]
         f[:self.n_vertices]=-self.estore.gradient(self.mesh.trimesh)
-
-
 
         ## UNCOMMENT IF TRIMEM SHOULD GET THE ENERGY IN REALTIME
         #self.lmp.fix_external_set_energy_global("ext", self.estore.energy(self.mesh.trimesh))
@@ -1681,13 +1680,13 @@ class TriLmp():
         """))
         
         if self.beads.n_beads:
+
             if self.beads.bead_interaction=='nonreciprocal':
                 overlay=True
                 # the bead_interaction_params should be set to 'nonreciprocal'
                 # the parameters are handed as tuples (activity1,mobility1,activity2,mobility2,exponent,scale,k_harmonic,cut_mult)
                 # k_harmonic determines height of bead_membrane harmonic barrier and k_harm_beads the bead-bead repulsion (if bead_self_interaction is set to True) (to do)
-                # SCALE BELOW MUST BE REVISED
-		if self.beads.bead_interaction_params[5]=='auto':
+                if self.beads.bead_interaction_params[5]=='auto':
                     scale=(1+self.beads.bead_interaction_params[4])*0.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)*2**(-self.beads.bead_interaction_params[4])
                 else:
                     scale=self.beads.bead_interaction_params[5]
@@ -1701,8 +1700,8 @@ class TriLmp():
                 # soft-core (harmonic) repulsion
                 k_harmonic=self.beads.bead_interaction_params[6]
                 lc_harmonic_12=0.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes)
-		lc_harmonic_22=self.beads.bead_sizes
-		
+                lc_harmonic_22=self.beads.bead_sizes
+
                 add_pair("harmonic/cut","","",dedent(f"""\
                     pair_coeff * * harmonic/cut 0 0
                     pair_coeff 1 2 harmonic/cut {k_harmonic} {lc_harmonic_12}
@@ -1710,21 +1709,22 @@ class TriLmp():
                 """))
 
                 sigma12=float(0.5*(self.estore.eparams.bond_params.lc1 + self.beads.bead_sizes))
-		cutoff_nonrec=float(sigma12*self.beads.bead_interaction_params[7])
-		    
+                cutoff_nonrec = float(sigma12*self.beads.bead_interaction_params[7])
                 exponent=self.beads.bead_interaction_params[4]
                 scale_nonrep=float(f"{scale:.4f}")
                 add_pair("nonreciprocal", "",f"{cutoff_nonrec} {scale_nonrep} {exponent} {sigma12}",dedent(f"""
                     pair_coeff * * nonreciprocal 0 0 0 0 0
                     pair_coeff 1 2 nonreciprocal {activity_1} {activity_2} {mobility_1} {mobility_2} {cutoff_nonrec}
                 """))
+
             elif self.beads.bead_interaction=='lj/cut':
+                overlay=True
                 bead_ljd = 0.5 * (self.estore.eparams.bond_params.lc1 + np.max(self.beads.bead_sizes))
                 cutoff=4*bead_ljd
                 cmds:list[str]=[]
                 if self.beads.n_types==1:
-                    cmds.append(dedent(f"""\                    
-                        pair_coeff * * 0 0 0 0                   
+                    cmds.append(dedent(f"""                    
+                        pair_coeff * * {self.beads.bead_interaction} 0 0 0                   
                         pair_coeff 1 2 {self.beads.bead_interaction} {self.beads.bead_interaction_params[0]} {bead_ljd} {bead_ljd*self.beads.bead_interaction_params[1]}  
                         pair_coeff 2 2 {self.beads.bead_interaction} 0 0 0             
                         """))
@@ -1739,7 +1739,8 @@ class TriLmp():
                         else:
                             for j in range(i,self.beads.n_types):
                                 cmds.append(f'pair_coeff {i + 2} {j + 2}  {self.beads.bead_interaction} 0 0 0')
-                add_pair(str(self.beads.bead_interaction),float(cutoff),"",'\n'.join(cmds))
+
+                add_pair(str(self.beads.bead_interaction),float(cutoff),"", "\n".join(cmds))
             elif self.beads.bead_interaction=='custom':
                 raise NotImplementedError()
                 # self.lmp.commands_string(self.beads.bead_interaction_params)
