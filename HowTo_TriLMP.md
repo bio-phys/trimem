@@ -1,4 +1,4 @@
-#TriLMP usage
+# TriLMP usage
 
 **1. Resolution of the mesh/membrane (i.e., number of vertices in the mesh) [Before initializing trilmp object]** 
 
