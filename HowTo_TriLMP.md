@@ -1,4 +1,4 @@
-![monitor_FR_0 1_TS_100_R_4](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/32e182fc-c224-43b8-8263-5e891f435c31)# TriLMP usage
+#TriLMP usage
 
 **1. Resolution of the mesh/membrane (i.e., number of vertices in the mesh) [Before initializing trilmp object]** 
 
