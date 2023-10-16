@@ -78,7 +78,7 @@ We can monitor the value of the Trimem Hamiltonian (see Trimem documentation), t
 
 ![monitor_FR_0 1_TS_100_R_4](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/e66aed1b-dc1a-4b87-9038-e3cd909725fe)
 
-The total energy of the membrane depends on the mesh resolution (the number of vertices and number of edges), as shown in the figure below. It also depends on its mechanical properties (compare the data for floppy, where $k_v = k_a = 10^5 ~k_B T$ with rigid, where $k_v = k_a = 10^6~k_B T$). Additionally, it seems to depend on the length of the MD stage in the program for short MD simulations. The energy of the membrane does not depend on the ```flip_ratio``` parameter (all three curves for ```flip_ratio = 0.1, 0.2 and 0.3``` are practically identical).
+The total energy of the membrane depends on the mesh resolution (the number of vertices and number of edges), as shown in the figure below. It also depends on its mechanical properties (compare the data for floppy, where ```k_v = k_a = 1e5```, with rigid, where ```k_v = k_a = 1e6```). Additionally, it seems to depend on the length of the MD stage in the program for short MD simulations. The energy of the membrane does not depend on the ```flip_ratio``` parameter (all three curves for ```flip_ratio = 0.1, 0.2 and 0.3``` are practically identical).
 
 ![summary_energy](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/50006337-e608-46af-b709-d07f26307e20)
 
