@@ -76,12 +76,15 @@ The program prints outputs at a user defined frequency.
 **1. Monitoring energy of the system
 We can monitor the value of the Trimem Hamiltonian (see Trimem documentation), the total energy and the acceptance rate for the bond flips by plotting the data in ```output_prefix```_system.dat.  The figure below shows data for a membrane with ```r=4```, ```flip_ratio``` of 0.1 and MD trajectories with ```traj_steps=100``` steps. Note how this data also shows that the system is correctly equilibrating to the prescribed temperature, as $k_B T = 2/3 KE/N = 1.014$ (set temperature ```temperature = 1```).
 
-![monitor_FR_0 1_TS_100_R_4](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/e66aed1b-dc1a-4b87-9038-e3cd909725fe)
+![monitor_FR_0 1_TS_100_R_4](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/1f697af6-99b4-4c53-98e0-46b6389e154c)
 
 The total energy of the membrane depends on the mesh resolution (the number of vertices and number of edges), as shown in the figure below. It also depends on its mechanical properties (compare the data for floppy, where ```k_v = k_a = 1e5```, with rigid, where ```k_v = k_a = 1e6```). Additionally, it seems to depend on the length of the MD stage in the program for short MD simulations. The energy of the membrane does not depend on the ```flip_ratio``` parameter (all three curves for ```flip_ratio = 0.1, 0.2 and 0.3``` are practically identical).
 
-![summary_energy](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/50006337-e608-46af-b709-d07f26307e20)
+![summary_energy](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/fa98417f-2931-4cb3-b478-99d5a8924f90)
 
-Simulations with short MD stages also seem to give slightly lower temperature than expected, as shown in the figure below (data shown corresponds to 'floppy' and 'rigid' membranes (see above) with ```flip_ratio = 0.1, 0.2 and 0.3```).
 
-![summary_ke](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/7fb1e6b1-b9c9-4bb1-9585-7b518adaa7f4)
+Simulations with short MD stages also seem to give slightly lower temperature than expected, as shown in the figure below (data shown corresponds to 'floppy' and 'rigid' membranes (see above) with ```flip_ratio = 0.1, 0.2 and 0.3```). The MD stages are simulated using the ```fix langevin``` from LAMMPS; we chose ```t_damp = 1```.
+
+![summary_ke](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/06bc54e5-e4ea-4aa1-a275-07a5e8212875)
+
+
