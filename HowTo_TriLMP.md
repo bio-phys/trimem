@@ -74,7 +74,8 @@ The program prints outputs at a user defined frequency.
 # Validation and checks of the code
 
 **1. Monitoring energy of the system**
-We can monitor the value of the Trimem Hamiltonian (see Trimem documentation), the total energy and the acceptance rate for the bond flips by plotting the data in ```output_prefix```_system.dat.  The figure below shows data for a membrane with ```r=4```, ```flip_ratio``` of 0.1 and MD trajectories with ```traj_steps=100``` steps. Note how this data also shows that the system is correctly equilibrating to the prescribed temperature, as $k_B T = 2/3 KE/N = 1.014$ (set temperature ```temperature = 1```).
+
+We can monitor the value of the Trimem Hamiltonian (see Trimem documentation), the total kinetic energy and the acceptance rate for the bond flips by plotting the data in ```output_prefix```_system.dat (double check values for acceptance rate).  The figure below shows data for a membrane with ```r=4```, ```flip_ratio``` of 0.1 and MD trajectories with ```traj_steps=100``` steps. Note how this data also shows that the system is correctly equilibrating to the prescribed temperature, as $k_B T = 2/3 KE/N = 1.014$ (set temperature ```temperature = 1```).
 
 ![monitor_FR_0 1_TS_100_R_4](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/1f697af6-99b4-4c53-98e0-46b6389e154c)
 
@@ -87,4 +88,9 @@ Simulations with short MD stages also seem to give slightly lower temperature th
 
 ![summary_ke](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/06bc54e5-e4ea-4aa1-a275-07a5e8212875)
 
+**2. Performance evaluation**
+
+The figure below shows the average time it takes to perform one simulation step (MD stage + MC flips) as a function of the length of the MD stage for two mesh sizes (```r=4``` (2562 beads) and ```r=5``` (10242 beads)), and different flip rates ```f```.
+
+![performance_evaluation](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/ec07ab88-ff3b-4539-a429-7153df0f2732)
 
