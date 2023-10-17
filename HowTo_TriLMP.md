@@ -73,7 +73,7 @@ The program prints outputs at a user defined frequency.
 
 # Validation and checks of the code
 
-**1. Monitoring energy of the system
+**1. Monitoring energy of the system**
 We can monitor the value of the Trimem Hamiltonian (see Trimem documentation), the total energy and the acceptance rate for the bond flips by plotting the data in ```output_prefix```_system.dat.  The figure below shows data for a membrane with ```r=4```, ```flip_ratio``` of 0.1 and MD trajectories with ```traj_steps=100``` steps. Note how this data also shows that the system is correctly equilibrating to the prescribed temperature, as $k_B T = 2/3 KE/N = 1.014$ (set temperature ```temperature = 1```).
 
 ![monitor_FR_0 1_TS_100_R_4](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/1f697af6-99b4-4c53-98e0-46b6389e154c)
