@@ -2,13 +2,15 @@
 
 **1. Resolution of the mesh/membrane (i.e., number of vertices in the mesh) [Before initializing trilmp object]** 
 
-Controlled via the parameter ```r``` in ```trimesh.creation.icosphere(r, r_sphere = 1)```. 
+The program uses the Trimesh python library to initialize a triangulated mesh. The resolution of the mesh is controlled via the parameter ```r``` in ```trimesh.creation.icosphere(r, r_sphere = 1)```. 
 
-You can simulate meshes with 42 beads (```r=1```), 162 beads (```r=2```), 642 beads (```r=3```), 2562 beads (```r=4```) or 10242 beads (```r=5```), for example. 
+Using ```trimesh.creation.icosphere()```, you can simulate meshes with 42 beads (```r=1```), 162 beads (```r=2```), 642 beads (```r=3```), 2562 beads (```r=4```) or 10242 beads (```r=5```), for example. 
 
 The command creates a sphere of radius ```r_sphere = 1``` by default. You can see several examples in the image below. The numbers correspond to the number of vertices in the mesh, while the number in parenthesis indicates the ```r``` value given to ```trimesh```.
 
 ![DivisionMesh](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/c1f703f4-7071-4ad4-99f1-f2dc76404661)
+
+The use of Trimesh to initialize the triangulated mesh is not compulsory. If you are not satisfied with the resolution provided because you'd like something in between the values allowed by the ```icosphere``` function, you can use the in-house code of the group to initialize your own mesh. The only thing to keep in mind is that you must give ```trilmp``` the same array format that ```icosphere``` does.
 
 ***
 
@@ -93,4 +95,9 @@ Simulations with short MD stages also seem to give slightly lower temperature th
 The figure below shows the average time it takes to perform one simulation step (MD stage + MC flips) as a function of the length of the MD stage for two mesh sizes (```r=4``` (2562 beads) and ```r=5``` (10242 beads)), and different flip rates ```f```.
 
 ![performance_evaluation](https://github.com/Saric-Group/trimem_sbeady/assets/58335020/ec07ab88-ff3b-4539-a429-7153df0f2732)
+
+**3. A comment on numerical stability and what parameters to use**
+
+Simulations for membranes (with membrane parameters ```k_v = k_a = 1e6```, ```k_c =0```, ```k_t =1e5```, ```k_r=1e3```) tend to explode when the step size is ```step_size = 0.01, 0.001```, while ```step_size = 5e-4``` seems stable. Different membrane parameters may admit larger step sizes for the MD stage of the program.
+
 
