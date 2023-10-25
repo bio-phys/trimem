@@ -29,9 +29,9 @@ def get_energy_manager(mesh, bond_type):
     eparams.kappa_v        = 1.0
     eparams.kappa_c        = 1.0
     eparams.kappa_t        = 1.0
-    eparams.area_frac      = 0.8
-    eparams.volume_frac    = 0.8
-    eparams.curvature_frac = 0.8
+    eparams.area_frac      = m.ContinuationTuple(0.8)
+    eparams.volume_frac    = m.ContinuationTuple(0.8)
+    eparams.curvature_frac = m.ContinuationTuple(0.8)
     eparams.bond_params    = bparams
 
     return m.EnergyManager(mesh, eparams)

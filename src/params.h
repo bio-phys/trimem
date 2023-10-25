@@ -25,10 +25,61 @@ struct BondParams
   BondType type = BondType::Edge;
 };
 
-struct ContinuationParams
+class ContinuationTuple
 {
-    real delta  = 0;
-    real lambda = 1;
+private:
+
+    real start;
+    real stop;
+    real delta;
+    real lambda;
+
+    real state;
+
+    void eval_state()
+    {
+        state = (1 - lambda) * start + lambda * stop;
+    }
+
+public:
+
+    ContinuationTuple(
+        const real& start,
+        const real& stop,
+        const real& delta,
+        const real& lambda
+    ) :
+        start(start),
+        stop(stop),
+        delta(delta),
+        lambda(lambda)
+    {
+        eval_state();
+    }
+
+    ContinuationTuple(const real& start) :
+        start(start),
+        stop(start),
+        delta(0),
+        lambda(0),
+        state(start) {}
+
+    void update()
+    {
+        if (lambda < 1) lambda += delta;
+        if (lambda > 1) lambda = 1;
+        eval_state();
+    }
+
+    const real& get() const
+    {
+        return state;
+    }
+
+    std::string to_string() const {
+        return std::to_string(start) + " " + std::to_string(stop) + " " + \
+               std::to_string(delta) + " " + std::to_string(lambda);
+    }
 };
 
 struct SurfaceRepulsionParams
@@ -56,16 +107,14 @@ struct EnergyParams
   real kappa_r = 0;
 
   //! target area as fraction of initial area
-  real area_frac = 1;
+  ContinuationTuple area_frac = 1;
   //! target volume as fraction of initial volume
-  real volume_frac = 1;
+  ContinuationTuple volume_frac = 1;
   //! target curvature as fraction of initial curvature
-  real curvature_frac = 1;
+  ContinuationTuple curvature_frac = 1;
 
   //! parameters for the tether penalty
   BondParams bond_params;
-  //! parameters for the interpolation of reference properties
-  ContinuationParams continuation_params;
   //! parameters for the repulsion penalty
   SurfaceRepulsionParams repulse_params;
 };

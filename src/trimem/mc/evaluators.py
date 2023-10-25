@@ -180,7 +180,7 @@ class EnergyEvaluators:
             self.write_cpt(self.mesh, self.estore, steps)
         if self.refresh_step and (i % self.refresh_step == 0):
             self.estore.update_repulsion(self.mesh.trimesh)
-        self.estore.update_reference_properties()
+        self.estore.update()
 
 
 class TimingEnergyEvaluators(EnergyEvaluators):

@@ -74,8 +74,9 @@ def write_checkpoint_handle(config):
         # update config
         upd = {
             "ENERGY": {
-                "continuation_lambda": estore.eparams.continuation_params.lam,
-                "continuation_delta":  estore.eparams.continuation_params.delta,
+                "area_fraction": estore.eparams.area_frac,
+                "volume_fraction": estore.eparams.volume_frac,
+                "curvature_fraction": estore.eparams.curvature_frac,
             },
             "HMC": {
                 "init_step": json.dumps(step),
@@ -118,8 +119,9 @@ def read_checkpoint(config, restartnum):
     # TODO: restart logic (see issue 26)
     upd = {
         "ENERGY": {
-            "continuation_delta":  conf["ENERGY"]["continuation_delta"],
-            "continuation_lambda": conf["ENERGY"]["continuation_lambda"],
+            "area_fraction": conf["ENERGY"]["area_fraction"],
+            "volume_fraction": conf["ENERGY"]["volume_fraction"],
+            "curvature_fraction": conf["ENERGY"]["curvature_fraction"],
         },
         "DEFAULT": {
             "init_step": conf["HMC"]["init_step"],

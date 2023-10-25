@@ -24,8 +24,7 @@ public:
                   const EnergyParams& params);
 
     // update reference properties
-    void update_reference_properties();
-    VertexProperties interpolate_reference_properties() const;
+    void update();
 
     // update repulsion potential
     void update_repulsion(const TriMesh& mesh);

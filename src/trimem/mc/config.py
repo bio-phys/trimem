@@ -98,12 +98,17 @@ kappa_t = 1.0
 kappa_r = 1.0
 
 # target surface area fraction wrt. the initial geometry
+# this parameter can be linearly interpolated during sampling
+# for that also four values representing `start, stop, delta, lambda`
+# for parameter continuation
 area_fraction = 1.0
 
 # target volume fraction wrt. the initial geometry
+# see `area_fraction` for parameter continuation
 volume_fraction = 1.0
 
 # target curvature fraction wrt. the initial geometry
+# see `area_fraction` for parameter continuation
 curvature_fraction = 1.0
 
 # time step for the parameter continuation (choose from: [0,1])
@@ -280,10 +285,6 @@ def config_to_params(config):
 
     # translate energy params
     ec = config["ENERGY"]
-    cp = m.ContinuationParams()
-    cp.delta = ec.getfloat("continuation_delta")
-    cp.lam   = ec.getfloat("continuation_lambda")
-
     eparams = m.EnergyParams()
     eparams.kappa_b             = ec.getfloat("kappa_b")
     eparams.kappa_a             = ec.getfloat("kappa_a")
@@ -291,11 +292,15 @@ def config_to_params(config):
     eparams.kappa_c             = ec.getfloat("kappa_c")
     eparams.kappa_t             = ec.getfloat("kappa_t")
     eparams.kappa_r             = ec.getfloat("kappa_r")
-    eparams.area_frac           = ec.getfloat("area_fraction")
-    eparams.volume_frac         = ec.getfloat("volume_fraction")
-    eparams.curvature_frac      = ec.getfloat("curvature_fraction")
+
+    af = [float(i) for i in ec.get("area_fraction").split()]
+    vf = [float(i) for i in ec.get("volume_fraction").split()]
+    cf = [float(i) for i in ec.get("curvature_fraction").split()]
+    eparams.area_frac           = m.ContinuationTuple(*af)
+    eparams.volume_frac         = m.ContinuationTuple(*vf)
+    eparams.curvature_frac      = m.ContinuationTuple(*cf)
+
     eparams.bond_params         = bparams
     eparams.repulse_params      = rparams
-    eparams.continuation_params = cp
 
     return eparams

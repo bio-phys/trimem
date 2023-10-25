@@ -27,31 +27,11 @@ EnergyManager::EnergyManager(const TriMesh& mesh,
     initial_props = properties(mesh);
 }
 
-VertexProperties EnergyManager::interpolate_reference_properties() const
+void EnergyManager::update()
 {
-    auto& cparams = params.continuation_params;
-
-    real i_af = 1.0 - params.area_frac;
-    real i_vf = 1.0 - params.volume_frac;
-    real i_cf = 1.0 - params.curvature_frac;
-    const real& lam = cparams.lambda;
-
-    VertexProperties ref_props{0, 0, 0, 0, 0, 0};
-    ref_props.area      = ( 1.0 - lam * i_af ) * initial_props.area;
-    ref_props.volume    = ( 1.0 - lam * i_vf ) * initial_props.volume;
-    ref_props.curvature = ( 1.0 - lam * i_cf ) * initial_props.curvature;
-
-    return ref_props;
-}
-
-void EnergyManager::update_reference_properties()
-{
-    auto& cparams = params.continuation_params;
-
-    if (cparams.lambda < 1.0)
-    {
-        cparams.lambda += cparams.delta;
-    }
+    params.area_frac.update();
+    params.volume_frac.update();
+    params.curvature_frac.update();
 }
 
 void EnergyManager::update_repulsion(const TriMesh& mesh)
@@ -78,16 +58,14 @@ VertexProperties EnergyManager::properties(const TriMesh& mesh)
 
 real EnergyManager::energy(const TriMesh& mesh)
 {
-    auto ref_props = interpolate_reference_properties();
-    auto props     = properties(mesh);
+    auto props = properties(mesh);
 
-    return trimem_energy(params, props, ref_props);
+    return trimem_energy(params, props, initial_props);
 }
 
 real EnergyManager::energy(const VertexProperties& props)
 {
-    auto ref_props = interpolate_reference_properties();
-    return trimem_energy(params, props, ref_props);
+    return trimem_energy(params, props, initial_props);
 }
 
 std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
@@ -104,9 +82,6 @@ std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
     ReduceProperties reduce_kernel(vprops);
     parallel_reduction(n, reduce_kernel, props);
 
-    // reference properties
-    auto ref_props = interpolate_reference_properties();
-
     // properties gradients
     VertexPropertiesGradient zeros
       { Point(0), Point(0), Point(0), Point(0), Point(0), Point(0) };
@@ -117,7 +92,7 @@ std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
 
     // evaluate gradient
     std::vector<Point> gradient(n, Point(0));
-    EvaluateGradient g_kernel(params, props, ref_props, gprops, gradient);
+    EvaluateGradient g_kernel(params, props, initial_props, gprops, gradient);
     parallel_for(n, g_kernel);
 
     return gradient;
@@ -126,27 +101,30 @@ std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
 void EnergyManager::print_info(const TriMesh& mesh)
 {
   auto props     = properties(mesh);
-  auto ref_props = interpolate_reference_properties();
+
+  auto ref_area = params.area_frac.get() * initial_props.area;
+  auto ref_volume = params.volume_frac.get() * initial_props.volume;
+  auto ref_curvature = params.curvature_frac.get() * initial_props.curvature;
 
   std::ostream& out = std::cout;
 
   out << "----- EnergyManager info\n";
   out << "reference properties:\n";
-  out << "  area:      " << ref_props.area << "\n";
-  out << "  volume:    " << ref_props.volume << "\n";
-  out << "  curvature: " << ref_props.curvature << "\n";
+  out << "  area:      " << ref_area << "\n";
+  out << "  volume:    " << ref_volume << "\n";
+  out << "  curvature: " << ref_curvature << "\n";
   out << "current properties:\n";
   out << "  area:      " << props.area << "\n";
   out << "  volume:    " << props.volume << "\n";
   out << "  curvature: " << props.curvature << "\n";
   out << "energies:\n";
-  out << "  area:      " << area_penalty(params, props, ref_props) << "\n";
-  out << "  volume:    " << volume_penalty(params, props, ref_props) << "\n";
-  out << "  area diff: " << curvature_penalty(params, props, ref_props) << "\n";
+  out << "  area:      " << area_penalty(params, props, initial_props) << "\n";
+  out << "  volume:    " << volume_penalty(params, props, initial_props) << "\n";
+  out << "  area diff: " << curvature_penalty(params, props, initial_props) << "\n";
   out << "  bending:   " << helfrich_energy(params, props) << "\n";
   out << "  tether:    " << tether_penalty(params, props) << "\n";
   out << "  repulsion: " << repulsion_penalty(params, props) << "\n";
-  out << "  total:     " << trimem_energy(params, props, ref_props) << "\n";
+  out << "  total:     " << trimem_energy(params, props, initial_props) << "\n";
   out << std::endl;
 }
 

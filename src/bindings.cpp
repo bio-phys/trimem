@@ -529,23 +529,6 @@ void expose_parameters(py::module& m)
             )pbdoc"
         );
 
-    py::class_<ContinuationParams>(
-        m,
-        "ContinuationParams",
-        "Parameters used for smooth continuation."
-        )
-        .def(py::init())
-        .def_readwrite(
-            "delta",
-            &ContinuationParams::delta,
-            "Interpolation blending `time` step."
-        )
-        .def_readwrite(
-            "lam",
-            &ContinuationParams::lambda,
-            "Interpolation state."
-        );
-
     py::class_<EnergyParams>(
         m,
         "EnergyParams",
@@ -657,15 +640,53 @@ void expose_parameters(py::module& m)
 
             :type: SurfaceRepulsionParams
             )pbdoc"
-        )
-        .def_readwrite(
-            "continuation_params",
-            &EnergyParams::continuation_params,
-            R"pbdoc(
-            Parameters for the parameter continuation.
+        );
 
-            :type: ContinuationParams
+    py::class_<ContinuationTuple>(
+        m,
+        "ContinuationTuple",
+        R"pbdoc(
+        Parameter as tuple `(start, stop, delta, lambda)` for continuation.
+
+        Allows linear interplation for the associated parameter via
+        blending: (1-lambda)*start + lambda*stop.
+        )pbdoc"
+        )
+
+        .def(
+            py::init<const real&, const real&, const real&, const real&>(),
+            py::arg("start"),
+            py::arg("stop"),
+            py::arg("delta"),
+            py::arg("lambda"),
+            R"pbdoc(
+            Initialization with full `start,stop,delta,lambda` tuple.
             )pbdoc"
+        )
+        .def(
+            py::init<const real&>(),
+            py::arg("start"),
+            R"pbdoc(
+            Initialization with single start value (disabling continuation).
+            )pbdoc"
+        )
+        .def(
+            "get",
+            &ContinuationTuple::get,
+            R"pbdoc(
+            Get interpolated parameter.
+            )pbdoc"
+        )
+        .def(
+            "update",
+            &ContinuationTuple::update,
+            R"pbdoc(
+            Update state (`lambda`).
+            )pbdoc"
+        )
+        .def(
+            "__str__",
+            &ContinuationTuple::to_string
         );
 
 }
@@ -782,8 +803,8 @@ void expose_energy(py::module& m){
         )
 
         .def(
-            "update_reference_properties",
-            &EnergyManager::update_reference_properties,
+            "update",
+            &EnergyManager::update,
             R"pbdoc(
             Update reference configurations.
 

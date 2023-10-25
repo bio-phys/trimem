@@ -29,9 +29,9 @@ def params():
     eparams.kappa_v        = 1.0
     eparams.kappa_c        = 1.0
     eparams.kappa_t        = 1.0
-    eparams.area_frac      = 1.0
-    eparams.volume_frac    = 1.0
-    eparams.curvature_frac = 1.0
+    eparams.area_frac      = m.ContinuationTuple(1.0)
+    eparams.volume_frac    = m.ContinuationTuple(1.0)
+    eparams.curvature_frac = m.ContinuationTuple(1.0)
     eparams.bond_params    = params
 
     estore = m.EnergyManager(mesh, eparams)
