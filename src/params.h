@@ -6,6 +6,8 @@
 
 #include "defs.h"
 
+#include <autodiff/forward/real.hpp>
+
 namespace trimem {
 
 enum class BondType : int
@@ -71,10 +73,8 @@ public:
         eval_state();
     }
 
-    const real& get() const
-    {
-        return state;
-    }
+    operator const real&() const {return state;}
+    operator autodiff::real() const {return state;}
 
     std::string to_string() const {
         return std::to_string(start) + " " + std::to_string(stop) + " " + \
@@ -91,6 +91,14 @@ struct SurfaceRepulsionParams
   int         exclusion_level = 2;
 };
 
+struct ExternalPotentialParams
+{
+  std::string type              = "none";
+  real epsilon                  = 1.0;
+  real sigma                    = 1.0;
+  ContinuationTuple radius      = 1.0;
+};
+
 struct EnergyParams
 {
   //! weight bending energy
@@ -105,6 +113,8 @@ struct EnergyParams
   real kappa_t = 0;
   //! weight repulsion penalty
   real kappa_r = 0;
+  //! weight external potential
+  real kappa_e = 0;
 
   //! target area as fraction of initial area
   ContinuationTuple area_frac = 1;
@@ -117,6 +127,8 @@ struct EnergyParams
   BondParams bond_params;
   //! parameters for the repulsion penalty
   SurfaceRepulsionParams repulse_params;
+  //! parametees for the external potential
+  ExternalPotentialParams external_params;
 };
 
 }

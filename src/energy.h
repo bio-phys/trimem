@@ -13,6 +13,7 @@ namespace trimem {
 
 struct BondPotential;
 struct SurfaceRepulsion;
+struct ExternalPotential;
 struct NeighbourList;
 
 class EnergyManager
@@ -49,6 +50,9 @@ public:
 
     // repulsion penalty
     std::unique_ptr<SurfaceRepulsion> repulse;
+
+    // external potential
+    std::unique_ptr<ExternalPotential> external;
 
     // neighbour list
     std::unique_ptr<NeighbourList> nlist;

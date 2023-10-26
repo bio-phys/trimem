@@ -20,7 +20,7 @@ real area_penalty(const EnergyParams& params,
                   const VertexProperties& props,
                   const VertexProperties& ref_props)
 {
-    real ref_area = params.area_frac.get() * ref_props.area;
+    real ref_area = params.area_frac * ref_props.area;
 
     real d = props.area / ref_area - 1.0;
     return params.kappa_a * d * d;
@@ -31,7 +31,7 @@ Point area_penalty_grad(const EnergyParams& params,
                         const VertexProperties& ref_props,
                         const Point& d_area)
 {
-    real ref_area = params.area_frac.get() * ref_props.area;
+    real ref_area = params.area_frac * ref_props.area;
 
     real d   = props.area / ref_area - 1.0;
     real fac = 2.0 * params.kappa_a / ref_area * d;
@@ -42,7 +42,7 @@ real volume_penalty(const EnergyParams& params,
                     const VertexProperties& props,
                     const VertexProperties& ref_props)
 {
-    real ref_volume = params.volume_frac.get() * ref_props.volume;
+    real ref_volume = params.volume_frac * ref_props.volume;
 
     real d = props.volume / ref_volume - 1.0;
     return params.kappa_v * d * d;
@@ -53,7 +53,7 @@ Point volume_penalty_grad(const EnergyParams& params,
                           const VertexProperties& ref_props,
                           const Point& d_volume)
 {
-    real ref_volume = params.volume_frac.get() * ref_props.volume;
+    real ref_volume = params.volume_frac * ref_props.volume;
 
     real d = props.volume / ref_volume - 1.0;
     real fac = 2.0 * params.kappa_v / ref_volume * d;
@@ -64,7 +64,7 @@ real curvature_penalty(const EnergyParams& params,
                        const VertexProperties& props,
                        const VertexProperties& ref_props)
 {
-    real ref_curvature = params.curvature_frac.get() * ref_props.curvature;
+    real ref_curvature = params.curvature_frac * ref_props.curvature;
     real d = props.curvature / ref_curvature - 1.0;
     return params.kappa_c * d * d;
 }
@@ -74,7 +74,7 @@ Point curvature_penalty_grad(const EnergyParams& params,
                              const VertexProperties& ref_props,
                              const Point& d_curvature)
 {
-    real ref_curvature = params.curvature_frac.get() * ref_props.curvature;
+    real ref_curvature = params.curvature_frac * ref_props.curvature;
 
     real d = props.curvature / ref_curvature - 1.0;
     real fac = 2.0 * params.kappa_c / ref_curvature * d;
@@ -106,6 +106,19 @@ Point repulsion_penalty_grad(const EnergyParams& params,
     return params.kappa_r * d_repulsion;
 }
 
+real external_potential(const EnergyParams& params,
+                        const VertexProperties& props)
+{
+    return params.kappa_e * props.external;
+}
+
+Point external_potential_grad(const EnergyParams& params,
+                             const VertexProperties& props,
+                             const Point& d_external)
+{
+    return params.kappa_e * d_external;
+}
+
 real helfrich_energy(const EnergyParams& params, const VertexProperties& props)
 {
     return params.kappa_b * props.bending;
@@ -128,6 +141,7 @@ real trimem_energy(const EnergyParams& params,
     energy += curvature_penalty(params, props, ref_props);
     energy += tether_penalty(params, props);
     energy += repulsion_penalty(params, props);
+    energy += external_potential(params, props);
     energy += helfrich_energy(params, props);
     return energy;
 }
@@ -143,6 +157,7 @@ Point trimem_gradient(const EnergyParams& params,
     grad += curvature_penalty_grad(params, props, ref_props, gprops.curvature);
     grad += tether_penalty_grad(params, props, gprops.tethering);
     grad += repulsion_penalty_grad(params, props, gprops.repulsion);
+    grad += external_potential_grad(params, props, gprops.external);
     grad += helfrich_energy_grad(params, props, gprops.bending);
     return grad;
 }
@@ -154,17 +169,20 @@ struct EvaluateProperties
                        const TriMesh& mesh,
                        const BondPotential& bonds,
                        const SurfaceRepulsion& repulse,
+                       const ExternalPotential& external,
                        std::vector<VertexProperties>& props) :
         params_(params),
         mesh_(mesh),
         bonds_(bonds),
         repulse_(repulse),
+        external_(external),
         props_(props) {}
 
     //parameters
     const EnergyParams& params_;
     const TriMesh& mesh_;
     const BondPotential& bonds_;
+    const ExternalPotential& external_;
     const SurfaceRepulsion& repulse_;
 
     // result
@@ -173,7 +191,7 @@ struct EvaluateProperties
     void operator() (const int i)
     {
         auto vh = mesh_.vertex_handle(i);
-        props_[i] = vertex_properties(mesh_, bonds_, repulse_, vh);
+        props_[i] = vertex_properties(mesh_, bonds_, repulse_, external_, vh);
     }
 };
 
@@ -197,12 +215,14 @@ struct EvaluatePropertiesGradient
     EvaluatePropertiesGradient(const TriMesh& mesh,
                                const BondPotential& bonds,
                                const SurfaceRepulsion& repulse,
+                               const ExternalPotential& external,
                                const std::vector<VertexProperties>& props,
                                std::vector<VertexPropertiesGradient>& gradients)
         :
         mesh_(mesh),
         bonds_(bonds),
         repulse_(repulse),
+        external_(external),
         props_(props),
         gradients_(gradients) {}
 
@@ -210,6 +230,7 @@ struct EvaluatePropertiesGradient
     const TriMesh& mesh_;
     const BondPotential& bonds_;
     const SurfaceRepulsion& repulse_;
+    const ExternalPotential& external_;
     const std::vector<VertexProperties>& props_;
 
     // result
@@ -218,7 +239,7 @@ struct EvaluatePropertiesGradient
     void operator() (const int i)
     {
         auto vh = mesh_.vertex_handle(i);
-        vertex_properties_grad(mesh_, bonds_, repulse_, vh, props_, gradients_);
+        vertex_properties_grad(mesh_, bonds_, repulse_, external_, vh, props_, gradients_);
     }
 };
 

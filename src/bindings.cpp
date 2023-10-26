@@ -9,6 +9,7 @@
 #include "mesh_py.h"
 #include "numpy_util.h"
 #include "energy.h"
+#include "external.h"
 #include "flips.h"
 #include "mesh_repulsion.h"
 #include "mesh_tether.h"
@@ -243,6 +244,11 @@ void expose_properties(py::module& m)
             "repulsion",
             &VertexProperties::repulsion,
             "Repulsion penalty"
+        )
+        .def_readwrite(
+            "external",
+            &VertexProperties::external,
+            "External Potential"
         );
 }
 
@@ -529,6 +535,51 @@ void expose_parameters(py::module& m)
             )pbdoc"
         );
 
+    py::class_<ExternalPotentialParams>(
+        m,
+        "ExternalPotentialParams",
+        "Parameters for the external potential."
+        )
+        .def(py::init())
+        .def_readwrite(
+            "type",
+            &ExternalPotentialParams::type,
+            R"pbdoc(
+            Type of external potential.
+
+            :type: str
+
+            Can be one of (``none``, ``lj``, ``lj-ad``, ``sphere``).
+            )pbdoc"
+        )
+        .def_readwrite(
+            "epsilon",
+            &ExternalPotentialParams::epsilon,
+            R"pbdoc(
+            LJ epsilon.
+
+            :type: float
+            )pbdoc"
+        )
+        .def_readwrite(
+            "sigma",
+            &ExternalPotentialParams::sigma,
+            R"pbdoc(
+            LJ sigma.
+
+            :type: float
+            )pbdoc"
+        )
+        .def_readwrite(
+            "radius",
+            &ExternalPotentialParams::radius,
+            R"pbdoc(
+            Sphere radius.
+
+            :type: float
+            )pbdoc"
+        );
+
     py::class_<EnergyParams>(
         m,
         "EnergyParams",
@@ -597,6 +648,15 @@ void expose_parameters(py::module& m)
             )pbdoc"
         )
         .def_readwrite(
+            "kappa_e",
+            &EnergyParams::kappa_e,
+            R"pbdoc(
+            Weight of the external potential.
+
+            :type: float
+            )pbdoc"
+        )
+        .def_readwrite(
             "area_frac",
             &EnergyParams::area_frac,
             R"pbdoc(
@@ -640,6 +700,15 @@ void expose_parameters(py::module& m)
 
             :type: SurfaceRepulsionParams
             )pbdoc"
+        )
+        .def_readwrite(
+            "external_params",
+            &EnergyParams::external_params,
+            R"pbdoc(
+            Parameters for the external potential.
+
+            :type: ExternalPotentialParams
+            )pbdoc"
         );
 
     py::class_<ContinuationTuple>(
@@ -670,12 +739,10 @@ void expose_parameters(py::module& m)
             Initialization with single start value (disabling continuation).
             )pbdoc"
         )
-        .def(
-            "get",
-            &ContinuationTuple::get,
-            R"pbdoc(
-            Get interpolated parameter.
-            )pbdoc"
+        .def("get",
+            [](const ContinuationTuple &a) -> real {
+                return a;
+            }
         )
         .def(
             "update",

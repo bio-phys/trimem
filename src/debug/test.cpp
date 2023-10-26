@@ -11,6 +11,7 @@
 #include "mesh.h"
 #include "params.h"
 #include "energy.h"
+#include "external.h"
 #include "util.h"
 #include "mesh_tether.h"
 #include "nlists/nlist.h"

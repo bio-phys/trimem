@@ -6,6 +6,7 @@
 #include "mesh_tether.h"
 #include "nlists/nlist.h"
 #include "mesh_repulsion.h"
+#include "external.h"
 #include "kernel.h"
 
 namespace trimem {
@@ -23,6 +24,9 @@ EnergyManager::EnergyManager(const TriMesh& mesh,
     // setup mesh repulsion
     repulse = make_repulsion(*nlist, params.repulse_params);
 
+    // external potential
+    external = make_external(params.external_params);
+
     // evaluate properties from mesh
     initial_props = properties(mesh);
 }
@@ -32,6 +36,7 @@ void EnergyManager::update()
     params.area_frac.update();
     params.volume_frac.update();
     params.curvature_frac.update();
+    params.external_params.radius.update();
 }
 
 void EnergyManager::update_repulsion(const TriMesh& mesh)
@@ -47,7 +52,7 @@ VertexProperties EnergyManager::properties(const TriMesh& mesh)
     VertexProperties props{ 0, 0, 0, 0, 0, 0};
     std::vector<VertexProperties> vprops(n, props);
 
-    EvaluateProperties eval_kernel(params, mesh, *bonds, *repulse, vprops);
+    EvaluateProperties eval_kernel(params, mesh, *bonds, *repulse, *external, vprops);
     parallel_for(n, eval_kernel);
 
     ReduceProperties reduce_kernel(vprops);
@@ -76,7 +81,7 @@ std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
     VertexProperties props{ 0, 0, 0, 0, 0, 0};
     std::vector<VertexProperties> vprops(n, props);
 
-    EvaluateProperties eval_kernel(params, mesh, *bonds, *repulse, vprops);
+    EvaluateProperties eval_kernel(params, mesh, *bonds, *repulse, *external, vprops);
     parallel_for(n, eval_kernel);
 
     ReduceProperties reduce_kernel(vprops);
@@ -87,7 +92,7 @@ std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
       { Point(0), Point(0), Point(0), Point(0), Point(0), Point(0) };
     std::vector<VertexPropertiesGradient> gprops(n, zeros);
     EvaluatePropertiesGradient pg_kernel(
-        mesh, *bonds, *repulse, vprops, gprops);
+        mesh, *bonds, *repulse, *external, vprops, gprops);
     parallel_for(n, pg_kernel);
 
     // evaluate gradient
@@ -102,9 +107,9 @@ void EnergyManager::print_info(const TriMesh& mesh)
 {
   auto props     = properties(mesh);
 
-  auto ref_area = params.area_frac.get() * initial_props.area;
-  auto ref_volume = params.volume_frac.get() * initial_props.volume;
-  auto ref_curvature = params.curvature_frac.get() * initial_props.curvature;
+  auto ref_area = params.area_frac * initial_props.area;
+  auto ref_volume = params.volume_frac * initial_props.volume;
+  auto ref_curvature = params.curvature_frac * initial_props.curvature;
 
   std::ostream& out = std::cout;
 

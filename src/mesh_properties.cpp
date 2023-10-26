@@ -6,12 +6,14 @@
 #include "mesh_util.h"
 #include "mesh_tether.h"
 #include "mesh_repulsion.h"
+#include "external.h"
 
 namespace trimem {
 
 VertexProperties vertex_properties(const TriMesh& mesh,
                                    const BondPotential& bonds,
                                    const SurfaceRepulsion& constraint,
+                                   const ExternalPotential& external,
                                    const VertexHandle& ve)
 {
     VertexProperties p{ 0, 0, 0, 0, 0, 0 };
@@ -45,12 +47,16 @@ VertexProperties vertex_properties(const TriMesh& mesh,
     // mesh repulsion
     p.repulsion = constraint.vertex_property(mesh, ve.idx());
 
+    // external potential
+    p.external = external.vertex_property(mesh, ve);
+
     return p;
 }
 
 void vertex_properties_grad(const TriMesh& mesh,
                             const BondPotential& bonds,
                             const SurfaceRepulsion& repulse,
+                            const ExternalPotential& external,
                             const VertexHandle& ve,
                             const std::vector<VertexProperties>& props,
                             std::vector<VertexPropertiesGradient>& d_props)
@@ -145,5 +151,7 @@ void vertex_properties_grad(const TriMesh& mesh,
         d_props[idx].repulsion += 2 * d_repulse[i];
     }
 
+    // external potential
+    d_props[idx].external = external.vertex_property_grad(mesh, ve);
 }
 }

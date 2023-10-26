@@ -26,6 +26,11 @@ exclusion_level = 2
 refresh = 1
 lc1 = 0.0
 r = 2
+[EXTERNALPOTENTIAL]
+type = none
+epsilon = 1.0
+sigma = 1.0
+radius = 1.0
 [ENERGY]
 kappa_b = 1.0
 kappa_a = 1.0
@@ -33,6 +38,7 @@ kappa_v = 1.0
 kappa_c = 1.0
 kappa_t = 1.0
 kappa_r = 1.0
+kappa_e = 0.0
 area_fraction = 1.0
 volume_fraction = 1.0
 curvature_fraction = 1.0

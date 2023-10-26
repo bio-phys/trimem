@@ -78,6 +78,9 @@ def write_checkpoint_handle(config):
                 "volume_fraction": estore.eparams.volume_frac,
                 "curvature_fraction": estore.eparams.curvature_frac,
             },
+            "EXTERNALPOTENTIAL": {
+                "radius": estore.eparams.external_params.radius
+            },
             "HMC": {
                 "init_step": json.dumps(step),
             },
@@ -122,6 +125,9 @@ def read_checkpoint(config, restartnum):
             "area_fraction": conf["ENERGY"]["area_fraction"],
             "volume_fraction": conf["ENERGY"]["volume_fraction"],
             "curvature_fraction": conf["ENERGY"]["curvature_fraction"],
+        },
+        "EXTERNALPOTENTIAL": {
+            "radius": conf["EXTERNALPOTENTIAL"]["radius"],
         },
         "DEFAULT": {
             "init_step": conf["HMC"]["init_step"],

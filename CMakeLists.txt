@@ -20,7 +20,10 @@ add_library(trimem SHARED src/mesh.cpp
                              src/omp_guard.cpp
                              src/nlists/nlist.cpp
                              src/util.cpp)
-target_include_directories(trimem PUBLIC src OpenMesh/src)
+target_include_directories(trimem PUBLIC src
+                                         OpenMesh/src
+                                         ${CMAKE_SOURCE_DIR}/eigen
+                                         ${CMAKE_SOURCE_DIR}/autodiff)
 target_link_libraries(trimem PUBLIC OpenMeshCore
                                     OpenMP::OpenMP_CXX)
 

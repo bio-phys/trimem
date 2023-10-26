@@ -78,6 +78,20 @@ lc1 = 0.0
 # steepness of repulsion force (must be an integer >= 1)
 r = 2
 
+[EXTERNALPOTENTIAL]
+# type (choose from: 'none', 'sphere'; default: 'none')
+type = none
+
+# lennard-jones epsilon
+epsilon = 1.0
+
+# lennard-jones sigma
+sigma = 1.0
+
+# sphere potential radius
+# see `ENERGY.area_fraction` for parameter continuation
+radius = 1.0
+
 [ENERGY]
 # Helfrich functional weight
 kappa_b = 1.0
@@ -97,10 +111,18 @@ kappa_t = 1.0
 # repulsion penalty weight
 kappa_r = 1.0
 
+# external potential weight (default: currently 0.0 since untested)
+kappa_e = 0.0
+
 # target surface area fraction wrt. the initial geometry
-# this parameter can be linearly interpolated during sampling
-# for that also four values representing `start, stop, delta, lambda`
-# for parameter continuation
+# this parameter can be linearly interpolated during sampling. In
+# addition to a single value (that would set the target value
+# ad-hoc) also four white-space delimited values representing the
+# 4-tuple `(start, stop, delta, lambda)` for parameter continuation
+# can be specified. In that case, the current value for area_fraction
+# during energy/gradient evaluation is evaluated as
+# state = (1-lambda)*start + lambda*stop
+# and lambda is evolved over the sampling time with lambda += delta.
 area_fraction = 1.0
 
 # target volume fraction wrt. the initial geometry
@@ -125,7 +147,7 @@ num_steps = 10
 
 # inital step number counters (default: {})
 # if not empty it must be a stringification of a dict with keys in
-# ["move", "flip"] and values giving the step count for the step-type indicated 
+# ["move", "flip"] and values giving the step count for the step-type indicated
 # by the key, e.g., a value of {"move": 10, "flip": 5} would restart with a
 # total step count of 15. An empty dict resets all counters.
 # this can be used to control the start of simulated annealing in combination
@@ -283,6 +305,15 @@ def config_to_params(config):
     rparams.lc1             = rc.getfloat("lc1")
     rparams.r               = rc.getint("r")
 
+    ex = config["EXTERNALPOTENTIAL"]
+    exparams = m.ExternalPotentialParams()
+    exparams.type    = ex["type"]
+    exparams.epsilon = ex.getfloat("epsilon")
+    exparams.sigma   = ex.getfloat("sigma")
+    exparams.radius  = m.ContinuationTuple(
+        *[float(i) for i in ex.get("radius").split()]
+    )
+
     # translate energy params
     ec = config["ENERGY"]
     eparams = m.EnergyParams()
@@ -292,6 +323,7 @@ def config_to_params(config):
     eparams.kappa_c             = ec.getfloat("kappa_c")
     eparams.kappa_t             = ec.getfloat("kappa_t")
     eparams.kappa_r             = ec.getfloat("kappa_r")
+    eparams.kappa_e             = ec.getfloat("kappa_e")
 
     af = [float(i) for i in ec.get("area_fraction").split()]
     vf = [float(i) for i in ec.get("volume_fraction").split()]
@@ -302,5 +334,6 @@ def config_to_params(config):
 
     eparams.bond_params         = bparams
     eparams.repulse_params      = rparams
+    eparams.external_params     = exparams
 
     return eparams

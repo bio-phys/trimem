@@ -45,14 +45,20 @@ int flip_serial(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio)
         if (mesh.is_flip_ok(eh) and !mesh.is_boundary(eh))
         {
             // remove old properties
-            auto oprops = edge_vertex_properties(mesh, eh, *(estore.bonds),
-                                                 *(estore.repulse));
+            auto oprops = edge_vertex_properties(mesh,
+                                                 eh,
+                                                 *(estore.bonds),
+                                                 *(estore.repulse),
+                                                 *(estore.external));
             props -= oprops;
 
             // update with new properties
             mesh.flip(eh);
-            auto nprops = edge_vertex_properties(mesh, eh, *(estore.bonds),
-                                                 *(estore.repulse));
+            auto nprops = edge_vertex_properties(mesh,
+                                                 eh,
+                                                 *(estore.bonds),
+                                                 *(estore.repulse),
+                                                 *(estore.external));
             props += nprops;
 
             // evaluate energy
@@ -130,11 +136,17 @@ int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, const real& flip
                 continue;
 
             // compute differential properties
-            auto dprops = edge_vertex_properties(mesh, eh, *(estore.bonds),
-                                                 *(estore.repulse));
+            auto dprops = edge_vertex_properties(mesh,
+                                                 eh,
+                                                 *(estore.bonds),
+                                                 *(estore.repulse),
+                                                 *(estore.external));
             mesh.flip(eh);
-            dprops -= edge_vertex_properties(mesh, eh, *(estore.bonds),
-                                             *(estore.repulse));
+            dprops -= edge_vertex_properties(mesh,
+                                             eh,
+                                             *(estore.bonds),
+                                             *(estore.repulse),
+                                             *(estore.external));
 
             real u = accept(prng);
 
