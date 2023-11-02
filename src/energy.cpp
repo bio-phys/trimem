@@ -129,6 +129,7 @@ void EnergyManager::print_info(const TriMesh& mesh)
   out << "  bending:   " << helfrich_energy(params, props) << "\n";
   out << "  tether:    " << tether_penalty(params, props) << "\n";
   out << "  repulsion: " << repulsion_penalty(params, props) << "\n";
+  out << "  external:  " << external_potential(params, props) << "\n";
   out << "  total:     " << trimem_energy(params, props, initial_props) << "\n";
   out << std::endl;
 }
