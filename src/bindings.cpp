@@ -2,6 +2,7 @@
 #include "pybind11/numpy.h"
 #include "pybind11/iostream.h"
 #include "pybind11/stl.h"
+#include "pybind11/eval.h"
 
 #include "defs.h"
 #include "mesh.h"
@@ -729,7 +730,7 @@ void expose_parameters(py::module& m)
             py::arg("delta"),
             py::arg("lambda"),
             R"pbdoc(
-            Initialization with full `start,stop,delta,lambda` tuple.
+            Initialization with full `start,stop,delta,lambda`-tuple.
             )pbdoc"
         )
         .def(
@@ -737,6 +738,44 @@ void expose_parameters(py::module& m)
             py::arg("start"),
             R"pbdoc(
             Initialization with single start value (disabling continuation).
+            )pbdoc"
+        )
+        .def(
+            py::init([](
+                const std::string& repr,
+                const int& sampling,
+                const real& delta,
+                const real& lambda,
+                std::optional<const py::str> label
+            ){
+                py::dict scope = py::module_::import("math").attr("__dict__");
+                scope["linspace"] = py::module_::import("numpy").attr("linspace");
+                std::string eval = "[eval('" + repr + "') " + \
+                                   "for x in linspace(0,1," + \
+                                   std::to_string(sampling) + ")]";
+                py::list res = py::eval(eval, scope);
+
+                if (label.has_value())
+                {
+                    py::object conf = py::module_::import("trimem.mc.config");
+                    py::object plot = conf.attr("termplot");
+                    plot(res, label);
+                }
+
+                auto data = res.cast<std::vector<real>>();
+                return ContinuationTuple(data, repr, delta, lambda, label);
+            }),
+            py::arg("repr"),
+            py::arg("sampling"),
+            py::arg("delta"),
+            py::arg("lambda"),
+            py::arg("label") = py::none(),
+            R"pbdoc(
+            Initialization from mathematical expression as string.
+
+            This string is evaluated within the scope of the 'math' module
+            and sampled on [0,1] with 'sampling' steps. The optional label
+            can be given for debug printout.
             )pbdoc"
         )
         .def("get",

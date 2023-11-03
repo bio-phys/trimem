@@ -4,6 +4,8 @@
 #ifndef PARAMS_H
 #define PARAMS_H
 
+#include <optional>
+
 #include "defs.h"
 
 #include <autodiff/forward/real.hpp>
@@ -31,16 +33,35 @@ class ContinuationTuple
 {
 private:
 
-    real start;
-    real stop;
-    real delta;
-    real lambda;
+    std::string               pathspec;
+    std::vector<real>         pathdata;
+    std::optional<std::string> label;
 
+    real lambda;
+    real delta;
     real state;
 
     void eval_state()
     {
-        state = (1 - lambda) * start + lambda * stop;
+        // start-stop
+        if ( pathdata.size() == 2 )
+            state = (1 - lambda) * pathdata[0] + lambda * pathdata[1];
+        // constant
+        else if ( pathdata.size() == 1 )
+            state = pathdata[0];
+        // discrete path
+        else if ( pathdata.size() > 2 )
+        {
+            auto N  = pathdata.size();
+            auto si = 1.0 / ( N - 1 );
+            real r  = lambda / si;
+            int  il = r;
+            if (il == N) state = pathdata[N-1];
+            int  iu = il + 1;
+            real g  = r - il;
+
+            state = pathdata[il] + g * ( pathdata[iu] - pathdata[il]);
+        }
     }
 
 public:
@@ -51,20 +72,37 @@ public:
         const real& delta,
         const real& lambda
     ) :
-        start(start),
-        stop(stop),
         delta(delta),
         lambda(lambda)
+    {
+        pathdata.resize(2);
+        pathdata[0] = start;
+        pathdata[1] = stop;
+        eval_state();
+    }
+
+    ContinuationTuple(
+        const std::vector<real> data,
+        const std::string& spec,
+        const real& delta,
+        const real& lambda,
+        std::optional<std::string> label
+    ) :
+        pathdata(data),
+        pathspec(spec),
+        delta(delta),
+        lambda(lambda),
+        label(label)
     {
         eval_state();
     }
 
-    ContinuationTuple(const real& start) :
-        start(start),
-        stop(start),
-        delta(0),
-        lambda(0),
-        state(start) {}
+    ContinuationTuple(const real& start)
+    {
+        pathdata.resize(1);
+        pathdata[0] = start;
+        eval_state();
+    }
 
     void update()
     {
@@ -77,8 +115,22 @@ public:
     operator autodiff::real() const {return state;}
 
     std::string to_string() const {
-        return std::to_string(start) + " " + std::to_string(stop) + " " + \
-               std::to_string(delta) + " " + std::to_string(lambda);
+        if ( pathdata.size() == 2 )
+            return std::to_string(pathdata[0]) + " " + \
+                   std::to_string(pathdata[1]) + " " + \
+                   std::to_string(delta) + " " + \
+                   std::to_string(lambda);
+        else if (pathdata.size() == 1)
+            return std::to_string(pathdata[0]);
+        else if (pathdata.size() > 2)
+        {
+            std::string out = "$<" + pathspec + ">$ " + \
+                   std::to_string(pathdata.size()) + " " + \
+                   std::to_string(delta) + " " + \
+                   std::to_string(lambda);
+            if (label.has_value()) out += " " + label.value();
+            return out;
+        }
     }
 };
 

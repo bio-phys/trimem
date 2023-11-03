@@ -4,10 +4,14 @@ Utilities to set up, read and write configuration files providing
 control on the trimem functionality.
 """
 
+import importlib
+import warnings
 import configparser
 import pathlib
 import io
 import os
+
+import numpy as np
 
 from .. import core as m
 
@@ -115,14 +119,28 @@ kappa_r = 1.0
 kappa_e = 0.0
 
 # target surface area fraction wrt. the initial geometry
-# this parameter can be linearly interpolated during sampling. In
-# addition to a single value (that would set the target value
-# ad-hoc) also four white-space delimited values representing the
-# 4-tuple `(start, stop, delta, lambda)` for parameter continuation
-# can be specified. In that case, the current value for area_fraction
-# during energy/gradient evaluation is evaluated as
-# state = (1-lambda)*start + lambda*stop
-# and lambda is evolved over the sampling time with lambda += delta.
+# This parameter can be dynamically evaluated during sampling. In
+# addition to a single value (that would set the target value ad-hoc)
+# also two other modes of specification are understood by trimem:
+# 1. $<expr>$ N delta lambda optional-label
+#  'expr'  : mathemacical expression given in between tokens '$<' and
+#            '>$' as a function of 'x', such as 'sin(x) + cos(x)'. It
+#            is evaluated at position x='lambda'. It must evaluate
+#            within the scope of the built-in math module.
+#  'N'     : positive integer defining the number of intervals at which
+#            the above expression is evaluated
+#  'lambda': path variable in [0,1] that is used to evolve the
+#            respective parameter from fun(0) -> fun(1). The effective
+#            value is computed from linear interpolation based on the
+#            discretely sampled 'expr'.
+#  'delta' : increment to propagate the state 'lambda' from one Monte-
+#            Carlo step to the other.
+#  'label' : optional label, when given enables a rough terminal-plot
+#            of 'expr' over MC-steps.
+# 2. start stop delta lambda
+#    This results in a linear interpolation of the effective value of
+#    the parameter at a certain MC-step by linear interpolation between
+#    'start' and 'stop' based on parameter 'lambda'.
 area_fraction = 1.0
 
 # target volume fraction wrt. the initial geometry
@@ -275,6 +293,33 @@ def update_config_defaults(config, **kwargs):
     """
     config.read_dict({"DEFAULT": kwargs})
 
+def _parse_continuation_specs(spec):
+    """Preprocess continuation tuples."""
+    try:
+        if spec.startswith("$<"):
+            end   = spec.find(">$")
+            if end == -1:
+                msg = "missing expression token: '>$'"
+                raise ValueError(msg)
+            expr  = spec[2:end]
+            rem   = spec[end+2:].split()
+            props = rem[:3]
+            if not len(props) == 3:
+                msg = f"wrong number of parameters: {len(props)}"
+                raise ValueError(msg)
+            label = "".join(rem[3:])[:8]
+            props = [int(props[0]), float(props[1]), float(props[2])]
+            tup   = [expr, *props, label if not label=="" else None]
+        else:
+            tup = [float(i) for i in spec.split()]
+            if not ( len(tup) == 1 or len(tup) == 4 ):
+                msg = f"wrong number of parameters: {len(tup)}"
+                raise ValueError(msg)
+    except Exception as e:
+        msg = f"Cannot parse continuation tuple: {spec}"
+        raise ValueError(msg) from e
+    return tup
+
 def config_to_params(config):
     """Translate config to energy params.
 
@@ -311,7 +356,7 @@ def config_to_params(config):
     exparams.epsilon = ex.getfloat("epsilon")
     exparams.sigma   = ex.getfloat("sigma")
     exparams.radius  = m.ContinuationTuple(
-        *[float(i) for i in ex.get("radius").split()]
+        *_parse_continuation_specs(ex.get("radius"))
     )
 
     # translate energy params
@@ -325,15 +370,39 @@ def config_to_params(config):
     eparams.kappa_r             = ec.getfloat("kappa_r")
     eparams.kappa_e             = ec.getfloat("kappa_e")
 
-    af = [float(i) for i in ec.get("area_fraction").split()]
-    vf = [float(i) for i in ec.get("volume_fraction").split()]
-    cf = [float(i) for i in ec.get("curvature_fraction").split()]
-    eparams.area_frac           = m.ContinuationTuple(*af)
-    eparams.volume_frac         = m.ContinuationTuple(*vf)
-    eparams.curvature_frac      = m.ContinuationTuple(*cf)
+    eparams.area_frac           = m.ContinuationTuple(
+        *_parse_continuation_specs(ec.get("area_fraction"))
+    )
+    eparams.volume_frac         = m.ContinuationTuple(
+        *_parse_continuation_specs(ec.get("volume_fraction"))
+    )
+    eparams.curvature_frac      = m.ContinuationTuple(
+        *_parse_continuation_specs(ec.get("curvature_fraction"))
+    )
 
     eparams.bond_params         = bparams
     eparams.repulse_params      = rparams
     eparams.external_params     = exparams
 
     return eparams
+
+def termplot(line, label):
+    try:
+        plt = importlib.import_module('plotille')
+    except ModuleNotFoundError as e:
+        msg = "module 'plotille' needed for plotting"
+        warnings.warn(msg)
+    N     = len(line)
+    x     = np.arange(N)
+    fig = plt.plot(
+        x,
+        line,
+        width=58,
+        height=20,
+        x_min=0,
+        x_max=N,
+        origin=False,
+        Y_label=label,
+        X_label='steps',
+    )
+    print('\n'+fig)
