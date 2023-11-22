@@ -15,15 +15,47 @@
 
 namespace trimem {
 
+real t_ref_penalty(
+    const real& fac,
+    const real& frac,
+    const real& prop,
+    const real& ref_prop
+)
+{
+    if (fac == 0.0) return 0;
+    real ref = frac * ref_prop;
+    if (ref == 0.0 and prop == 0.0) return 0;
+    real d   = prop / ref - 1;
+    return fac * d * d;
+}
+
+Point t_ref_penalty_grad(
+    const real& fac,
+    const real& frac,
+    const real& prop,
+    const real& ref_prop,
+    const Point& d_prop
+)
+{
+    if (fac == 0.0) return Point(0);
+    real ref = frac * ref_prop;
+    if (ref == 0.0 and prop == 0.0) return Point(0);
+    real d   = prop / ref - 1;
+    real pre = 2 * fac / ref * d;
+    return pre * d_prop;
+}
+
 //! energy contributions
 real area_penalty(const EnergyParams& params,
                   const VertexProperties& props,
                   const VertexProperties& ref_props)
 {
-    real ref_area = params.area_frac * ref_props.area;
-
-    real d = props.area / ref_area - 1.0;
-    return params.kappa_a * d * d;
+    return t_ref_penalty(
+        params.kappa_a,
+        params.area_frac,
+        props.area,
+        ref_props.area
+    );
 }
 
 Point area_penalty_grad(const EnergyParams& params,
@@ -31,21 +63,25 @@ Point area_penalty_grad(const EnergyParams& params,
                         const VertexProperties& ref_props,
                         const Point& d_area)
 {
-    real ref_area = params.area_frac * ref_props.area;
-
-    real d   = props.area / ref_area - 1.0;
-    real fac = 2.0 * params.kappa_a / ref_area * d;
-    return fac * d_area;
+    return t_ref_penalty_grad(
+        params.kappa_a,
+        params.area_frac,
+        props.area,
+        ref_props.area,
+        d_area
+    );
 }
 
 real volume_penalty(const EnergyParams& params,
                     const VertexProperties& props,
                     const VertexProperties& ref_props)
 {
-    real ref_volume = params.volume_frac * ref_props.volume;
-
-    real d = props.volume / ref_volume - 1.0;
-    return params.kappa_v * d * d;
+    return t_ref_penalty(
+        params.kappa_v,
+        params.volume_frac,
+        props.volume,
+        ref_props.volume
+    );
 }
 
 Point volume_penalty_grad(const EnergyParams& params,
@@ -53,20 +89,25 @@ Point volume_penalty_grad(const EnergyParams& params,
                           const VertexProperties& ref_props,
                           const Point& d_volume)
 {
-    real ref_volume = params.volume_frac * ref_props.volume;
-
-    real d = props.volume / ref_volume - 1.0;
-    real fac = 2.0 * params.kappa_v / ref_volume * d;
-    return fac * d_volume;
+    return t_ref_penalty_grad(
+        params.kappa_v,
+        params.volume_frac,
+        props.volume,
+        ref_props.volume,
+        d_volume
+    );
 }
 
 real curvature_penalty(const EnergyParams& params,
                        const VertexProperties& props,
                        const VertexProperties& ref_props)
 {
-    real ref_curvature = params.curvature_frac * ref_props.curvature;
-    real d = props.curvature / ref_curvature - 1.0;
-    return params.kappa_c * d * d;
+    return t_ref_penalty(
+        params.kappa_c,
+        params.curvature_frac,
+        props.curvature,
+        ref_props.curvature
+    );
 }
 
 Point curvature_penalty_grad(const EnergyParams& params,
@@ -74,11 +115,13 @@ Point curvature_penalty_grad(const EnergyParams& params,
                              const VertexProperties& ref_props,
                              const Point& d_curvature)
 {
-    real ref_curvature = params.curvature_frac * ref_props.curvature;
-
-    real d = props.curvature / ref_curvature - 1.0;
-    real fac = 2.0 * params.kappa_c / ref_curvature * d;
-    return fac * d_curvature;
+    return t_ref_penalty_grad(
+        params.kappa_c,
+        params.curvature_frac,
+        props.curvature,
+        ref_props.curvature,
+        d_curvature
+    );
 }
 
 real tether_penalty(const EnergyParams& params, const VertexProperties& props)
