@@ -310,7 +310,7 @@ struct EvaluateGradient
 
     void operator() (const int i)
     {
-        gradient_[i] += trimem_gradient(params_, props_, ref_props_, gprops_[i]);
+        gradient_[i] = trimem_gradient(params_, props_, ref_props_, gprops_[i]);
     }
 
 };
