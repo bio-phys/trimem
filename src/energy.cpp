@@ -78,7 +78,7 @@ std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
     const size_t n = mesh.n_vertices();
 
     // update properties
-    VertexProperties props{ 0, 0, 0, 0, 0, 0};
+    VertexProperties props{ 0, 0, 0, 0, 0, 0, 0 };
     std::vector<VertexProperties> vprops(n, props);
 
     EvaluateProperties eval_kernel(params, mesh, *bonds, *repulse, *external, vprops);
@@ -89,7 +89,7 @@ std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
 
     // properties gradients
     VertexPropertiesGradient zeros
-      { Point(0), Point(0), Point(0), Point(0), Point(0), Point(0) };
+      { Point(0), Point(0), Point(0), Point(0), Point(0), Point(0), Point(0) };
     std::vector<VertexPropertiesGradient> gprops(n, zeros);
     EvaluatePropertiesGradient pg_kernel(
         mesh, *bonds, *repulse, *external, vprops, gprops);
