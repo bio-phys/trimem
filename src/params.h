@@ -131,6 +131,8 @@ public:
             if (label.has_value()) out += " " + label.value();
             return out;
         }
+        else
+            return "unknown";
     }
 };
 
