@@ -209,7 +209,7 @@ class MeshHMC(HMC):
 
     def __init__(
         self,
-        mesh, 
+        mesh,
         nlog_prob,
         grad_nlog_prob,
         callback=None,
@@ -246,8 +246,9 @@ class MeshFlips:
     C++-module such that it fits into a multi-proposal Monte Carlo framework.
 
     Args:
-        mesh (Mesh): initial state.
-        estore (EnergyManager): `backend` for performing flipping on edges.
+        mesh (:class:`TriMesh`): initial state.
+        estore (:class:`EnergyManager`):
+            `backend` for performing flipping on edges.
 
     Keyword Args:
         options (dict-like): flip parametrization (optional):
@@ -287,9 +288,9 @@ class MeshFlips:
         if self.ft == "none" or self.fr == 0.0:
             self._flips = lambda: 0
         elif self.ft == "serial":
-            self._flips = lambda: m.flip(self.mesh.trimesh, self.estore, self.fr)
+            self._flips = lambda: m.flip(self.mesh, self.estore, self.fr)
         elif self.ft == "parallel":
-            self._flips = lambda: m.pflip(self.mesh.trimesh, self.estore, self.fr)
+            self._flips = lambda: m.pflip(self.mesh, self.estore, self.fr)
         else:
             raise ValueError("Wrong flip-type: {}".format(self.ft))
 
@@ -301,7 +302,7 @@ class MeshFlips:
         """Print algorithmic information."""
         i_total = sum(self.counter.values())
         if self.istep and i_total % self.istep == 0:
-            n_edges = self.mesh.trimesh.n_edges()
+            n_edges = self.mesh.n_edges()
             ar      = self.acc / (self.i * n_edges) if not self.i == 0 else 0.0
             print("\n-- MCFlips-Step ", self.counter["flip"])
             print("----- flip-accept: ", ar)

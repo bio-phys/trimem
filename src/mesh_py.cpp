@@ -93,7 +93,7 @@ py::array_t<int> fv_indices(TriMesh& mesh)
 }
 
 // get reference to mesh-points (memory remains with the mesh)
-py::array_t<typename TriMesh::Point::value_type> points(TriMesh& mesh)
+py::array_t<typename TriMesh::Point::value_type> get_points(TriMesh& mesh)
 {
     typedef typename TriMesh::Point::value_type dtype;
 
@@ -103,6 +103,22 @@ py::array_t<typename TriMesh::Point::value_type> points(TriMesh& mesh)
 		std::vector<size_t> strides = {point.size() * sizeof(dtype), sizeof(dtype)};
 
 	  return py::array_t<dtype>(shape, strides, point.data(), py::cast(mesh));
+}
+
+// set points by copying from python numpy array
+void set_points(
+    TriMesh& mesh,
+    const py::array_t<typename TriMesh::Point::value_type> arr
+)
+{
+    auto proxy_p = arr.unchecked<2>();
+
+#pragma omp parallel for
+    for (ssize_t i = 0; i < proxy_p.shape(0); ++i)
+    {
+        auto ve = mesh.vertex_handle(i);
+        mesh.point(ve) = {proxy_p(i, 0), proxy_p(i, 1), proxy_p(i, 2)};
+    }
 }
 
 }

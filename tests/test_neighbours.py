@@ -62,7 +62,7 @@ def test_distance_matrix(data, rlist):
     """Verify distance matrix againt kdtee implementation."""
 
     mesh = data.mesh
-    x = mesh.points()
+    x = mesh.x
 
     nl = get_nlist(mesh, data.ltype, rlist, 0)
 
@@ -82,7 +82,7 @@ def test_exclusion(data, excl):
     """Test neighbour lists exclusion level."""
 
     mesh = data.mesh
-    x = mesh.points()
+    x = mesh.x
 
     nl = get_nlist(mesh, data.ltype, 0.2, excl.excl)
 

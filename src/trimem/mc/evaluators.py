@@ -34,10 +34,11 @@ class EnergyEvaluators:
     algorithms.
 
     Args:
-        mesh (Mesh): mesh representing the state to be evaluated.
+        mesh (:class:`TriMesh`): mesh representing the state to be evaluated.
             It's vertices will be updated prior to the evaluation of
             `fun`, `gradient` and `callback`.
-        estore (EnergyManager): `backend` to energy and gradient evaluations.
+        estore (:class:`EnergyManager`): `backend` to energy and gradient
+            evaluations.
         output (callable): object with callable attribute ``write_points_cells``            having signature `(points, cells)`. Usually one of the writers
             constructed by
             :func:`make_output <helfrich.mc.output.util.make_output>`.
@@ -126,7 +127,7 @@ class EnergyEvaluators:
             float:
                 Value of the Energy represented by ``self.estore``.
         """
-        return self.estore.energy(self.mesh.trimesh)
+        return self.estore.energy(self.mesh)
 
     @_update_mesh
     def grad(self, x):
@@ -147,7 +148,7 @@ class EnergyEvaluators:
                 Gradient with respect to `x` of the Energy represented by
                 ``self.estore``.
         """
-        return self._ravel(self.estore.gradient(self.mesh.trimesh))
+        return self._ravel(self.estore.gradient(self.mesh))
 
     @_update_mesh
     def callback(self, x, steps):
@@ -173,13 +174,13 @@ class EnergyEvaluators:
         i = sum(steps.values()) #py3.10: steps.total()
         if self.info_step and (i % self.info_step == 0):
             print("\n-- Energy-Evaluation-Step ", i)
-            self.estore.print_info(self.mesh.trimesh)
+            self.estore.print_info(self.mesh)
         if self.out_step and (i % self.out_step == 0):
-            self.output.write_points_cells(self.mesh.x, self.mesh.f)
+            self.output.write_points_cells(self.mesh.x, self.mesh.fv_indices)
         if self.cpt_step and (i % self.cpt_step == 0):
             self.write_cpt(self.mesh, self.estore, steps)
         if self.refresh_step and (i % self.refresh_step == 0):
-            self.estore.update_repulsion(self.mesh.trimesh)
+            self.estore.update_repulsion(self.mesh)
         self.estore.update()
 
 

@@ -110,7 +110,7 @@ void expose_mesh(py::module& m)
             )pbdoc"
         )
 
-        .def(
+        .def_property_readonly(
             "fv_indices",
             &fv_indices,
             R"pbdoc(
@@ -122,16 +122,17 @@ void expose_mesh(py::module& m)
             )pbdoc"
          )
 
-        .def(
-            "points",
-            &points,
-            R"pbdoc(
-            Get vertex positions.
-
-            Returns:
-                An (N,3) array of type float with N being the number of
-                vertices.
-            )pbdoc"
+        .def_property(
+            "x",
+            [](TriMesh& mesh) {return get_points(mesh);},
+            [](
+                TriMesh& mesh,
+                py::array_t<typename TriMesh::Point::value_type> arr
+            )
+            {
+                set_points(mesh, arr);
+			      },
+            "get/set vertex positions."
         )
 
         .def(

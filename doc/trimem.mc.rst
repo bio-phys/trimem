@@ -42,12 +42,6 @@ trimem.mc.hmc module
 .. automodule:: trimem.mc.hmc
    :members:
 
-trimem.mc.mesh module
-^^^^^^^^^^^^^^^^^^^^^
-
-.. automodule:: trimem.mc.mesh
-   :members:
-
 trimem.mc.util module
 ^^^^^^^^^^^^^^^^^^^^^
 

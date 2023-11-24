@@ -19,12 +19,18 @@ namespace trimem {
 // this is the add_vertices and add_face functions from openmesh
 TriMesh
 from_points_cells(py::array_t<typename TriMesh::Point::value_type> points,
-                  py::array_t<int>                                  cells);
+                  py::array_t<int>                                 cells);
 
 // get faces from mesh (memory maintenance goes to python)
 py::array_t<int> fv_indices(TriMesh& mesh);
 
 // get reference to mesh-points (memory remains with the mesh)
-py::array_t<typename TriMesh::Point::value_type> points(TriMesh& mesh);
+py::array_t<typename TriMesh::Point::value_type> get_points(TriMesh& mesh);
+
+// set points by copying from python numpy array
+void set_points(
+    TriMesh& mesh,
+    const py::array_t<typename TriMesh::Point::value_type> arr
+);
 }
 #endif

@@ -14,7 +14,6 @@ from scipy.optimize import minimize
 
 from .. import core as m
 from .hmc import MeshHMC, MeshFlips, MeshMonteCarlo, get_step_counters
-from .mesh import Mesh, read_trimesh
 from .config import update_config_defaults, config_to_params, print_config
 from .output import make_output, create_backup, \
                     CheckpointWriter, CheckpointReader
@@ -32,18 +31,18 @@ def setup_energy_manager(config):
 
     Returns:
         A tuple (estore, mesh) where estore is of type :class:`EnergyManager`
-        and mesh is of type :class:`Mesh`.
+        and mesh is of type :class:`TriMesh`.
     """
 
-    mesh = read_trimesh(config["GENERAL"]["input"])
+    mesh = m.read_mesh(config["GENERAL"]["input"])
 
     # reference values for edge_length and face_area
-    a, l = m.avg_tri_props(mesh.trimesh)
+    a, l = m.avg_tri_props(mesh)
 
     update_config_defaults(config, lc0=1.25*l, lc1=0.75*l, a0=a)
     eparams = config_to_params(config)
 
-    estore = m.EnergyManager(mesh.trimesh, eparams)
+    estore = m.EnergyManager(mesh, eparams)
 
     return estore, mesh
 
@@ -90,7 +89,7 @@ def write_checkpoint_handle(config):
         prefix = config["GENERAL"]["restart_prefix"]
 
         cpt = CheckpointWriter(prefix)
-        cpt.write(mesh.x, mesh.f, conf)
+        cpt.write(mesh.x, mesh.fv_indices, conf)
 
         print("Writing checkpoint:", cpt.fname)
 
@@ -110,8 +109,8 @@ def read_checkpoint(config, restartnum):
         restartnum (int): checkpoint file number to read.
 
     Returns:
-        A tuple (mesh, config) with mesh being of type :class:`Mesh` and
-        config being of type `ConfigParser`.
+        A tuple (mesh, config) with mesh being of type :class:`TriMesh`
+        and config being of type `ConfigParser`.
     """
 
     prefix = config["GENERAL"]["restart_prefix"]
@@ -137,7 +136,7 @@ def read_checkpoint(config, restartnum):
 
     print("Read checkpoint:", cpt.fname)
 
-    return Mesh(points, cells), config
+    return m.TriMesh(points, cells), config
 
 def run(config, restart=None):
     """Run algorithm.
@@ -165,7 +164,7 @@ def run(config, restart=None):
     else:
         mesh, config = read_checkpoint(config, restart)
         estore, _    = setup_energy_manager(config)
-        estore.update_repulsion(mesh.trimesh)
+        estore.update_repulsion(mesh)
 
     # print effective run configuration
     print_config(config)
@@ -186,8 +185,8 @@ def run_mc(mesh, estore, config):
     by the `config`.
 
     Args:
-        mesh (mesh.Mesh): initial geometry.
-        estore (EnergyManager): EnergyManager.
+        mesh (:class:`TriMesh`): initial geometry.
+        estore (:class:`EnergyManager`): EnergyManager.
         config (dict-like): run-config file.
     """
 
@@ -236,7 +235,7 @@ def run_mc(mesh, estore, config):
     # setup combined-step markov chain
     mmc = MeshMonteCarlo(hmc, flips, step_count, callback=funcs.callback)
 
-    # run sampling 
+    # run sampling
     mmc.run(cmc.getint("num_steps"))
 
     # update mesh
@@ -252,7 +251,7 @@ def run_minim(mesh, estore, config):
     by the `config`.
 
     Args:
-        mesh (mesh.Mesh): initial geometry.
+        mesh (:class:`TriMesh`): initial geometry.
         estore (EnergyManager): EnergyManager.
         config (dict-like): run-config file.
     """
@@ -289,7 +288,7 @@ def run_minim(mesh, estore, config):
     def _cb(x):
         funcs.callback(x, step_count)
         step_count["move"] += 1
-        
+
     # run minimization
     options = {
         "maxiter": config["MINIMIZATION"].getint("maxiter"),
@@ -308,7 +307,7 @@ def run_minim(mesh, estore, config):
     # print info
     print("\n-- Minimization finished at iteration", res.nit)
     print(res.message)
-    estore.print_info(mesh.trimesh)
+    estore.print_info(mesh)
 
     # write final checkpoint
-    cpt_writer(mesh,estore)
+    cpt_writer(mesh, estore)
