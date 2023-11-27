@@ -34,9 +34,6 @@ class EnergyEvaluators:
     algorithms.
 
     Args:
-        mesh (:class:`TriMesh`): mesh representing the state to be evaluated.
-            It's vertices will be updated prior to the evaluation of
-            `fun`, `gradient` and `callback`.
         estore (:class:`EnergyManager`): `backend` to energy and gradient
             evaluations.
         output (callable): object with callable attribute ``write_points_cells``            having signature `(points, cells)`. Usually one of the writers
@@ -63,11 +60,10 @@ class EnergyEvaluators:
 
     """
 
-    def __init__(self, mesh, estore, output, options):
+    def __init__(self, estore, output, options):
         """Initialize."""
 
         # keep properties to operate
-        self.mesh   = mesh
         self.estore = estore
         self.output = output
 
@@ -96,61 +92,44 @@ class EnergyEvaluators:
         else:
             self._ravel = lambda x: x
 
-    def _update_mesh(func):
-        """Decorates a method with an update of the mesh vertices.
-
-        The method must have signature f(self, x, \*args, \*\*kwargs) with
-        x being the new vertex coordinates.
-        """
+    def _reshape_x(func):
         def wrap(self, x, *args, **kwargs):
-            self.mesh.x = x.reshape(self.mesh.x.shape)
+            x = x.reshape(self.estore.mesh.x.shape)
             return func(self, x, *args, **kwargs)
         wrap.__doc__  = func.__doc__
         wrap.__name__ = func.__name__
         return wrap
 
-    @_update_mesh
+    @_reshape_x
     def fun(self, x):
         """Evaluate energy.
 
-        Updates ``self.mesh`` with ``x`` and calls ``self.estore.energy(x)``.
-
         Args:
             x (ndarray[float]): (N,3) array of vertex positions with N being
-                the number of vertices in ``self.mesh``.
-            args: ignored
-
-        Keyword Args:
-            kwargs: ignored
+                the number of vertices in ``self.estore.mesh``.
 
         Returns:
             float:
                 Value of the Energy represented by ``self.estore``.
         """
-        return self.estore.energy(self.mesh)
+        return self.estore.energy(x)
 
-    @_update_mesh
+    @_reshape_x
     def grad(self, x):
         """Evaluate gradient.
 
-        Updates ``self.mesh`` with ``x`` and calls ``self.estore.gradient(x)``.
-
         Args:
             x (ndarray[float]): (N,3) array of vertex positions with N being
-                the number of vertices in ``self.mesh``.
-            args: ignored
-
-        Keyword Args:
-            kwargs: ignored
+                the number of vertices in ``self.estore.mesh``.
 
         Returns:
             ndarray[float]:
                 Gradient with respect to `x` of the Energy represented by
                 ``self.estore``.
         """
-        return self._ravel(self.estore.gradient(self.mesh))
+        return self._ravel(self.estore.gradient(x))
 
-    @_update_mesh
+    @_reshape_x
     def callback(self, x, steps):
         """Callback.
 
@@ -171,16 +150,20 @@ class EnergyEvaluators:
         Keyword Args:
             kwargs: ignored
         """
+        self.estore.mesh.x = x
         i = sum(steps.values()) #py3.10: steps.total()
         if self.info_step and (i % self.info_step == 0):
             print("\n-- Energy-Evaluation-Step ", i)
-            self.estore.print_info(self.mesh)
+            self.estore.print_info()
         if self.out_step and (i % self.out_step == 0):
-            self.output.write_points_cells(self.mesh.x, self.mesh.fv_indices)
+            self.output.write_points_cells(
+                self.estore.mesh.x,
+                self.estore.mesh.fv_indices,
+            )
         if self.cpt_step and (i % self.cpt_step == 0):
-            self.write_cpt(self.mesh, self.estore, steps)
+            self.write_cpt(self.estore, steps)
         if self.refresh_step and (i % self.refresh_step == 0):
-            self.estore.update_repulsion(self.mesh)
+            self.estore.update_repulsion()
         self.estore.update()
 
 
@@ -190,8 +173,8 @@ class TimingEnergyEvaluators(EnergyEvaluators):
     Extends :class:`EnergyEvaluators` with periodic measurements of
     the simulation performance and an estimate on the expected runtime.
     """
-    def __init__(self, mesh, estore, output, options):
-        super().__init__(mesh, estore, output, options)
+    def __init__(self, estore, output, options):
+        super().__init__(estore, output, options)
         self.timestamps = []
         self.n          = options["num_steps"] // self.info_step
         self.start      = datetime.now()

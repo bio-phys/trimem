@@ -13,7 +13,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from .. import core as m
-from .hmc import MeshHMC, MeshFlips, MeshMonteCarlo, get_step_counters
+from .hmc import HMC, MeshFlips, MeshMonteCarlo, get_step_counters
 from .config import update_config_defaults, config_to_params, print_config
 from .output import make_output, create_backup, \
                     CheckpointWriter, CheckpointReader
@@ -44,7 +44,7 @@ def setup_energy_manager(config):
 
     estore = m.EnergyManager(mesh, eparams)
 
-    return estore, mesh
+    return estore
 
 def write_checkpoint_handle(config):
     """Create checkpoint write handle.
@@ -64,7 +64,7 @@ def write_checkpoint_handle(config):
 
     conf = copy.deepcopy(config)
 
-    def _write_checkpoint(mesh, estore, step={}):
+    def _write_checkpoint(estore, step={}):
         """Write checkpoint with signature (mesh, estore, step)."""
 
         if not isinstance(step, dict):
@@ -89,7 +89,7 @@ def write_checkpoint_handle(config):
         prefix = config["GENERAL"]["restart_prefix"]
 
         cpt = CheckpointWriter(prefix)
-        cpt.write(mesh.x, mesh.fv_indices, conf)
+        cpt.write(estore.mesh.x, estore.mesh.fv_indices, conf)
 
         print("Writing checkpoint:", cpt.fname)
 
@@ -160,11 +160,12 @@ def run(config, restart=None):
 
     # setup mesh and energy
     if restart is None:
-        estore, mesh = setup_energy_manager(config)
+        estore = setup_energy_manager(config)
     else:
         mesh, config = read_checkpoint(config, restart)
-        estore, _    = setup_energy_manager(config)
-        estore.update_repulsion(mesh)
+        estore       = setup_energy_manager(config)
+        estore.mesh  = mesh
+        estore.update_repulsion()
 
     # print effective run configuration
     print_config(config)
@@ -172,20 +173,19 @@ def run(config, restart=None):
     # run algorithm
     algo    = config["GENERAL"]["algorithm"]
     if algo == "hmc":
-      run_mc(mesh, estore, config)
+      run_mc(estore, config)
     elif algo == "minimize":
-      run_minim(mesh, estore, config)
+      run_minim(estore, config)
     else:
       raise ValueError("Invalid algorithm")
 
-def run_mc(mesh, estore, config):
+def run_mc(estore, config):
     """Run Monte Carlo sampling.
 
     Perform Monte Carlo sampling of the Helfrich bending energy as defined
     by the `config`.
 
     Args:
-        mesh (:class:`TriMesh`): initial geometry.
         estore (:class:`EnergyManager`): EnergyManager.
         config (dict-like): run-config file.
     """
@@ -205,7 +205,7 @@ def run_mc(mesh, estore, config):
         "num_steps":    config["HMC"].getint("num_steps"),
         "write_cpt":    cpt_writer,
     }
-    funcs = TimingEnergyEvaluators(mesh, estore, output, options)
+    funcs = TimingEnergyEvaluators(estore, output, options)
 
     # setup hmc to sample vertex positions
     cmc  = config["HMC"]
@@ -218,7 +218,7 @@ def run_mc(mesh, estore, config):
         "cooling_start_step":    cmc.getint("start_cooling"),
         "info_step":             config["GENERAL"].getint("info"),
     }
-    hmc = MeshHMC(mesh, funcs.fun, funcs.grad, options=options)
+    hmc = HMC(estore.mesh.x, funcs.fun, funcs.grad, options=options)
 
     # setup edge flips
     options = {
@@ -226,7 +226,7 @@ def run_mc(mesh, estore, config):
         "flip_ratio": cmc.getfloat("flip_ratio"),
         "info_step":  config["GENERAL"].getint("info"),
     }
-    flips = MeshFlips(mesh, estore, options=options)
+    flips = MeshFlips(estore.mesh, estore, options=options)
 
     # initialize counters
     step_count = get_step_counters()
@@ -239,19 +239,18 @@ def run_mc(mesh, estore, config):
     mmc.run(cmc.getint("num_steps"))
 
     # update mesh
-    mesh.x = hmc.x
+    estore.mesh.x = hmc.x
 
     # write final checkpoint
-    cpt_writer(mesh, estore, mmc.counter)
+    cpt_writer(estore, mmc.counter)
 
-def run_minim(mesh, estore, config):
+def run_minim(estore, config):
     """Run (precursor) minimization.
 
     Performs a minimization of the Helfrich bending energy as defined
     by the `config`.
 
     Args:
-        mesh (:class:`TriMesh`): initial geometry.
         estore (EnergyManager): EnergyManager.
         config (dict-like): run-config file.
     """
@@ -280,7 +279,7 @@ def run_minim(mesh, estore, config):
         "num_steps":    config["MINIMIZATION"].getint("maxiter"),
         "write_cpt":    cpt_writer,
     }
-    funcs = TimingEnergyEvaluators(mesh, estore, output, options)
+    funcs = TimingEnergyEvaluators(estore, output, options)
 
     # the callback has trimem-specific step counters as postional arg
     # which scipy's optimizers can't handle; so wrap this locally here
@@ -296,18 +295,18 @@ def run_minim(mesh, estore, config):
     }
     res = minimize(
         funcs.fun,
-        mesh.x,
+        estore.mesh.x,
         jac=funcs.grad,
         callback=_cb,
         method="L-BFGS-B",
         options=options
     )
-    mesh.x = res.x.reshape(mesh.x.shape)
+    estore.mesh.x = res.x.reshape(estore.mesh.x.shape)
 
     # print info
     print("\n-- Minimization finished at iteration", res.nit)
     print(res.message)
-    estore.print_info(mesh)
+    estore.print_info()
 
     # write final checkpoint
-    cpt_writer(mesh, estore)
+    cpt_writer(estore)

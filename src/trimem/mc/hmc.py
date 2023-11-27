@@ -189,50 +189,6 @@ class HMC:
             self.info()
             self.cb(self.x, self.counter)
 
-
-class MeshHMC(HMC):
-    """HMC with mesh as state.
-
-    A lightweight extension of :class:`HMC` that can be initialized with
-    a mesh as the `state` in the sampling space.
-
-    Args:
-        x (Mesh): initial state
-        nlog_prob (callable): negative log of probability density function
-        grad_nlog_prob (callable): gradient of negative log of pdf
-
-    Keyword Args:
-        callback (callable): step callback with signature callback(x)
-            (defaults to no-op.)
-        options (dict-like): algorithm parametrization. (see :class:`HMC`)
-    """
-
-    def __init__(
-        self,
-        mesh,
-        nlog_prob,
-        grad_nlog_prob,
-        callback=None,
-        counter=get_step_counters(),
-        options={},
-    ):
-        """Init."""
-        super().__init__(
-            mesh.x,
-            nlog_prob,
-            grad_nlog_prob,
-            callback,
-            counter,
-            options
-        )
-        self.mesh = mesh
-
-    def step(self):
-        """Make a step and explicitly update the mesh vertices."""
-        super().step()
-        self.mesh.x = self.x
-
-
 _mc_flip_default_options = {
     "flip_type": "parallel",
     "flip_ratio": 0.1,
@@ -288,9 +244,9 @@ class MeshFlips:
         if self.ft == "none" or self.fr == 0.0:
             self._flips = lambda: 0
         elif self.ft == "serial":
-            self._flips = lambda: m.flip(self.mesh, self.estore, self.fr)
+            self._flips = lambda: m.flip(self.estore, self.fr)
         elif self.ft == "parallel":
-            self._flips = lambda: m.pflip(self.mesh, self.estore, self.fr)
+            self._flips = lambda: m.pflip(self.estore, self.fr)
         else:
             raise ValueError("Wrong flip-type: {}".format(self.ft))
 

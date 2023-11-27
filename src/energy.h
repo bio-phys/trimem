@@ -28,16 +28,16 @@ public:
     void update();
 
     // update repulsion potential
-    void update_repulsion(const TriMesh& mesh);
+    void update_repulsion();
 
     // energy and gradient evaluation
-    VertexProperties properties(const TriMesh& mesh);
-    real energy(const TriMesh& mesh);
+    VertexProperties properties();
+    real energy();
     real energy(const VertexProperties& props);
-    std::vector<Point> gradient(const TriMesh& mesh);
+    std::vector<Point> gradient();
 
     // print status information
-    void print_info(const TriMesh& mesh);
+    void print_info();
 
     // energy parameters
     EnergyParams params;
@@ -56,6 +56,9 @@ public:
 
     // neighbour list
     std::unique_ptr<NeighbourList> nlist;
+
+    // the underlying mesh object
+    TriMesh mesh;
 };
 
 }

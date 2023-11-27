@@ -10,6 +10,7 @@
 #include "mesh_py.h"
 #include "numpy_util.h"
 #include "energy.h"
+#include "energy_py.h"
 #include "external.h"
 #include "flips.h"
 #include "mesh_repulsion.h"
@@ -24,13 +25,15 @@ namespace py = pybind11;
 namespace trimem {
 
 // FD gradient for debugging
-void gradient(TriMesh& mesh,
-              EnergyManager& estore,
-              py::array_t<real>& grad,
-              real eps=1.0e-6)
+void fd_gradient(
+    EnergyManager& estore,
+    py::array_t<real>& grad,
+    real eps=1.0e-6)
 {
+    auto& mesh = estore.mesh;
+
     // unperturbed energy
-    real e0 = estore.energy(mesh);
+    real e0 = estore.energy();
 
     auto r_grad = grad.mutable_unchecked<2>();
     for (int i=0; i<mesh.n_vertices(); i++)
@@ -42,7 +45,7 @@ void gradient(TriMesh& mesh,
             point[j] += eps;
 
             // evaluate differential energy
-            real de = ( estore.energy(mesh) - e0 ) / eps;
+            real de = ( estore.energy() - e0 ) / eps;
             r_grad(i,j) = de;
 
             // undo perturbation
@@ -833,17 +836,12 @@ void expose_energy(py::module& m){
         .def(
             "properties",
             &EnergyManager::properties,
-            py::arg("mesh"),
             R"pbdoc(
             Evaluation of vertex averaged properties.
 
             Triggers the evaluation of a vector of vertex-averaged properties
             :class:`VertexProperties` that comprises the basic per-vertex
             quantities.
-
-            Args:
-                mesh (TriMesh): mesh representing the state to be evaluated
-                    defined by vertex positions as well as connectivity.
 
             Returns:
                 (N,1) array of :class:`VertexProperties` with N
@@ -853,34 +851,18 @@ void expose_energy(py::module& m){
 
         .def(
             "energy",
-                static_cast<real (EnergyManager::*)(const TriMesh&)>(
-                    &EnergyManager::energy),
-            py::arg("mesh"),
-            R"pbdoc(
-            Evaluation of the Hamiltonian.
-
-            Args:
-                mesh (TriMesh): mesh representing the state to be evaluated
-                    defined by vertex positions as well as connectivity.
-
-            Returns:
-                The value of the nonlinear Hamiltonian by computing the
-                vector of VertexProperties and reducing it to the value
-                of the Hamiltonian.
-            )pbdoc"
-        )
-
-        .def(
-            "energy",
-            static_cast<real (EnergyManager::*)(const VertexProperties&)>
-                (&EnergyManager::energy),
+            [](
+                EnergyManager& self,
+                const py::array_t<typename TriMesh::Point::value_type> points
+            ){
+                return energy(self, points);
+            },
             py::arg("vprops"),
             R"pbdoc(
-            Evaluation of the Hamiltonian.
+            Evaluation of the Hamiltonian given vertex coordinates.
 
             Args:
-                vprops (VertexProperties): vector of VertexProperties that has
-                    already been evaluated beforehand by :func:`properties`.
+                points ((N,3)-array): array of vertex coordinates
 
             Returns:
                 The value of the nonlinear Hamiltonian by directly reducing
@@ -890,17 +872,15 @@ void expose_energy(py::module& m){
 
         .def(
             "gradient",
-            [](EnergyManager& _self, const TriMesh& mesh){
-                auto grad = _self.gradient(mesh);
-                return tonumpy(grad[0], grad.size());
+            [](
+                EnergyManager& self,
+                const py::array_t<typename TriMesh::Point::value_type> points
+            )
+            {
+                return gradient(self, points);
             },
-            py::arg("mesh"),
             R"pbdoc(
-            Evaluate gradient of the Hamiltonian.
-
-            Args:
-                mesh (TriMesh): mesh representing the state to be evaluated
-                    defined by vertex positions as well as connectivity.
+            Evaluate gradient of the Hamiltonian based on the internal state.
 
             Returns:
                 (N,3) array of the gradient of the Hamiltonian given by
@@ -937,8 +917,15 @@ void expose_energy(py::module& m){
             &EnergyManager::print_info,
             py::call_guard<py::scoped_ostream_redirect,
             py::scoped_estream_redirect>(),
-            py::arg("mesh"),
             "Print energy information evaluated on the state given by ``mesh``."
+        )
+
+        .def_readwrite(
+            "mesh",
+            &EnergyManager::mesh,
+            R"pbdoc(
+            Reference to the internal mesh.
+            )pbdoc"
         )
 
         .def_readonly(
@@ -969,7 +956,6 @@ void expose_flips(py::module& m)
     m.def(
         "flip",
         &flip_serial,
-        py::arg("mesh"),
         py::arg("estore"),
         py::arg("flip_ratio"),
         R"pbdoc(
@@ -991,7 +977,6 @@ void expose_flips(py::module& m)
     m.def(
         "pflip",
         &flip_parallel_batches,
-        py::arg("mesh"),
         py::arg("estore"),
         py::arg("flip_ratio"),
         R"pbdoc(
@@ -1199,8 +1184,7 @@ PYBIND11_MODULE(core, m) {
     // (debug) energy stuff
     m.def(
         "gradient",
-        &gradient,
-        py::arg("mesh"),
+        &fd_gradient,
         py::arg("estore"),
         py::arg("gradient"),
         py::arg("epsilon"),

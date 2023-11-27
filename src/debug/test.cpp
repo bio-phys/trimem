@@ -61,9 +61,9 @@ int main(int argc, char* argv[])
 
     trimem::EnergyManager estore(mesh, params);
 
-    auto e = estore.energy(mesh);
-    auto g = estore.gradient(mesh);
-    auto n = flip_serial(mesh, estore, 0.1);
+    auto e = estore.energy();
+    auto g = estore.gradient();
+    auto n = flip_serial(estore, 0.1);
 
     auto N = g.size();
     std::cout << "Energy: " << e << "\n";

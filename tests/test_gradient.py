@@ -55,9 +55,9 @@ def test_gradient(bond_type):
 
     # finite difference gradient
     ref_grad = np.empty((mesh.n_vertices(),3))
-    m.gradient(mesh, estore, ref_grad, 1.0e-8)
+    m.gradient(estore, ref_grad, 1.0e-8)
 
     # analytic gradient
-    grad = estore.gradient(mesh)
+    grad = estore.gradient(mesh.x)
 
     assert np.linalg.norm(grad - ref_grad)/np.linalg.norm(ref_grad) < 1.0e-4

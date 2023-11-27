@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 import trimem.core as m
-from trimem.mc.hmc import HMC, MeshHMC, MeshFlips, MeshMonteCarlo
+from trimem.mc.hmc import HMC, HMC, MeshFlips, MeshMonteCarlo
 
 from util import icosahedron
 
@@ -58,34 +58,6 @@ def test_hmc():
         with io.StringIO() as fp:
             np.savetxt(fp, hmc.x, fmt=["[%.14e,", "%.14e,", "%.14e],"])
             print(fp.getvalue())
-
-    assert np.linalg.norm(hmc.x - ref_hmc) < 1.0e-14
-
-def test_mesh_hmc():
-    """Test MeshHMC."""
-
-    np.random.seed(42)
-
-    p, c = icosahedron()
-    mesh = m.TriMesh(p,c)
-
-    # simplified energy and gradient evaluators, but with mesh access
-    def energy(x):
-        mesh.x = x
-        return 0.5*x.ravel().dot(x.ravel())
-
-    def gradient(x):
-        mesh.x = x
-        return x
-
-    opt = {
-        "info_step": 10,
-        "time_step": 1.0e-1,
-    }
-    
-    hmc = MeshHMC(mesh, energy, gradient, options=opt)
-
-    hmc.run(10)
 
     assert np.linalg.norm(hmc.x - ref_hmc) < 1.0e-14
 

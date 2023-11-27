@@ -19,16 +19,18 @@ namespace trimem {
 typedef std::chrono::high_resolution_clock myclock;
 static std::mt19937 generator_(myclock::now().time_since_epoch().count());
 
-int flip_serial(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio)
+int flip_serial(EnergyManager& estore, const real& flip_ratio)
 {
     if (flip_ratio > 1.0)
         std::runtime_error("flip_ratio must be <= 1.0");
+
+    auto& mesh = estore.mesh;
 
     int nedges = mesh.n_edges();
     int nflips = (int) (nedges * flip_ratio);
 
     // get initial vertex properties
-    VertexProperties props = estore.properties(mesh);
+    VertexProperties props = estore.properties();
     real             e0    = estore.energy(props);
 
     // acceptance probability distribution
@@ -85,16 +87,18 @@ int flip_serial(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio)
     return acc;
 }
 
-int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio)
+int flip_parallel_batches(EnergyManager& estore, const real& flip_ratio)
 {
     if (flip_ratio > 1.0)
         throw std::range_error("flip_ratio must be <= 1.0");
+
+    auto& mesh = estore.mesh;
 
     int nedges = mesh.n_edges();
     int nflips = (int) (nedges * flip_ratio);
 
     // get initial energy and associated vertex properties
-    VertexProperties props = estore.properties(mesh);
+    VertexProperties props = estore.properties();
     real             e0    = estore.energy(props);
 
     // set-up locks on edges

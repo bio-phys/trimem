@@ -53,8 +53,7 @@ def test_flips(params):
     """Test flipping of edges."""
 
     estore = params.estore
-    mesh   = params.mesh
 
-    acc = m.flip(mesh, estore, 0.5)
+    acc = m.flip(estore, 0.5)
 
     assert acc > 100

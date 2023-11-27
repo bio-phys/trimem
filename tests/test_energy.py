@@ -77,7 +77,7 @@ def params(data):
 def test_properties(params):
     """Test values of global energy properties."""
 
-    p = params.estore.properties(params.mesh)
+    p = params.estore.properties()
 
     def cmp(a,b):
         return np.abs(a-b)/b

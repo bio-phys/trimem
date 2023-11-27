@@ -13,6 +13,7 @@ namespace trimem {
 
 EnergyManager::EnergyManager(const TriMesh& mesh,
                              const EnergyParams& energy_params) :
+  mesh(mesh),
   params(energy_params)
 {
     // setup bond potential
@@ -28,7 +29,7 @@ EnergyManager::EnergyManager(const TriMesh& mesh,
     external = make_external(params.external_params);
 
     // evaluate properties from mesh
-    initial_props = properties(mesh);
+    initial_props = properties();
 }
 
 void EnergyManager::update()
@@ -39,13 +40,13 @@ void EnergyManager::update()
     params.external_params.radius.update();
 }
 
-void EnergyManager::update_repulsion(const TriMesh& mesh)
+void EnergyManager::update_repulsion()
 {
     nlist   = make_nlist(mesh, params);
     repulse = make_repulsion(*nlist, params.repulse_params);
 }
 
-VertexProperties EnergyManager::properties(const TriMesh& mesh)
+VertexProperties EnergyManager::properties()
 {
     const size_t n = mesh.n_vertices();
 
@@ -61,9 +62,9 @@ VertexProperties EnergyManager::properties(const TriMesh& mesh)
     return props;
 }
 
-real EnergyManager::energy(const TriMesh& mesh)
+real EnergyManager::energy()
 {
-    auto props = properties(mesh);
+    auto props = properties();
 
     return trimem_energy(params, props, initial_props);
 }
@@ -73,7 +74,7 @@ real EnergyManager::energy(const VertexProperties& props)
     return trimem_energy(params, props, initial_props);
 }
 
-std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
+std::vector<Point> EnergyManager::gradient()
 {
     const size_t n = mesh.n_vertices();
 
@@ -103,9 +104,9 @@ std::vector<Point> EnergyManager::gradient(const TriMesh& mesh)
     return gradient;
 }
 
-void EnergyManager::print_info(const TriMesh& mesh)
+void EnergyManager::print_info()
 {
-  auto props     = properties(mesh);
+  auto props = properties();
 
   auto ref_area = params.area_frac * initial_props.area;
   auto ref_volume = params.volume_frac * initial_props.volume;
