@@ -33,5 +33,8 @@ typedef OpenMesh::TriMesh_ArrayKernelT<MeshTraits> TriMesh;
 // read mesh from file
 TriMesh read_mesh(const std::string fname);
 
+// write mesh to file
+void write_mesh(const TriMesh& mesh, const std::string fname);
+
 }
 #endif

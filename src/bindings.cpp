@@ -196,6 +196,22 @@ void expose_mesh(py::module& m)
             An instance of TriMesh read from fname.
         )pbdoc"
         );
+
+    m.def(
+        "write_mesh",
+        &write_mesh,
+        py::arg("mesh"),
+        py::arg("fname"),
+        R"pbdoc(
+        Write mesh to fname
+
+        Uses ``OpenMesh::IO::write_mesh``.
+
+        Args:
+            mesh (TriMesh): mesh to be written.
+            fname (str): file name to read mesh to.
+        )pbdoc"
+        );
 }
 
 void expose_properties(py::module& m)
