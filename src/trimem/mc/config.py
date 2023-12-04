@@ -151,14 +151,6 @@ volume_fraction = 1.0
 # see `area_fraction` for parameter continuation
 curvature_fraction = 1.0
 
-# time step for the parameter continuation (choose from: [0,1])
-continuation_delta = 0.0
-
-# start time for the parameter continuation (choose from: [0,1])
-# should be consistent with initial geometry and the chosen
-# area-/volume-/curvature-fraction
-continuation_lambda = 1.0
-
 [HMC]
 # number of steps to run in the markov chain
 num_steps = 10

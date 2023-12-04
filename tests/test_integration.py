@@ -42,8 +42,6 @@ kappa_e = 0.0
 area_fraction = 1.0
 volume_fraction = 1.0
 curvature_fraction = 1.0
-continuation_delta = 0.0
-continuation_lambda = 1.0
 [HMC]
 num_steps = 10
 ;init_step = {{}}
