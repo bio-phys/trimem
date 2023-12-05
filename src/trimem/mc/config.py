@@ -348,7 +348,7 @@ def config_to_params(config):
     exparams.epsilon = ex.getfloat("epsilon")
     exparams.sigma   = ex.getfloat("sigma")
     exparams.radius  = m.ContinuationTuple(
-        *_parse_continuation_specs(ex.get("radius"))
+        _parse_continuation_specs(ex.get("radius"))
     )
 
     # translate energy params
@@ -363,13 +363,13 @@ def config_to_params(config):
     eparams.kappa_e             = ec.getfloat("kappa_e")
 
     eparams.area_frac           = m.ContinuationTuple(
-        *_parse_continuation_specs(ec.get("area_fraction"))
+        _parse_continuation_specs(ec.get("area_fraction"))
     )
     eparams.volume_frac         = m.ContinuationTuple(
-        *_parse_continuation_specs(ec.get("volume_fraction"))
+        _parse_continuation_specs(ec.get("volume_fraction"))
     )
     eparams.curvature_frac      = m.ContinuationTuple(
-        *_parse_continuation_specs(ec.get("curvature_fraction"))
+        _parse_continuation_specs(ec.get("curvature_fraction"))
     )
 
     eparams.bond_params         = bparams

@@ -2,7 +2,6 @@
 #include "pybind11/numpy.h"
 #include "pybind11/iostream.h"
 #include "pybind11/stl.h"
-#include "pybind11/eval.h"
 
 #include "defs.h"
 #include "mesh.h"
@@ -19,6 +18,7 @@
 #include "nlists/nlist.h"
 #include "util.h"
 #include "params.h"
+#include "params_py.h"
 
 namespace py = pybind11;
 
@@ -762,40 +762,26 @@ void expose_parameters(py::module& m)
         )
         .def(
             py::init([](
-                const std::string& repr,
-                const int& sampling,
-                const real& delta,
-                const real& lambda,
-                std::optional<const py::str> label
+                const py::list args
             ){
-                py::dict scope = py::module_::import("math").attr("__dict__");
-                scope["linspace"] = py::module_::import("numpy").attr("linspace");
-                std::string eval = "[eval('" + repr + "') " + \
-                                   "for x in linspace(0,1," + \
-                                   std::to_string(sampling) + ")]";
-                py::list res = py::eval(eval, scope);
-
-                if (label.has_value())
-                {
-                    py::object conf = py::module_::import("trimem.mc.config");
-                    py::object plot = conf.attr("termplot");
-                    plot(res, label);
-                }
-
-                auto data = res.cast<std::vector<real>>();
-                return ContinuationTuple(data, repr, delta, lambda, label);
+                return make_continuation_from_list(args);
             }),
-            py::arg("repr"),
-            py::arg("sampling"),
-            py::arg("delta"),
-            py::arg("lambda"),
-            py::arg("label") = py::none(),
+            py::arg("args"),
             R"pbdoc(
-            Initialization from mathematical expression as string.
+            Initialization from list.
 
-            This string is evaluated within the scope of the 'math' module
-            and sampled on [0,1] with 'sampling' steps. The optional label
-            can be given for debug printout.
+            Depending on the length of `args`, a ContinuationTuple is created:
+            len(args) == 1: construction from single value.
+            len(args) == 4: construction from (start,stop,step,lamda)-tuple in
+            case args[0] can be cast to real
+            len(args) >= 4: construction from (expr,N,delta,lambda,label)-tuple
+            in case args[0] is a string. This string is evaluated within
+            the scope of the 'math' module and sampled on [0,1] with
+            'N' steps. The optional label can be given for debug printout.
+
+            Args:
+                args (list): list of parameters (must have length 1, 4 or 5)
+
             )pbdoc"
         )
         .def("get",

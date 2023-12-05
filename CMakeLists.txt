@@ -30,7 +30,8 @@ target_link_libraries(trimem PUBLIC OpenMeshCore
 # python module
 pybind11_add_module(core MODULE src/bindings.cpp
                                 src/mesh_py.cpp
-                                src/energy_py.cpp)
+                                src/energy_py.cpp
+                                src/params_py.cpp)
 target_link_libraries(core PRIVATE trimem)
 
 install(TARGETS core trimem OpenMeshCore DESTINATION .)
