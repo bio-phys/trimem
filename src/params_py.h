@@ -14,5 +14,7 @@ namespace trimem{
 
 ContinuationTuple make_continuation_from_list(const py::list& args);
 
+BondType make_bondtype(const std::string& type);
+
 }
 #endif

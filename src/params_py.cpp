@@ -86,4 +86,14 @@ ContinuationTuple make_continuation_from_list(const py::list& args)
         throw std::runtime_error(err);
 }
 
+BondType make_bondtype(const std::string& type)
+{
+    if (type == "Area")
+        return BondType::Area;
+    else if (type == "Edge")
+        return BondType::Edge;
+    else
+        throw std::runtime_error("BondType must be one of ['Area', 'Edge']");
+}
+
 }

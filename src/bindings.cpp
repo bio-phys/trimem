@@ -447,7 +447,10 @@ void expose_parameters(py::module& m)
         .value("Edge", BondType::Edge, "Smoothed well/box potential on edges.")
         .value("Area", BondType::Area, "Harmonic potential on face area.")
         .value("None", BondType::None, "None")
-        .export_values();
+        .def(py::init([](const std::string& type){
+            return make_bondtype(type);
+        }));
+//        .export_values();
 
     py::class_<BondParams>(
         m,
