@@ -39,8 +39,12 @@ info = 1
 output_format = vtu
 
 [BONDS]
+
+# deprecated; use 'type'
+;bond_type =
+
 # type of tether potential (choose from: Edge, Area)
-bond_type = Edge
+type = Edge
 
 # control steepness of penalty potential (must be an integer >= 1)
 r = 2
@@ -244,6 +248,12 @@ def read_config(fname):
     config = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
     config.read(fname)
 
+    if 'bond_type' in config["BONDS"].keys():
+        msg = "'bond_type' parameter is deprecated; use 'type' instead. " \
+              "'type' is set from 'bond_type'"
+        warnings.warn(msg)
+        config["BONDS"]["type"] = config["BONDS"].pop('bond_type')
+
     # set config defaults
     update_config_defaults(
         config,
@@ -327,7 +337,7 @@ def config_to_params(config):
     # translate bond params
     bc      = config["BONDS"]
     bparams = m.BondParams()
-    bparams.type = _bond_enums[bc["bond_type"]]
+    bparams.type = _bond_enums[bc["type"]]
     bparams.r    = bc.getint("r")
     bparams.lc0  = bc.getfloat("lc0")
     bparams.lc1  = bc.getfloat("lc1")

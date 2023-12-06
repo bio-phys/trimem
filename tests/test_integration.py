@@ -14,7 +14,8 @@ info = 1
 ;checkpoint_every = 0
 output_format = vtu
 [BONDS]
-bond_type = Edge
+;bond_type =
+type = Edge
 r = 2
 ;lc0 =
 ;lc1 =
