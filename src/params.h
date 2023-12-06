@@ -172,11 +172,11 @@ struct EnergyParams
   real kappa_e = 0;
 
   //! target area as fraction of initial area
-  ContinuationTuple area_frac = 1;
+  ContinuationTuple area_fraction = 1;
   //! target volume as fraction of initial volume
-  ContinuationTuple volume_frac = 1;
+  ContinuationTuple volume_fraction = 1;
   //! target curvature as fraction of initial curvature
-  ContinuationTuple curvature_frac = 1;
+  ContinuationTuple curvature_fraction = 1;
 
   //! parameters for the tether penalty
   BondParams bond_params;

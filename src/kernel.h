@@ -52,7 +52,7 @@ real area_penalty(const EnergyParams& params,
 {
     return t_ref_penalty(
         params.kappa_a,
-        params.area_frac,
+        params.area_fraction,
         props.area,
         ref_props.area
     );
@@ -65,7 +65,7 @@ Point area_penalty_grad(const EnergyParams& params,
 {
     return t_ref_penalty_grad(
         params.kappa_a,
-        params.area_frac,
+        params.area_fraction,
         props.area,
         ref_props.area,
         d_area
@@ -78,7 +78,7 @@ real volume_penalty(const EnergyParams& params,
 {
     return t_ref_penalty(
         params.kappa_v,
-        params.volume_frac,
+        params.volume_fraction,
         props.volume,
         ref_props.volume
     );
@@ -91,7 +91,7 @@ Point volume_penalty_grad(const EnergyParams& params,
 {
     return t_ref_penalty_grad(
         params.kappa_v,
-        params.volume_frac,
+        params.volume_fraction,
         props.volume,
         ref_props.volume,
         d_volume
@@ -104,7 +104,7 @@ real curvature_penalty(const EnergyParams& params,
 {
     return t_ref_penalty(
         params.kappa_c,
-        params.curvature_frac,
+        params.curvature_fraction,
         props.curvature,
         ref_props.curvature
     );
@@ -117,7 +117,7 @@ Point curvature_penalty_grad(const EnergyParams& params,
 {
     return t_ref_penalty_grad(
         params.kappa_c,
-        params.curvature_frac,
+        params.curvature_fraction,
         props.curvature,
         ref_props.curvature,
         d_curvature

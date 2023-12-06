@@ -73,9 +73,9 @@ def write_checkpoint_handle(config):
         # update config
         upd = {
             "ENERGY": {
-                "area_fraction": estore.eparams.area_frac,
-                "volume_fraction": estore.eparams.volume_frac,
-                "curvature_fraction": estore.eparams.curvature_frac,
+                "area_fraction": estore.eparams.area_fraction,
+                "volume_fraction": estore.eparams.volume_fraction,
+                "curvature_fraction": estore.eparams.curvature_fraction,
             },
             "EXTERNALPOTENTIAL": {
                 "radius": estore.eparams.external_params.radius

@@ -686,8 +686,8 @@ void expose_parameters(py::module& m)
             )pbdoc"
         )
         .def_readwrite(
-            "area_frac",
-            &EnergyParams::area_frac,
+            "area_fraction",
+            &EnergyParams::area_fraction,
             R"pbdoc(
             Target surface area fraction wrt. the initial geometry.
 
@@ -695,8 +695,8 @@ void expose_parameters(py::module& m)
             )pbdoc"
         )
         .def_readwrite(
-            "volume_frac",
-            &EnergyParams::volume_frac,
+            "volume_fraction",
+            &EnergyParams::volume_fraction,
             R"pbdoc(
             Target volume fraction wrt. the initial geometry.
 
@@ -704,8 +704,8 @@ void expose_parameters(py::module& m)
             )pbdoc"
         )
         .def_readwrite(
-            "curvature_frac",
-            &EnergyParams::curvature_frac,
+            "curvature_fraction",
+            &EnergyParams::curvature_fraction,
             R"pbdoc(
             Target curvature fraction wrt. the initial geometry.
 

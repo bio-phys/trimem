@@ -372,13 +372,13 @@ def config_to_params(config):
     eparams.kappa_r             = ec.getfloat("kappa_r")
     eparams.kappa_e             = ec.getfloat("kappa_e")
 
-    eparams.area_frac           = m.ContinuationTuple(
+    eparams.area_fraction = m.ContinuationTuple(
         _parse_continuation_specs(ec.get("area_fraction"))
     )
-    eparams.volume_frac         = m.ContinuationTuple(
+    eparams.volume_fraction = m.ContinuationTuple(
         _parse_continuation_specs(ec.get("volume_fraction"))
     )
-    eparams.curvature_frac      = m.ContinuationTuple(
+    eparams.curvature_fraction = m.ContinuationTuple(
         _parse_continuation_specs(ec.get("curvature_fraction"))
     )
 

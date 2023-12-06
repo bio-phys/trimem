@@ -24,15 +24,15 @@ def params():
     params.a0   = a
 
     eparams = m.EnergyParams()
-    eparams.kappa_b        = 1.0
-    eparams.kappa_a        = 1.0
-    eparams.kappa_v        = 1.0
-    eparams.kappa_c        = 1.0
-    eparams.kappa_t        = 1.0
-    eparams.area_frac      = m.ContinuationTuple(1.0)
-    eparams.volume_frac    = m.ContinuationTuple(1.0)
-    eparams.curvature_frac = m.ContinuationTuple(1.0)
-    eparams.bond_params    = params
+    eparams.kappa_b            = 1.0
+    eparams.kappa_a            = 1.0
+    eparams.kappa_v            = 1.0
+    eparams.kappa_c            = 1.0
+    eparams.kappa_t            = 1.0
+    eparams.area_fraction      = m.ContinuationTuple(1.0)
+    eparams.volume_fraction    = m.ContinuationTuple(1.0)
+    eparams.curvature_fraction = m.ContinuationTuple(1.0)
+    eparams.bond_params        = params
 
     estore = m.EnergyManager(mesh, eparams)
 

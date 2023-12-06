@@ -34,9 +34,9 @@ EnergyManager::EnergyManager(const TriMesh& mesh,
 
 void EnergyManager::update()
 {
-    params.area_frac.update();
-    params.volume_frac.update();
-    params.curvature_frac.update();
+    params.area_fraction.update();
+    params.volume_fraction.update();
+    params.curvature_fraction.update();
     params.external_params.radius.update();
 }
 
@@ -108,9 +108,9 @@ void EnergyManager::print_info()
 {
   auto props = properties();
 
-  auto ref_area = params.area_frac * initial_props.area;
-  auto ref_volume = params.volume_frac * initial_props.volume;
-  auto ref_curvature = params.curvature_frac * initial_props.curvature;
+  auto ref_area = params.area_fraction * initial_props.area;
+  auto ref_volume = params.volume_fraction * initial_props.volume;
+  auto ref_curvature = params.curvature_fraction * initial_props.curvature;
 
   std::ostream& out = std::cout;
 
