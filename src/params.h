@@ -143,6 +143,7 @@ struct SurfaceRepulsionParams
   std::string n_search        = "cell-list";
   real        rlist           = 0.1;
   int         exclusion_level = 2;
+  int         refresh         = 1;
 };
 
 struct ExternalPotentialParams

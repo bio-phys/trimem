@@ -557,6 +557,11 @@ void expose_parameters(py::module& m)
                 * 2: exclude indirectly connected neighbourhood (2 edges)
 
             )pbdoc"
+        )
+        .def_readwrite(
+            "refresh",
+            &SurfaceRepulsionParams::refresh,
+            "Refresh interval."
         );
 
     py::class_<ExternalPotentialParams>(
