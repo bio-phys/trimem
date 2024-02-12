@@ -289,7 +289,7 @@ def run_minim(mesh, estore, config):
     }
     res = minimize(
         funcs.fun,
-        mesh.x,
+        mesh.x.ravel(),
         jac=funcs.grad,
         callback=_cb,
         method="L-BFGS-B",
