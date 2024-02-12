@@ -295,7 +295,7 @@ def run_minim(estore, config):
     }
     res = minimize(
         funcs.fun,
-        estore.mesh.x,
+        estore.mesh.x.ravel(),
         jac=funcs.grad,
         callback=_cb,
         method="L-BFGS-B",
