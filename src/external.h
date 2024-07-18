@@ -48,7 +48,7 @@ struct Sphere : ExternalPotential
 {
     // parameters
     const ExternalPotentialParams& params_;
-    static constexpr real twopow16 = std::pow(2, 1.0/6);
+    static constexpr real twopow16 = 1.122462048309373; //2^(1/6)
 
     struct SphereParams
     {
