@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.18)
-project(test)
+project(${SKBUILD_PROJECT_NAME}) #LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
 # dependencies
 find_package(OpenMP)
+set(PYBIND11_NEWPYTHON ON)
 find_package(pybind11 REQUIRED)
 
 # OpenMesh
@@ -34,9 +35,8 @@ pybind11_add_module(core MODULE src/bindings.cpp
                                 src/params_py.cpp)
 target_link_libraries(core PRIVATE trimem)
 
-install(TARGETS core trimem OpenMeshCore DESTINATION .)
-set_target_properties(core trimem PROPERTIES INSTALL_RPATH
-                                      "$ORIGIN/${CMAKE_INSTALL_LIBDIR}")
+install(TARGETS core trimem OpenMeshCore DESTINATION ${SKBUILD_PROJECT_NAME})
+set_target_properties(core trimem PROPERTIES INSTALL_RPATH "$ORIGIN")
 
 # c++ debug app
 add_subdirectory(src/debug)

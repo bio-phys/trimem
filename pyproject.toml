@@ -1,14 +1,30 @@
 [build-system]
 requires = [
-    "setuptools>=42",
-    "setuptools_scm>=6.2",
-    "wheel",
+    "setuptools_scm>=8.0",
     "pybind11[global]>=2.9.1",
-    "cmake>=3.18",
-    "scikit-build",
+    "scikit-build-core",
 ]
+build-backend = "scikit_build_core.build"
 
-build-backend = "setuptools.build_meta"
+[tool.scikit-build]
+cmake.version = ">=3.26.1"
+ninja.version = ">=1.11"
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+sdist.include = ["src/trimem/_version.py"]
+
+[project]
+name = "trimem"
+description = "Tools for the simulation of lipid membranes according to the Helfrich theory"
+authors = [ { name = "Trimem Team", email = "" } ]
+dependencies = [ "numpy", "scipy", "h5py", "meshio" ]
+dynamic = [ "version" ]
+
+[project.optional-dependencies]
+tests = [ "pytest", "autograd", "trimesh" ]
+docs  = [ "sphinx", "sphinx-copybutton", "sphinxcontrib-programoutput" ]
+
+[project.scripts]
+mc_app = "trimem.mc.app:cli"
 
 [tool.setuptools_scm]
-write_to = "src/trimem/_version.py"
+version_file = "src/trimem/_version.py"
