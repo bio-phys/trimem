@@ -1,4 +1,4 @@
-image: gitlab-registry.mpcdf.mpg.de/mpcdf/module-image
+image: gitlab-registry.mpcdf.mpg.de/mpcdf/ci-module-image/intel_2024_0:latest
 
 variables:
   GIT_SUBMODULE_STRATEGY: normal
@@ -17,20 +17,19 @@ workflow:
 tests:
   stage: test
   script:
-    - module load git gcc/9 anaconda/3/2020.02
-    - export CXX=g++
-    - export CC=gcc
+    - module load git intel/2024.0 anaconda/3/2023.03
+    - export CXX=icpx
+    - export CC=icx
     - pip install -v .[tests]
-    - pip install --upgrade numpy scipy
     - export PATH=$PATH:/root/.local/bin
     - pytest -v tests/
 
 pages-test:
   stage: test
   script:
-    - module load gcc/9 anaconda/3/2021.11 git
-    - export CXX=g++
-    - export CC=gcc
+    - module load git intel/2024.0 anaconda/3/2023.03
+    - export CXX=icpx
+    - export CC=icx
     - pip install .[docs]
     - export PATH=$PATH:/root/.local/bin
     - sphinx-build -W -b html doc/ doc-test/
@@ -43,9 +42,9 @@ pages-test:
 pages:
   stage: deploy
   script:
-    - module load gcc/9 anaconda/3/2021.11 git
-    - export CXX=g++
-    - export CC=gcc
+    - module load git intel/2024.0 anaconda/3/2023.03
+    - export CXX=icpx
+    - export CC=icx
     - pip install .[docs]
     - export PATH=$PATH:/root/.local/bin
     - sphinx-build -b html doc/ public/
