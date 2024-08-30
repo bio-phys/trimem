@@ -68,6 +68,8 @@ struct EnergyParams
   ContinuationParams continuation_params;
   //! parameters for the repulsion penalty
   SurfaceRepulsionParams repulse_params;
+
+
 };
 
 }

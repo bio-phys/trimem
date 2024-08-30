@@ -1,3 +1,5 @@
+
+
 """Evaluators for :class:`helfirch._core.EnergyManager`.
 
 Wrapper classes controlling the access to the functionality of the
@@ -9,7 +11,18 @@ of vertex positions.
 import numpy as np
 import time
 from datetime import datetime, timedelta
+import psutil
+import copy
+import gc
+import tracemalloc
 
+class Timer():
+    "Storage for timer state to reinitialize PerformanceEnergyEvaluator after Reset"
+    def __init__(self,ptime,ts,ta,tan):
+        self.performance_start=ptime
+        self.performance_timestamps=ts
+        self.timearray=ta
+        self.timearray_new=tan
 
 _eval_default_options = {
     "info_step":    100,
@@ -171,16 +184,29 @@ class EnergyEvaluators:
             kwargs: ignored
         """
         i = sum(steps.values()) #py3.10: steps.total()
+
         if self.info_step and (i % self.info_step == 0):
             print("\n-- Energy-Evaluation-Step ", i)
             self.estore.print_info(self.mesh.trimesh)
         if self.out_step and (i % self.out_step == 0):
             self.output.write_points_cells(self.mesh.x, self.mesh.f)
         if self.cpt_step and (i % self.cpt_step == 0):
-            self.write_cpt(self.mesh, self.estore, steps)
+            self.write_cpt()
         if self.refresh_step and (i % self.refresh_step == 0):
             self.estore.update_repulsion(self.mesh.trimesh)
         self.estore.update_reference_properties()
+
+        if  (i % 250==0):
+            with open(f'energies_vol{self.estore.eparams.volume_frac*100:03.0f}_cur{self.estore.eparams.curvature_frac*100:03.0f}.dat','a+') as f:
+                f.write(f'{i} {self.estore.energy(self.mesh.trimesh)}\n')
+
+        #######
+        #if i==1:
+        #    open('energy_tot.dat','w')
+        #if i>50 and (i % 50 == 0):
+        #    with open('energy_tot.dat','a') as file:
+        #        file.write(f'{self.estore.energy(self.mesh.trimesh)}\n')
+
 
 
 class TimingEnergyEvaluators(EnergyEvaluators):
@@ -212,3 +238,105 @@ class TimingEnergyEvaluators(EnergyEvaluators):
                 print(f"----- estimated speed: {speed:.3e} s/step")
                 print(f"----- estimated end:   {finish}")
                 self.timestamps.pop(0)
+
+
+
+class PerformanceEnergyEvaluators(EnergyEvaluators):
+    """EnergyEvaluators with timings for steps.
+
+    Extends :class:`EnergyEvaluators` with periodic measurements of
+    the simulation performance and an estimate on the expected runtime.
+
+    ADDS OUTPUT TO performance_measurement.dat containing timeseries of different
+    """
+    def __init__(self, mesh, estore, output, options,timerinp):
+        super().__init__(mesh, estore, output, options)
+        self.timestamps = []
+        self.n          = options["num_steps"] // self.info_step
+        self.start      = datetime.now()
+        self.timer = timerinp
+        self.performance_increment = 1000
+        self.prefix=options['prefix']
+        self.process = psutil.Process()
+
+
+
+
+    def callback(self, x, steps):
+        """Callback with timings.
+
+        Wraps :meth:`EnergyEvaluators.callback` with timing functionality.
+        """
+        super().callback(x, steps)
+        i = sum(steps.values()) #py3.10: steps.total()
+
+        if self.info_step and (i % self.info_step == 0):
+            self.timestamps.append(time.time())
+            if len(self.timestamps) == 2:
+                tspan  = self.timestamps[1] - self.timestamps[0]
+                speed  = tspan / self.info_step
+                finish = self.start + timedelta(seconds=tspan) * self.n
+                print("\n-- Performance measurements")
+                print(f"----- estimated speed: {speed:.3e} s/step")
+                print(f"----- estimated end:   {finish}")
+                self.timestamps.pop(0)
+
+
+        # Section for the preformance measurement of the code
+        if i==1:
+            with open(f'{self.prefix}_performance.dat','w') as file:
+                file.write('#Step Elapsed_Time Time_Per_Step %Vertex_Moves %Mesh_Flips %Residue %CPU RAM_USAGE %RAM RAM_AVAILABLE_PRC RAM_TOTAL\n')
+                #tracemalloc.start()
+
+        if (i % self.performance_increment == 0):
+            self.timer.performance_timestamps.append(time.time())
+            section_time = self.timer.timearray_new - self.timer.timearray
+            self.timer.timearray = self.timer.timearray_new.copy()
+            self.process = psutil.Process()
+
+            if len(self.timer.performance_timestamps) == 2:
+                performance_tspan = self.timer.performance_timestamps[1] - self.timer.performance_timestamps[0]
+
+
+
+
+                with open(f'{self.prefix}_performance.dat', 'a') as file:
+                    file.write(f'{i} {self.timer.performance_timestamps[1]-self.timer.performance_start:.4f}'
+                               f' {performance_tspan/self.performance_increment:.4f}'
+                               f' {section_time[0]/performance_tspan:.4f} {section_time[1]/performance_tspan:.4f}'
+                               f' {(performance_tspan-section_time[0]-section_time[1])/performance_tspan:.4f}'
+                               f' {self.process.cpu_percent(interval=None):.4f} {self.process.memory_info().vms / 1024 ** 3:.4f}'
+                               f' {self.process.memory_percent(memtype="vms"):.4f} {psutil.virtual_memory()[1]/1000000000:.4f}'
+                               f' {psutil.virtual_memory()[0]/1000000000:.4f} {len(gc.garbage)}\n'
+                               )
+
+                self.timer.performance_timestamps.pop(0)
+
+
+
+
+
+        #if i==1:
+        #    open(f'{self.prefix}_energy_tot.dat','w')
+        #if i>5000000 and (i % 50 == 0):
+        #    with open('energy_tot.dat','a') as file:
+        #        file.write(f'{self.estore.energy(self.mesh.trimesh)}\n')
+
+        #if i%50==0:
+        #    snapshot = tracemalloc.take_snapshot()
+        #    top_stats = snapshot.statistics('lineno')
+        #    with open('allocation.dat','a') as file:
+        #        for stats in top_stats[:10]:
+        #            file.write(f'{stats}\n')
+        #        file.write('\n')
+
+        #    del self.timearray_new
+
+        #    gc.collect()
+
+    def extra_callback(self, timearray_loc):
+        self.timer.timearray_new=timearray_loc
+
+
+
+

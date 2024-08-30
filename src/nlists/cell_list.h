@@ -216,7 +216,8 @@ struct CellList : NeighbourListT<exclusion>
       }
 
       return std::make_tuple(std::move(distances), std::move(neighbours));
-  }
+      }
+
 
   virtual
   std::tuple<std::vector<real>, std::vector<int>, std::vector<int> >

@@ -59,28 +59,19 @@ def create_backup(outprefix, cptprefix):
     if len(backups):
         print(f"Created backup #{bnum+1} of:", backups)
 
-def make_output(config):
-    """Construct output writer object.
+def make_output(fmt,prefix,counter,callback=None):
 
-    Args:
-        config (ConfigParser): trimem config defining the output type in
-            config['GENERAL']['output_format']. Must be one of `vtu`, `xyz` or
-            `xdmf`.
 
-    Returns:
-        Writer-like:
-            An instance of an output writer class having a method
-            `write_points_cells` with signature `(points, cells)`.
-    """
-
-    fmt    = config["GENERAL"]["output_format"]
-    prefix = config["GENERAL"]["output_prefix"]
+    fmt    = fmt
+    prefix = prefix
 
     if fmt == "xyz":
-        return XyzWriter(prefix)
+        return XyzWriter(prefix,counter,callback=callback)
     elif fmt == "xdmf":
         return XdmfWriter(prefix)
     elif fmt == "vtu":
         return VtuWriter(prefix)
     else:
         raise ValueError("Invalid output format: {}".format(fmt))
+
+

@@ -24,6 +24,8 @@ from_points_cells(py::array_t<typename TriMesh::Point::value_type> points,
 // get faces from mesh (memory maintenance goes to python)
 py::array_t<int> fv_indices(TriMesh& mesh);
 
+
+
 // get reference to mesh-points (memory remains with the mesh)
 py::array_t<typename TriMesh::Point::value_type> points(TriMesh& mesh);
 }

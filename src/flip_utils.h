@@ -22,6 +22,11 @@ VertexProperties edge_vertex_properties(TriMesh& mesh,
                                        const BondPotential& bonds,
                                        const SurfaceRepulsion& repulse);
 
+VertexPropertiesNSR edge_vertex_properties_nsr(TriMesh& mesh,
+                                       const EdgeHandle& eh,
+                                       const BondPotential& bonds
+                                       );
+
 //! Compute neighbourhood patch of edges blocked by a flip of eh
 std::unordered_set<int> flip_patch(TriMesh& mesh, const EdgeHandle& eh);
 

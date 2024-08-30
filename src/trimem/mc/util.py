@@ -5,10 +5,12 @@ from the `mc_app` cli but can also be used standalone as a python module.
 """
 
 import warnings
+import concurrent.futures
 import functools
+from collections import Counter
 import copy
 import json
-
+from multiprocessing import Process, Queue
 import numpy as np
 from scipy.optimize import minimize
 
@@ -18,7 +20,7 @@ from .mesh import Mesh, read_trimesh
 from .config import update_config_defaults, config_to_params, print_config
 from .output import make_output, create_backup, \
                     CheckpointWriter, CheckpointReader
-from .evaluators import TimingEnergyEvaluators
+from .evaluators import TimingEnergyEvaluators, PerformanceEnergyEvaluators, Timer
 from .. import __version__
 
 
@@ -92,44 +94,6 @@ def write_checkpoint_handle(config):
 
     return _write_checkpoint
 
-def read_checkpoint(config, restartnum):
-    """Read checkpoint file.
-
-    Acquire checkpoint prefix from config and read the checkpoint with
-    number 'restartnum'.
-
-    Note: Continuation params are taken from the checkpoint.
-    Note: 'init_step' is set from the HMC section if given.
-
-    Args:
-        config (dict-like): run-config file.
-        restartnum (int): checkpoint file number to read.
-
-    Returns:
-        A tuple (mesh, config) with mesh being of type :class:`Mesh` and
-        config being of type `ConfigParser`.
-    """
-
-    prefix = config["GENERAL"]["restart_prefix"]
-
-    cpt = CheckpointReader(prefix, restartnum)
-    points, cells, conf = cpt.read()
-
-    # TODO: restart logic (see issue 26)
-    upd = {
-        "ENERGY": {
-            "continuation_delta":  conf["ENERGY"]["continuation_delta"],
-            "continuation_lambda": conf["ENERGY"]["continuation_lambda"],
-        },
-        "DEFAULT": {
-            "init_step": conf["HMC"]["init_step"],
-        }
-    }
-    config.read_dict(upd)
-
-    print("Read checkpoint:", cpt.fname)
-
-    return Mesh(points, cells), config
 
 def run(config, restart=None):
     """Run algorithm.
@@ -171,7 +135,72 @@ def run(config, restart=None):
     else:
       raise ValueError("Invalid algorithm")
 
-def run_mc(mesh, estore, config):
+def change_config(config,mesh):
+    from copy import deepcopy
+
+    config=deepcopy(config)
+    # reference values for edge_length and face_area
+    a, l = m.avg_tri_props(mesh.trimesh)
+
+    update_config_defaults(config, lc0=1.25 * l, lc1=0.75 * l, a0=a)
+    return config
+
+def remake_energy_manager(config,mesh):
+    eparams = config_to_params(config)
+
+    estore = m.EnergyManager(mesh.trimesh, eparams)
+
+    return estore
+
+def run_substep(i_reset, xf, config,counter,timer):
+    from trimem.mc.mesh import Mesh
+    mesh=Mesh(*xf)
+    estore = remake_energy_manager(config, mesh)
+    output = make_output(config)
+
+    cmc = config["HMC"]
+
+    # setup edge flips
+    flips = MeshFlips(mesh, estore, options={
+        "flip_type": cmc["flip_type"],
+        "flip_ratio": cmc.getfloat("flip_ratio"),
+        "info_step": config["GENERAL"].getint("info"),
+    })
+
+    # initialize checkpoint writer
+    cpt_writer = write_checkpoint_handle(config)
+
+    # function, gradient and callback
+    funcs = PerformanceEnergyEvaluators(mesh, estore, output, {
+        "info_step": config["GENERAL"].getint("info"),
+        "output_step": config["HMC"].getint("thin"),
+        "cpt_step": config["GENERAL"].getint("checkpoint_every"),
+        "refresh_step": config["SURFACEREPULSION"].getint("refresh"),
+        "num_steps": config["HMC"].getint("num_steps"),
+        "write_cpt": cpt_writer,
+        "prefix": config["GENERAL"]["output_prefix"]
+    },timer)
+
+    hmc = MeshHMC(mesh, funcs.fun, funcs.grad, options={
+        "mass": cmc.getfloat("momentum_variance"),
+        "time_step": cmc.getfloat("step_size"),
+        "num_integration_steps": cmc.getint("traj_steps"),
+        "initial_temperature": cmc.getfloat("initial_temperature"),
+        "cooling_factor": cmc.getfloat("cooling_factor"),
+        "cooling_start_step": cmc.getint("start_cooling"),
+        "info_step": config["GENERAL"].getint("info"),
+    }, counter=counter)
+
+    mmc = MeshMonteCarlo(hmc, flips,funcs.timer.timearray_new, counter=counter, callback=funcs.callback,
+                         extra_callback=funcs.extra_callback)
+
+    mmc.run(i_reset)
+    cpt_writer(mmc.hmc.mesh, estore, mmc.counter)
+
+
+    return (mesh.x,mesh.f), mmc.counter, funcs.timer
+
+def run_mc(mesh, config,i_reset):
     """Run Monte Carlo sampling.
 
     Perform Monte Carlo sampling of the Helfrich bending energy as defined
@@ -182,60 +211,17 @@ def run_mc(mesh, estore, config):
         estore (EnergyManager): EnergyManager.
         config (dict-like): run-config file.
     """
+    timer=Timer()
+    config=change_config(config,mesh)
+    counter = get_step_counters()
+    xf=mesh.x,mesh.f
+    for i_p in range(np.int64(config["HMC"].getint("num_steps")/i_reset)):
+        with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(run_substep,i_reset,xf,config,counter,timer)
+            xf,counter,timer=future.result()
+    return xf
 
-    # construct output writer
-    output = make_output(config)
 
-    # initialize checkpoint writer
-    cpt_writer = write_checkpoint_handle(config)
-
-    # function, gradient and callback
-    options = {
-        "info_step":    config["GENERAL"].getint("info"),
-        "output_step":  config["HMC"].getint("thin"),
-        "cpt_step":     config["GENERAL"].getint("checkpoint_every"),
-        "refresh_step": config["SURFACEREPULSION"].getint("refresh"),
-        "num_steps":    config["HMC"].getint("num_steps"),
-        "write_cpt":    cpt_writer,
-    }
-    funcs = TimingEnergyEvaluators(mesh, estore, output, options)
-
-    # setup hmc to sample vertex positions
-    cmc  = config["HMC"]
-    options = {
-        "mass":                  cmc.getfloat("momentum_variance"),
-        "time_step":             cmc.getfloat("step_size"),
-        "num_integration_steps": cmc.getint("traj_steps"),
-        "initial_temperature":   cmc.getfloat("initial_temperature"),
-        "cooling_factor":        cmc.getfloat("cooling_factor"),
-        "cooling_start_step":    cmc.getint("start_cooling"),
-        "info_step":             config["GENERAL"].getint("info"),
-    }
-    hmc = MeshHMC(mesh, funcs.fun, funcs.grad, options=options)
-
-    # setup edge flips
-    options = {
-        "flip_type":  cmc["flip_type"],
-        "flip_ratio": cmc.getfloat("flip_ratio"),
-        "info_step":  config["GENERAL"].getint("info"),
-    }
-    flips = MeshFlips(mesh, estore, options=options)
-
-    # initialize counters
-    step_count = get_step_counters()
-    step_count.update(json.loads(cmc.get("init_step")))
-
-    # setup combined-step markov chain
-    mmc = MeshMonteCarlo(hmc, flips, step_count, callback=funcs.callback)
-
-    # run sampling 
-    mmc.run(cmc.getint("num_steps"))
-
-    # update mesh
-    mesh.x = hmc.x
-
-    # write final checkpoint
-    cpt_writer(mesh, estore, mmc.counter)
 
 def run_minim(mesh, estore, config):
     """Run (precursor) minimization.

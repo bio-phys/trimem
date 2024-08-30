@@ -1,0 +1,716 @@
+Sinister Plan to add non-reciprocal interactions with external beads to trimem simulations:
+VoB -> Vertex-on-Bead
+BoV -> Bead-on-Vertex
+BoB -> Bead-on-Bead
+
+0) Beads
+#############
+In order to seamlessly reuse already implemented functions Beads will be stored as new additional TriMesh with no faces
+
+1) Neighbour Lists
+#############
+
+Using only cell lists -> Having a cell-list neighbour list of say vertices one can get the neighbouring vertices of an external bead by simply determining cell index of the bead.
+Depending if BoV,VoB or BoB interactions have similar cutoff ranges on could also use differently ranged cell-list to increase efficiency
+take a look at lammps neighbor list info
+
+Necessary changes:
+src/nlists/cell_list.h
+
+Existing function for point distances used in interaction calculations:
+
+## EXISTING
+virtual
+  std::tuple<std::vector<Point>, std::vector<int> >
+  point_distances(const TriMesh& mesh, const int& pid, const real& dmax) const override
+
+   auto point = mesh.point(mesh.vertex_handle(pid));
+###
+
+point is then used to determine cell-index in the nlist the method is used from.
+   -> nlist_vertices.point_distances(mesh,beads,pid) should give distances between beads with
+   index pid and vertices in neighbouring cells of nlist_vertices
+
+1.1) Overload function with additional argument const TriMesh& beads and define point via beads.point(bead.vertex_handle(pid))
+1.2) Get rid of exclusion criterion in distance calculations. Original function can exclude neighbours in the mesh
+    -> avoids "too local" surface repulsion -> Not necessary for intended interactions
+1.3) Fix interface in nlist.h (add overloaded definition)
+
+
+2) Interactions
+
+Use mesh_repulsion.cpp as template and implement VoB/BoV/BoB accordingly
+BoB can be implemented by using the SurfaceRepulsion struct itself and making a new derived struct
+in the spirit of SurfaceRepulsionFlatBottom using the bead NeighbourList and bead mesh (coords)
+-> VoB and BoV need two TriMeshes as input -> new struct for clarity
+
+2.1) Make Interface for BeadInteraction
+
+#### EXISTING
+struct SurfaceRepulsion
+{
+    virtual ~SurfaceRepulsion() = default;
+
+  1->   //! Compute penalty contributions to VertexProperties
+    virtual real vertex_property(const TriMesh &mesh, const int &pid) const = 0;
+
+  2->  //! compute gradient of contributions to VertexProperties
+    virtual std::tuple<std::vector<Point>, std::vector<int>>
+    vertex_property_grad(const TriMesh &mesh, const int &pid) const = 0;
+};
+######
+change to
+1 -> for returning the energy contributions for vertices (BoV), and Beads separately (VoB)
+2 -> returns the corresponding potential gradients acting on Vertices and Beads
+
+Done by introducing two derived structures
+struct BeadInteraction_VoB : BeadInteraction
+struct BeadInteraction_BoV : BeadInteraction
+and one for the self interaction reusing Surface Repulsion
+struct BeadInteraction_BoB : SurfaceRepulsion
+
+In above structures the actual (non-)reciprocal interactions are calculated
+As test case I suggest implementing HardCore-SoftShoulder and HardCore-SquareWell potentials
+-> properties used for MC using (fast) step function criterion
+-> properties_gradient used in MD implemented according to https://doi.org/10.1088/1361-648X/ac5139
+
+Should result in 3 structures (dependent on nlist) that can be handed to VertexProperties functions in mesh_properties.cpp(.h)
+
+3) VertexProperties and/or BeadProperties
+############################
+In order to make use of the openmp parallelisation in evaluating the energies and gradients one has to
+a) Extend the VertexProperties class, templates and operators in mesh_properties.cpp(.h) by a VoB,BoV and BoB property (for the energies)
+   and modify the
+   void vertex_properties_grad function in sayed .cpp in order to fill the bead gradient -> gradient acting on the beads in the MD-part
+OR
+b) Extend the VertexProperties only by BoV and take the additional contribution of the interaction into account using the structures made in 2)
+   and create a BeadProperties struct that is equivalent to VertexProperties but has only VoB and BoB energies and corresponding gradients
+
+b) would be clearer in the sense that the Beads manage their own properties, but a) is probably faster as the operators for the VertexProperties
+are crucial for the OpenMP calculations and one would have to start up a second guard for VoB and BoB alone. -> Probably stick to variant a)
+
+-> In case of a) the structures created for the BeadInteractions in 2) are handed to the i) vertex_properties and ii) vertex_properties_grad functions and are used to
+   i) fill the added VoB, BoB and BoV attribute (of VertexProperty) as well as to ii) fill the additionally introduced bead_gradient (handed to vertex_properties_grad)
+
+
+4) Modifications to kernel.h
+###############
+In the energy.cpp  the structures EvaluateProperties, EvaluatePropertiesGradient, and ReduceProperties are used (with OpenMp)
+in order to calculate the energies (for MC) and Gradients (for MD). In order to parallelize VoV, BoV and BoB as well the BeadInteraction Structs
+have to be handed and the new vertex_properties and vertex_properties_grad function (in mesh_properties.cpp) have to be used. i.e. adding a lot of
+arguments (struct BeadInteraction_VoB vob, ...... ) should do the trick
+-> CAVEAT: One important difference is the second gradient for the Beads
+### Existing
+    // result
+    std::vector<VertexPropertiesGradient>& gradients_;
+in EvaluatePropertiesGradient
+and
+ // result
+    std::vector<Point>& gradient_;
+in EvaluateGradient
+#########
+
+in order to calculate this a new
+function like
+
+
+### EXISTING
+ trimem_gradient(const EnergyParams& params,
+                      const VertexProperties& props,
+                      const VertexProperties& ref_props,
+                      const VertexPropertiesGradient& gprops)
+ #####
+
+is needed summing over the VoB and BoB contribution
+this function is then filled separately in the EvaluatePropertiesGradient and EvaluateGradient Struct
+
+
+5) energy.cpp
+#############
+
+5.1) add the creation of the 2 additional required neighbour lists and corresponding functions updating both nlist as well
+as the BeadInteraction structs
+5.2) in the gradient calculation via EvaluateGradient take into account that the function should now return 2 gradients one for the vertices
+     and one for the beads
+
+6) bindings.cpp
+###############
+
+take the changed arguments in the energy and gradient functions (bead postitions!) into account and expose the additional properties in VertexProperties as well
+as the second gradient
+
+7) hmc.py
+##########
+in _vv_integration():
+the force(x) function should now already take the bead positions as well and return two gradients -> update bead positions accordingly
+in hmc, _step() and _hamiltonian() respectively:
+Having made the changes to the kernel the energy originating from BoB/VoV/BoV should be calulated by the exposed estore.energy(mesh,beads)
+and only arguments must be modified.
+
+8) Test excessively
+###########
+
+9) Celebrate
+###########
+
+
+
+
+
+#########################################################################################################################################
+#########################################################################################################################################
+#########################################################################################################################################
+
+
+On how stuff is calculated:
+
+
+1) Nlists
+
+
+Before:
+nlist.point_distance( mesh, pid)
+#
+point=mesh(pid) <- getting position of particle of interest
+
+indx=cell_inx(point) <- using coordinates of point, calculates the cell index
+
+(dij,jdx)=distances(indx)
+-> walks through lists of bordering cells and calculates distances
+-> takes exclusion of neighbourhood in mesh into account
+-> returns_ pair of neighbour ids of particle at position "point" and the corresponding distances
+
+Intended changes:
+
+-> Introduction of additional TriMesh object beads, storing bead positions and using it to define point
+nlist.point_distance(mesh,bead,pid)
+
+point = bead(pid)
+
+distances(indx) -> no need for exclusions of neighborhood in VoB,....
+
+
+Used for:
+Creation of two additional neighbourlists nlist_vertices and nlist_beads that can be used to calculate VoB,BoV and BoB distances
+
+
+
+
+
+
+2) Interactions
+
+
+Before:
+SurfaceRepulsion
+SurfaceRepulsionFlatBottom :: SurfaceRepulsion
+-> Structure incorporating the calculation of the vertex-vertex interactions using NeighbourList
+Neighbourlist-> attribute
+
+Surface repulsion gets nlist
+
+
+
+void vertex_property_grad(mesh,pid):
+    (dij,jdx)=nlist.point_distance(pid) -> calculates distances to particle pid
+
+    for j in jdx:
+      dij[j,:]= gradient induced by interaction of particle j on particle pid
+
+    return (dij,jdx)-> now dij being the gadient instead of distance
+
+void vertex_property(mesh,pid):
+     (dij,jdx)=nlist.point_distance(pid) -> calculates distances to particle pid
+     for j in jdx:
+         pot+=(energy contribution of interaction with particle j)
+     return pot -> energy of particle pid
+
+Intended Changes:
+Introduce new struct similar to above  BeadInteractions
+containing both neighbour lists nlist_vertices and nlist_beads
+depending on Type of Interaction make three derived structs
+BeadInteraction_VoB :: BeadInteraction
+BeadInteraction_BoV :: BeadInteraction
+
+adopt the two functions to take aditional mesh ->
+
+void vertex_property_(grad)(mesh1,mesh2,pid):
+        (dij,jdx)=nlist_mesh1.point_distance(mesh2,pid)  // e.g. mesh1=beads / mesh2=vertices -> BoV distances  nlist_mesh1-> nlist created with mesh1
+
+       otherwise returns the exact same things as the above functions -> only change is the used distance and obviously the interaction potential
+
+for BoB interactions
+just make
+BeadInteraction_BoB :: SurfaceRepulsion and use existing functions with altered interaction potential where mesh=beads
+
+
+Used for: Calculation of VertexProperties (energies) and VertexPropertiesGrad (gradients) in mesh_properties.cpp,
+            i.e. the summation over the different contributiions (bending, area, etc.)
+
+
+
+3) VertexProperties
+
+
+
+Before:
+
+Class containing the different Energy contributions
+
+template<class T>
+struct TVertexProperties
+{
+    T area;
+    T volume;
+    T curvature;
+    T bending;
+    T tethering;
+    T repulsion;
+
+And defining operations to add (or subtract) them
+
+    TVertexProperties<T>& operator+=(const TVertexProperties<T>& lhs)
+    {
+        area      += lhs.area;
+        volume    += lhs.volume;
+        curvature += lhs.curvature;
+        bending   += lhs.bending;
+        tethering += lhs.tethering;
+        repulsion += lhs.repulsion;
+        return *this;
+    }
+
+
+
+
+
+
+
+
+
+ !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Template is used to get real VertexProperties and point VertexPropertiesGrad
+Energies are then caluclated  PER VERTEX (ve) and PER CONTRIBUTION (e.g. curvature)
+
+
+
+
+
+
+
+
+
+
+
+
+VertexProperties vertex_properties(const TriMesh& mesh,
+                                   const BondPotential& bonds,
+                                   const SurfaceRepulsion& constraint,
+                                   const VertexHandle& ve)
+{
+    VertexProperties p{ 0, 0, 0, 0, 0, 0 };
+
+    for (auto he : mesh.voh_range(ve))
+    {
+        if ( not he.is_boundary() )
+        {
+            // edge curvature
+            real el      = edge_length(mesh, he);
+            real da      = dihedral_angle(mesh, he);
+            p.curvature += 0.5 * el * da;
+
+            // face area/volume
+            p.area   += face_area(mesh, he);
+            p.volume += face_volume(mesh, he);
+
+            // bonds
+            p.tethering += bonds.vertex_property(mesh, he);
+        }
+    }
+
+    // correct multiplicity
+    p.area      /= 3;
+    p.volume    /= 3;
+    p.curvature /= 2;
+    p.tethering /= bonds.valence();
+
+    p.bending    = 2 * p.curvature * p.curvature / p.area;
+
+    // mesh repulsion
+    p.repulsion = constraint.vertex_property(mesh, ve.idx());
+
+
+void vertex_properties_grad(const TriMesh& mesh,
+                            const BondPotential& bonds,
+                            const SurfaceRepulsion& repulse,
+                            const VertexHandle& ve,
+                            const std::vector<VertexProperties>& props,
+                            std::vector<VertexPropertiesGradient>& d_props)
+{
+    // This routine, instead of evaluating the gradient of each vertex-averaged
+    // property wrt the coordinates of all the vertices involved (which would
+    // require atomic operations or some gradient buffers; the former having
+    // shown to produce a significant slow down, the latter being inefficient for
+    // large number of threads), gathers gradients from all vertex-averaged
+    // properties ve is involved in, i.e., summing only into the gradient at index
+    // ve.idx() (being not used by other threads!).
+
+    // pre-compute vertex-curvature to vertex-area ratio (needed for bending)
+    // for the patch of vertex ve (at pos 0 of this array) and later also at
+    // pos 1 and 2 for other vertex-patches.
+    std::array<real, 3> c_to_a;
+    auto idx = ve.idx();
+    c_to_a[0] = props[idx].curvature / props[idx].area;
+
+    for (auto he : mesh.voh_range(ve))
+    {
+        if ( not he.is_boundary() )
+        {
+            auto n_he = mesh.next_halfedge_handle(he);
+            auto jdx  = mesh.to_vertex_handle(he).idx();
+            auto kdx  = mesh.to_vertex_handle(n_he).idx();
+
+            // vertex-curvature ratio of other patches
+            c_to_a[1] = props[jdx].curvature / props[jdx].area;
+            c_to_a[2] = props[kdx].curvature / props[kdx].area;
+
+            // edge curvature of outgoing he
+            // the gradient of the edge-length as well as the dihedral-angle
+            // is symmetric wrt to edge-swap, i.e. when seen from vertex jdx
+            real edge_length = trimem::edge_length(mesh, he);
+            real edge_angle  = trimem::dihedral_angle(mesh, he);
+            auto d_length    = trimem::edge_length_grad<1>(mesh, he);
+            auto d_angle     = trimem::dihedral_angle_grad<1>(mesh, he);
+            for (int i=0; i<2; i++)
+            {
+                auto val = 0.25 * (edge_angle * d_length[0] +
+                                   edge_length * d_angle[0]);
+                d_props[idx].curvature += val;
+                d_props[idx].bending   += 4.0 * c_to_a[i] * val;
+            }
+
+            // face area of outgoing he
+            // contribution from self as well as from outgoing he of jdx,
+            // the latter being equivalent just needs different c_to_a
+            auto d_face_area = trimem::face_area_grad<1>(mesh, he);
+            for (int i=0; i<3; i++)
+            {
+                auto val = d_face_area[0] / 3;
+                d_props[idx].area    += val;
+                d_props[idx].bending -= 2.0  * c_to_a[i] * c_to_a[i] * val;
+            }
+
+            // face volume of outging he
+            // same logic as for the area
+            auto d_face_volume = trimem::face_volume_grad<1>(mesh, he);
+            for (size_t i=0; i<3; i++)
+            {
+                auto val = d_face_volume[0] / 3;
+                d_props[idx].volume += val;
+            }
+
+            // edge curvature of next halfedge
+            edge_length = trimem::edge_length(mesh, n_he);
+            edge_angle  = trimem::dihedral_angle(mesh, n_he);
+            d_angle     = trimem::dihedral_angle_grad<4>(mesh, n_he);
+            for (int i=1; i<3; i++)
+            {
+                auto val = 0.25 * edge_length * d_angle[0];
+                d_props[idx].curvature += val;
+                d_props[idx].bending   += 4.0 * c_to_a[i] * val;
+            }
+
+            // tether bonds
+            auto d_bond = bonds.vertex_property_grad(mesh, he)[0];
+            d_props[idx].tethering += d_bond;
+
+        } // not boundary
+    } // outgoing halfedges
+
+    // repulsion penalty
+    std::vector<Point> d_repulse;
+    std::vector<int> jdx;
+    std::tie(d_repulse, jdx) = repulse.vertex_property_grad(mesh, idx);
+    for (size_t i=0; i<d_repulse.size(); i++)
+    {
+        auto val = d_repulse[i];
+        d_props[idx].repulsion += 2 * d_repulse[i];
+    }
+
+}
+}
+
+
+
+
+
+-> VertexProperties(Grad) containing the contributions to energy and gradients of all vertices.
+Intended Changes:
+1) Add the vertex atributes BoV in template-> used in template i.e. defined for both VertexProperty and VertexPropertyGrad
+2) Add passages like
+
+    // mesh repulsion
+    p.repulsion = constraint.vertex_property(mesh, ve.idx());
+
+    in energies
+
+    // repulsion penalty
+    std::vector<Point> d_repulse;
+    std::vector<int> jdx;
+    std::tie(d_repulse, jdx) = repulse.vertex_property_grad(mesh, idx);
+    for (size_t i=0; i<d_repulse.size(); i++)
+    {
+        auto val = d_repulse[i];
+        d_props[idx].repulsion += 2 * d_repulse[i];
+
+    in gradients corresponding to
+    VoB, BoV and BoB
+    using the structures from the last section,
+    i.e. give as argument e.g.  &BeadInteraction_BoV bov
+
+    and the use
+
+    bov.vertex_property(mesh,beads,ve.idx())
+
+    or
+
+    bov.vertex_property_grad(mesh,beads,idx);
+
+    in order to calculate corresponding contributions to energy and gradient
+
+
+3) To calculate BeadProperties we suppose to make new class a)
+template<class T>
+struct TBeadProperties
+{
+    T VoB;
+    T BoB;
+
+
+again used to make a BeadProperties<real> -> BeadProperties
+and                  BeadProperties<point> -> BeadPropertiesGradient
+
+Again defining operations +/- in order to use it with openmp in the kernel
+
+
+
+Analogous to the vertex_properies and vertex_properties_grad make bead_properties and bead_properties_grad function in this case only containing
+
+
+        #properties
+        p.vob = vob.vertex_property(mesh,beads,ve.idx())
+        p.bob = bob.verex_propert(mes ...)
+
+        #grad
+
+        WITH:
+        std::vector<BeadPropertiesGradient>& d_props
+
+        std::vector<Point> d_vob;
+         std::vector<int> jdx;
+        std::tie(d_vob, jdx) = vob.vertex_property_grad(mesh,beads, idx);
+        for (size_t i=0; i<d_vob.size(); i++)
+        {
+         auto val = d_vob[i];
+        d_props[idx].vob += 2 * d_vob[i];
+
+        and the same for BoB
+
+
+
+
+
+
+
+
+ALTERNATIVE: Store VoB, BoB also in VertexProperties and take special care to return the right gradients and summation over the right ranges is taken care of -> could be tricky
+
+
+Used in:
+Kernel to sum over different contributions and particles
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+4) KERNEL
+
+
+Before:
+
+-> Some functions to modify stregth of interactions
+
+
+real repulsion_penalty(const EnergyParams& params,
+                       const VertexProperties& props)
+{
+    return params.kappa_r * props.repulsion;
+}
+
+Point repulsion_penalty_grad(const EnergyParams& params,
+                             const VertexProperties& props,
+                             const Point& d_repulsion)
+{
+    return params.kappa_r * d_repulsion;
+
+-> analogous to use parameters given in eparams to modify strenght of interactions
+-> makes sense for HCSW and HCSS ? maybe not
+
+
+And functions that sum over different contributions e.g.
+
+real trimem_energy(const EnergyParams& params,
+                   const VertexProperties& props,
+                   const VertexProperties& ref_props)
+{
+    real energy = 0.0;
+    energy += area_penalty(params, props, ref_props);
+    energy += volume_penalty(params, props, ref_props);
+    energy += curvature_penalty(params, props, ref_props);
+    energy += tether_penalty(params, props);
+    energy += repulsion_penalty(params, props);
+    energy += helfrich_energy(params, props);
+    return energy;
+
+
+
+
+
+
+
+Different Kernels that are used in the openmp templates
+
+
+
+ - Fills the VertexProperties(Grad) for each vertex
+ template<class Kernel>
+void parallel_for(int n, Kernel& kernel)
+{
+#pragma omp parallel for
+    for (int i=0; i<n; i++)
+      kernel(i);
+}
+
+}
+
+
+! ADD BEADS TO THE KERNEL WITH IF SWITCHING TO BEADKERNAL
+
+
+
+ - AddsThemUp
+template<class Kernel, class ReductionType>
+void parallel_reduction(int n, Kernel& kernel, ReductionType& reduce)
+{
+#pragma omp declare reduction (tred : ReductionType : omp_out += omp_in) \
+  initializer(omp_priv={})
+
+#pragma omp parallel for reduction(tred:reduce)
+    for (int i=0; i<n; i++)
+    {
+        kernel(i, reduce);
+    }
+}
+
+
+
+
+
+
+
+Kernels  and their roles
+
+
+
+
+EvaluateProperties -> used to calculate interactions particles wise
+-> reduced to get to full energy
+
+EvaluatePropertiesGrad -> used to calculate the different gradients comming from the different contributions
+
+EvaluateGrad -> used to sum over the contributions
+
+
+
+
+
+
+
+calculates properties
+struct EvaluateProperties
+{
+    EvaluateProperties(const EnergyParams& params,
+                       const TriMesh& mesh,
+                       const BondPotential& bonds,
+                       const SurfaceRepulsion& repulse,
+                       std::vector<VertexProperties>& props) :
+        params_(params),
+        mesh_(mesh),
+        bonds_(bonds),
+        repulse_(repulse),
+        props_(props) {}
+
+    //parameters
+    const EnergyParams& params_;
+    const TriMesh& mesh_;
+    const BondPotential& bonds_;
+    const SurfaceRepulsion& repulse_;
+
+    // result
+    std::vector<VertexProperties>& props_;
+
+    void operator() (const int i)
+    {
+        auto vh = mesh_.vertex_handle(i);
+        props_[i] = vertex_properties(mesh_, bonds_, repulse_, vh);
+    }
+};
+
+
+
+
+FURTHER NOTES ON PARALELLISATION:
+
+As the number of beads will in general be relatively small it does not make sense to parallelize over the beads. Instead parallelize over the different Bead-Vertex Pairs
+
+-> Alternative Kernel Design for Bead Interactiosn
+
+-> parallel_for(n -> n!= n_beads but n_pairs)
+
+
+-> BeadProperties!!!
+-> BeadPropertiesGrad
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

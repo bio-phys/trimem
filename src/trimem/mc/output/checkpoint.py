@@ -57,6 +57,8 @@ class CheckpointWriter:
 
         h5file.close()
 
+
+
     def write(self, points, cells, config, **kwargs):
         """Write points, cells and config to checkpoint file.
 
@@ -159,12 +161,12 @@ class CheckpointReader:
         h5file[dataset].read_direct(cells)
         h5file.close()
 
-        # read config
-        xconfig = self.root[2]
-        if not xconfig.tag == "config":
-            raise ValueError("Checkpoint file corrupt.")
-        config_str = json.loads(xconfig.text)
-        config = configparser.ConfigParser()
-        config.read_string(config_str)
+        ## read config
+        #xconfig = self.root[2]
+        #if not xconfig.tag == "config":
+        #    raise ValueError("Checkpoint file corrupt.")
+        #config_str = json.loads(xconfig.text)
+        #config = configparser.ConfigParser()
+        #config.read_string(config_str)
 
-        return points, cells, config
+        return points, cells#, config

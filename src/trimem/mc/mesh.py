@@ -51,6 +51,9 @@ class Mesh:
         """Make a deep copy."""
         return copy.deepcopy(self)
 
+    def __reduce__(self):
+        return self.__class__,(self.x,self.f)
+
 def read_trimesh(filename):
     """Read a mesh from file.
 

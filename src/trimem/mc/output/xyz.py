@@ -16,12 +16,17 @@ class XyzWriter:
         fname (str, path-like): output file prefix.
     """
 
-    def __init__(self, fname):
+    def __init__(self, fname,counter,callback=None):
         """Init."""
         self.fname = pathlib.Path(fname).with_suffix(".xyz")
-        self.fname = _create_part(self.fname)
 
-        self.step_counter = 0
+
+
+        self.step_counter = counter
+        self.callback=callback
+
+        if self.step_counter == 0:
+            self.fname = _create_part(self.fname)
 
     def write_points_cells(self, points, cells):
         """Write points and ignore cells.
@@ -40,3 +45,6 @@ class XyzWriter:
                 fp.write(fmt.format(*row))
 
         self.step_counter += 1
+        if self.callback is not None:
+            self.callback(self.step_counter)
+
