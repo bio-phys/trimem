@@ -25,15 +25,6 @@ def _vv_integration(x0, p0, force, m, dt, N):
 
     return x, p
 
-def get_step_counters():
-    """Counter to manage the accounting of steps for moves and flips.
-
-    Returns:
-        collections.Counter:
-            Counter with keys for vertex-moves and edge-flips.
-    """
-    return Counter(move=0, flip=0)
-
 _hmc_default_options = {
     "mass":                  1.0,
     "time_step":             1.0e-4,
@@ -87,7 +78,7 @@ class HMC:
         nlog_prob,
         grad_nlog_prob,
         callback=None,
-        counter=get_step_counters(),
+        counter=Counter(),
         options={},
     ):
         """Initialization."""
@@ -220,7 +211,7 @@ class MeshFlips:
         self,
         mesh,
         estore,
-        counter=get_step_counters(),
+        counter=Counter(),
         options={}
     ):
         """Init."""
@@ -300,7 +291,7 @@ class MeshMonteCarlo:
         self,
         hmc,
         flips,
-        counter=get_step_counters(),
+        counter=Counter(),
         callback=None
     ):
         """Initialize."""

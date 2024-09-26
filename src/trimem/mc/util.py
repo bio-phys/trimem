@@ -8,12 +8,13 @@ import warnings
 import functools
 import copy
 import json
+from collections import Counter
 
 import numpy as np
 from scipy.optimize import minimize
 
 from .. import core as m
-from .hmc import HMC, MeshFlips, MeshMonteCarlo, get_step_counters
+from .hmc import HMC, MeshFlips, MeshMonteCarlo
 from .config import update_config_defaults, config_to_params, print_config
 from .output import make_output, create_backup, \
                     CheckpointWriter, CheckpointReader
@@ -229,8 +230,7 @@ def run_mc(estore, config):
     flips = MeshFlips(estore.mesh, estore, options=options)
 
     # initialize counters
-    step_count = get_step_counters()
-    step_count.update(json.loads(cmc.get("init_step")))
+    step_count = Counter(json.loads(cmc.get("init_step")))
 
     # setup combined-step markov chain
     mmc = MeshMonteCarlo(hmc, flips, step_count, callback=funcs.callback)
@@ -283,7 +283,7 @@ def run_minim(estore, config):
 
     # the callback has trimem-specific step counters as postional arg
     # which scipy's optimizers can't handle; so wrap this locally here
-    step_count = get_step_counters()
+    step_count = Counter()
     def _cb(x):
         funcs.callback(x, step_count)
         step_count["move"] += 1
