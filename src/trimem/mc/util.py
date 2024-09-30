@@ -9,6 +9,8 @@ import functools
 import copy
 import json
 from collections import Counter
+import time
+from datetime import datetime
 
 import numpy as np
 from scipy.optimize import minimize
@@ -18,7 +20,6 @@ from .hmc import MeshHMC, MeshMutation, MeshMonteCarlo
 from .config import update_config_defaults, config_to_params, print_config
 from .output import make_output, create_backup, \
                     CheckpointWriter, CheckpointReader
-from .evaluators import TimingEnergyEvaluators
 from .. import __version__
 
 
@@ -139,6 +140,47 @@ def read_checkpoint(config, restartnum):
 
     return m.TriMesh(points, cells), config
 
+def callback_handle(
+    output,
+    info_step=100,
+    out_step=1000,
+    cpt_step=0,
+    refresh_step=10,
+    write_cpt=lambda e,s: None,
+    num_steps=None,
+    ):
+    """Make a callback handle for minimization and mc."""
+
+    t0 = time.time()
+    def _estimate_speed(i):
+        if (num_steps is None) or (i == 0):
+            return
+        dt = time.time() - t0
+        speed  = dt / i
+        finish = datetime.fromtimestamp(t0 + dt + speed * (num_steps - i))
+        print("\n-- Performance measurements")
+        print(f"----- estimated speed: {speed:.3e} s/step")
+        print(f"----- estimated end:   {finish}")
+
+    def _callback(estore, steps):
+        i = sum(steps.values()) #py3.10: steps.total()
+        if info_step and (i % info_step == 0):
+            print("\n-- Energy-Evaluation-Step ", i)
+            estore.print_info()
+            _estimate_speed(i)
+        if out_step and (i % out_step == 0):
+            output.write_points_cells(
+                estore.mesh.x,
+                estore.mesh.fv_indices,
+            )
+        if cpt_step and (i % cpt_step == 0):
+            write_cpt(estore, steps)
+        if refresh_step and (i % refresh_step == 0):
+            estore.update_repulsion()
+        estore.update()
+
+    return _callback
+
 def run(config, restart=None):
     """Run algorithm.
 
@@ -199,16 +241,16 @@ def run_mc(estore, config):
 
     istep = config["GENERAL"].getint("info")
 
-    # function, gradient and callback
+    # callback
     options = {
         "info_step":    config["GENERAL"].getint("info"),
-        "output_step":  config["HMC"].getint("thin"),
+        "out_step":     config["HMC"].getint("thin"),
         "cpt_step":     config["GENERAL"].getint("checkpoint_every"),
         "refresh_step": config["SURFACEREPULSION"].getint("refresh"),
         "num_steps":    config["HMC"].getint("num_steps"),
         "write_cpt":    cpt_writer,
     }
-    funcs = TimingEnergyEvaluators(estore, output, options)
+    cb = callback_handle(output, **options)
 
     # list of single MC step to run on the mesh
     steps = []
@@ -228,7 +270,7 @@ def run_mc(estore, config):
             "info_step":             istep,
         }
         options = {k: v for k,v in options.items() if not v is None}
-        steps.append(MeshHMC(estore, funcs.fun, funcs.grad, **options))
+        steps.append(MeshHMC(estore, estore.energy, estore.gradient, **options))
 
     # setup edge flips
     ft = cmc["flip_type"]
@@ -248,7 +290,7 @@ def run_mc(estore, config):
     step_count = Counter(json.loads(cmc.get("init_step")))
 
     # setup combined-step markov chain
-    mmc = MeshMonteCarlo(steps, step_count, callback=funcs.callback)
+    mmc = MeshMonteCarlo(steps, step_count, callback=cb)
 
     # run sampling
     mmc.run(cmc.getint("num_steps"))
@@ -284,21 +326,26 @@ def run_minim(estore, config):
     # function, gradient and callback
     options = {
         "info_step":    config["GENERAL"].getint("info"),
-        "output_step":  config["MINIMIZATION"].getint("out_every"),
+        "out_step":     config["MINIMIZATION"].getint("out_every"),
         "cpt_step":     config["GENERAL"].getint("checkpoint_every"),
         "refresh_step": refresh,
-        "flatten":      True,
         "num_steps":    config["MINIMIZATION"].getint("maxiter"),
         "write_cpt":    cpt_writer,
     }
-    funcs = TimingEnergyEvaluators(estore, output, options)
+    _cb = callback_handle(output, **options)
 
-    # the callback has trimem-specific step counters as postional arg
-    # which scipy's optimizers can't handle; so wrap this locally here
+    # make function handles for scipy
     step_count = Counter()
-    def _cb(x):
-        funcs.callback(x, step_count)
+    def cb(x):
+        estore.mesh.x = x.reshape(estore.mesh.x.shape)
+        _cb(estore, step_count)
         step_count["move"] += 1
+
+    def fun(x):
+        return estore.energy(x.reshape(estore.mesh.x.shape))
+
+    def grad(x):
+        return estore.gradient(x.reshape(estore.mesh.x.shape)).ravel()
 
     # run minimization
     options = {
@@ -306,10 +353,10 @@ def run_minim(estore, config):
         "disp": 0,
     }
     res = minimize(
-        funcs.fun,
+        fun,
         estore.mesh.x.ravel(),
-        jac=funcs.grad,
-        callback=_cb,
+        jac=grad,
+        callback=cb,
         method="L-BFGS-B",
         options=options
     )

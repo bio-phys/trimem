@@ -187,7 +187,6 @@ class MeshHMC(HMC):
 
     def step(self):
         super().step()
-        # make sure the mesh is consistent with the state from the base
         self.estore.mesh.x = self.x
 
 class MeshMutation:
@@ -297,4 +296,4 @@ class MeshMonteCarlo:
             self.step()
             for s in self.steps:
                 s.info()
-            self.cb(self.steps[0].estore.mesh.x, self.counter)
+            self.cb(self.steps[0].estore, self.counter)

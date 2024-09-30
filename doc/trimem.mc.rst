@@ -30,12 +30,6 @@ trimem.mc.config module
 .. automodule:: trimem.mc.config
    :members:
 
-trimem.mc.evaluators module
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. automodule:: trimem.mc.evaluators
-   :members:
-
 trimem.mc.hmc module
 ^^^^^^^^^^^^^^^^^^^^
 
