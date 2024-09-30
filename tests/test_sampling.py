@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 import trimem.core as m
-from trimem.mc.hmc import HMC, HMC, MeshFlips, MeshMonteCarlo
+from trimem.mc.hmc import HMC, MeshMutation, MeshMonteCarlo
 
 from util import icosahedron
 
@@ -48,7 +48,7 @@ def test_hmc():
         "time_step": 1.0e-1,
     }
 
-    hmc = HMC(mesh.x, energy, gradient, options=opt)
+    hmc = HMC(mesh.x, energy, gradient, **opt)
 
     hmc.run(10)
 

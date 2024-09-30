@@ -14,7 +14,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from .. import core as m
-from .hmc import HMC, MeshFlips, MeshMonteCarlo
+from .hmc import MeshHMC, MeshMutation, MeshMonteCarlo
 from .config import update_config_defaults, config_to_params, print_config
 from .output import make_output, create_backup, \
                     CheckpointWriter, CheckpointReader
@@ -197,6 +197,8 @@ def run_mc(estore, config):
     # initialize checkpoint writer
     cpt_writer = write_checkpoint_handle(config)
 
+    istep = config["GENERAL"].getint("info")
+
     # function, gradient and callback
     options = {
         "info_step":    config["GENERAL"].getint("info"),
@@ -208,38 +210,48 @@ def run_mc(estore, config):
     }
     funcs = TimingEnergyEvaluators(estore, output, options)
 
+    # list of single MC step to run on the mesh
+    steps = []
+
     # setup hmc to sample vertex positions
     cmc  = config["HMC"]
-    options = {
-        "mass":                  cmc.getfloat("momentum_variance"),
-        "time_step":             cmc.getfloat("step_size"),
-        "num_integration_steps": cmc.getint("traj_steps"),
-        "initial_temperature":   cmc.getfloat("initial_temperature"),
-        "cooling_factor":        cmc.getfloat("cooling_factor"),
-        "cooling_start_step":    cmc.getint("start_cooling"),
-        "info_step":             config["GENERAL"].getint("info"),
-    }
-    hmc = HMC(estore.mesh.x, funcs.fun, funcs.grad, options=options)
+    dt   = cmc.getfloat("step_size")
+    nts  = cmc.getint("traj_steps")
+    if not (dt == 0.0 or nts == 0):
+        options = {
+            "mass":                  cmc.getfloat("momentum_variance"),
+            "time_step":             dt,
+            "num_integration_steps": nts,
+            "initial_temperature":   cmc.getfloat("initial_temperature"),
+            "cooling_factor":        cmc.getfloat("cooling_factor"),
+            "cooling_start_step":    cmc.getint("start_cooling"),
+            "info_step":             istep,
+        }
+        options = {k: v for k,v in options.items() if not v is None}
+        steps.append(MeshHMC(estore, funcs.fun, funcs.grad, **options))
 
     # setup edge flips
-    options = {
-        "flip_type":  cmc["flip_type"],
-        "flip_ratio": cmc.getfloat("flip_ratio"),
-        "info_step":  config["GENERAL"].getint("info"),
-    }
-    flips = MeshFlips(estore.mesh, estore, options=options)
+    ft = cmc["flip_type"]
+    fr = cmc.getfloat("flip_ratio")
+    if not (ft == "none" or fr == 0.0):
+        if ft == "serial":
+            flip_func = m.flip
+        elif ft == "parallel":
+            flip_func = m.pflip
+        else:
+            raise ValueError("Wrong flip-type: {}".format(self.ft))
+        steps.append(
+            MeshMutation(estore, "flips", flip_func, rate=fr, info_step=istep)
+        )
 
     # initialize counters
     step_count = Counter(json.loads(cmc.get("init_step")))
 
     # setup combined-step markov chain
-    mmc = MeshMonteCarlo(hmc, flips, step_count, callback=funcs.callback)
+    mmc = MeshMonteCarlo(steps, step_count, callback=funcs.callback)
 
     # run sampling
     mmc.run(cmc.getint("num_steps"))
-
-    # update mesh
-    estore.mesh.x = hmc.x
 
     # write final checkpoint
     cpt_writer(estore, mmc.counter)

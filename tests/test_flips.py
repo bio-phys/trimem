@@ -56,4 +56,4 @@ def test_flips(params):
 
     acc = m.flip(estore, 0.5)
 
-    assert acc > 100
+    assert acc > 0.052 #i.e more than 100 flips
