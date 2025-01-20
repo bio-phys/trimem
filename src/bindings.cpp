@@ -607,7 +607,26 @@ void expose_parameters(py::module& m)
 
             :type: float
             )pbdoc"
-        );
+        )
+        .def_readwrite(
+            "alpha",
+            &ExternalPotentialParams::alpha,
+            R"pbdoc(
+            Angle of hole.
+              
+            :type: float
+            )pbdoc"
+        )
+        .def_readwrite(
+            "height",
+            &ExternalPotentialParams::height,
+            R"pbdoc(
+            Height of cylindrical body.
+            
+            :type: float
+            )pbdoc"
+        );  
+         
 
     py::class_<EnergyParams>(
         m,

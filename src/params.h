@@ -150,8 +150,11 @@ struct ExternalPotentialParams
 {
   std::string type              = "none";
   real epsilon                  = 1.0;
-  real sigma                    = 1.0;
+//  real sigma                    = 1.0;
+  ContinuationTuple sigma       = 1.0;
   ContinuationTuple radius      = 1.0;
+  ContinuationTuple alpha       = 1.0;
+  ContinuationTuple height      = 1.0;
 };
 
 struct EnergyParams

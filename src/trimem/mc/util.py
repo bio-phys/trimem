@@ -80,6 +80,9 @@ def write_checkpoint_handle(config):
                 "curvature_fraction": estore.eparams.curvature_fraction,
             },
             "EXTERNALPOTENTIAL": {
+                "alpha": estore.eparams.external_params.alpha,
+                "sigma": estore.eparams.external_params.sigma,
+                "height": estore.eparams.external_params.height,
                 "radius": estore.eparams.external_params.radius
             },
             "HMC": {
@@ -128,7 +131,10 @@ def read_checkpoint(config, restartnum):
             "curvature_fraction": conf["ENERGY"]["curvature_fraction"],
         },
         "EXTERNALPOTENTIAL": {
+            "alpha": conf["EXTERNALPOTENTIAL"]["alpha"],
             "radius": conf["EXTERNALPOTENTIAL"]["radius"],
+            "height": conf["EXTERNALPOTENTIAL"]["height"],
+            "sigma": conf["EXTERNALPOTENTIAL"]["sigma"],
         },
         "DEFAULT": {
             "init_step": conf["HMC"]["init_step"],

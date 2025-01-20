@@ -38,6 +38,9 @@ void EnergyManager::update()
     params.volume_fraction.update();
     params.curvature_fraction.update();
     params.external_params.radius.update();
+    params.external_params.height.update();
+    params.external_params.alpha.update();
+    params.external_params.sigma.update();
 }
 
 void EnergyManager::update_repulsion()

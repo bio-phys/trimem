@@ -100,6 +100,10 @@ sigma = 1.0
 # see `ENERGY.area_fraction` for parameter continuation
 radius = 1.0
 
+height = 1.0
+
+alpha = 1.0
+
 [ENERGY]
 # Helfrich functional weight
 kappa_b = 1.0
@@ -356,7 +360,16 @@ def config_to_params(config):
     exparams = m.ExternalPotentialParams()
     exparams.type    = ex["type"]
     exparams.epsilon = ex.getfloat("epsilon")
-    exparams.sigma   = ex.getfloat("sigma")
+    exparams.sigma  = m.ContinuationTuple(
+        _parse_continuation_specs(ex.get("sigma"))
+    )
+#    exparams.sigma   = ex.getfloat("sigma")
+    exparams.alpha  = m.ContinuationTuple(
+        _parse_continuation_specs(ex.get("alpha"))
+    )
+    exparams.height  = m.ContinuationTuple(
+        _parse_continuation_specs(ex.get("height"))
+    )
     exparams.radius  = m.ContinuationTuple(
         _parse_continuation_specs(ex.get("radius"))
     )
